@@ -1,0 +1,90 @@
+# GoReleaser 配置文件 - 仅 macOS 版本
+# 用于在 macOS 系统上只构建 macOS 版本
+
+version: 2
+
+project_name: realm
+
+# 发布配置
+release:
+  # GitHub发布配置
+  github:
+    owner: panyingyun  # 修改为你的GitHub用户名
+    name: realm     # 修改为你的仓库名
+  
+  # 发布模式：替换或跳过已存在的发布
+  mode: replace
+  
+  # 发布说明模板
+  header: |
+    ## {{ .ProjectName }} {{ .Tag }}
+    
+    发布版本 {{ .Tag }} (macOS)
+    
+  footer: |
+    ---
+    
+    由 [GoReleaser](https://github.com/goreleaser/goreleaser) 自动生成
+
+# 构建前钩子
+before:
+  hooks:
+    - go mod tidy
+    # 注意：如果 npm 不在 PATH 中，可以注释掉以下两行
+    # 前提是前端资源已经构建完成（frontend/dist 目录存在）
+    # - npm --prefix frontend install
+    # - npm --prefix frontend run build
+
+# 构建配置 - 仅 macOS
+builds:
+  # macOS 构建配置
+  # 注意：此构建需要在 macOS 系统上执行，需要安装 Xcode
+  - id: darwin
+    main: .
+    binary: realm
+    goos:
+      - darwin
+    goarch:
+      - amd64
+    # 环境变量 - macOS 平台
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    # 构建标签 - macOS 平台
+    tags:
+      - desktop
+      - production
+    ldflags:
+      - -s -w
+      - -X main.Version={{.Version}}
+      - -X main.GitCommit={{.Commit}}
+      - -X main.BuildTime={{.Date}}
+
+# 归档配置
+archives:
+  - id: darwin
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
+    formats:
+      - tar.gz
+    files:
+      - LICENSE
+      - README.md
+
+# 校验和配置
+checksum:
+  name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
+  algorithm: sha256
+
+# 快照配置
+snapshot: {}
+
+# Changelog配置
+changelog:
+  use: git
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^update:"

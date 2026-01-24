@@ -1,0 +1,110 @@
+# GoReleaser 配置文件 - Ubuntu 22.04
+# 用于在 Ubuntu 22.04 系统上构建 Linux 版本（使用 webkit2_40）
+
+version: 2
+
+# 项目名称
+project_name: realm
+
+# 发布配置
+release:
+  # GitHub发布配置
+  github:
+    owner: panyingyun  # 修改为你的GitHub用户名
+    name: realm     # 修改为你的仓库名
+  
+  # 发布模式：替换或跳过已存在的发布
+  mode: replace
+  
+  # 发布说明模板
+  header: |
+    ## {{ .ProjectName }} {{ .Tag }}
+    
+    发布版本 {{ .Tag }} (Ubuntu 22.04)
+    
+  footer: |
+    ---
+    
+    由 [GoReleaser](https://github.com/goreleaser/goreleaser) 自动生成
+
+# 构建前钩子 - 构建前端资源
+before:
+  hooks:
+    - go mod tidy
+    # 注意：如果 npm 不在 PATH 中，可以注释掉以下两行
+    # 前提是前端资源已经构建完成（frontend/dist 目录存在）
+    # - npm --prefix frontend install
+    # - npm --prefix frontend run build
+
+# 构建配置 - Ubuntu 22.04（webkit2_40）
+builds:
+  # Linux 构建配置 - Ubuntu 22.04（需要 webkit2_40 标签）
+  # 注意：此构建需要在 Ubuntu 22.04 系统上执行，需要安装 gcc 和 webkit2gtk-4.0-dev
+  - id: linux-webkit2_40
+    # 主程序入口
+    main: .
+    
+    # 二进制文件名称
+    binary: realm
+    
+    # 构建平台
+    goos:
+      - linux
+    
+    # 架构
+    goarch:
+      - amd64
+    
+    # 环境变量 - Linux 平台需要 CGO（Wails 需要）
+    env:
+      - CGO_ENABLED=1
+    
+    # 构建标志
+    flags:
+      - -trimpath
+    
+    # 构建标签 - Ubuntu 22.04 使用 webkit2_40
+    tags:
+      - webkit2_40
+      - desktop
+      - production
+    
+    # LDFlags
+    ldflags:
+      - -s -w
+      - -X main.Version={{.Version}}
+      - -X main.GitCommit={{.Commit}}
+      - -X main.BuildTime={{.Date}}
+
+# 归档配置
+archives:
+  # Ubuntu 22.04 归档配置（webkit2_40）
+  - id: linux-webkit2_40
+    # 文件名模板 - 包含 webkit 版本信息
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}_webkit2_40"
+    formats:
+      - tar.gz
+    # 包含的文件
+    files:
+      - LICENSE
+      - README.md
+
+# 校验和配置
+checksum:
+  name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
+  algorithm: sha256
+
+# 快照配置（用于测试）
+snapshot: {}
+
+# Changelog配置
+changelog:
+  # 使用git日志生成changelog
+  use: git
+  # 过滤提交信息
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^update:"

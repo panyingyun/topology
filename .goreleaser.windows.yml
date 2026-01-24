@@ -1,0 +1,62 @@
+# GoReleaser 配置文件 - 仅 Windows 版本
+# 用于在 Windows 系统上只构建 Windows 版本
+
+version: 2
+
+project_name: topology
+
+# 构建前钩子
+before:
+  hooks:
+    - go mod tidy
+
+# 构建配置 - 仅 Windows
+builds:
+  - id: windows
+    main: .
+    binary: topology
+    goos:
+      - windows
+    goarch:
+      - amd64
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    tags:
+      - desktop
+      - production
+    ldflags:
+      - -s -w
+      - -H=windowsgui
+      - -X main.Version={{.Version}}
+      - -X main.GitCommit={{.Commit}}
+      - -X main.BuildTime={{.Date}}
+
+# 归档配置
+archives:
+  - id: windows
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
+    formats:
+      - zip
+    files:
+      - LICENSE
+      - README.md
+
+# 校验和配置
+checksum:
+  name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
+  algorithm: sha256
+
+# 快照配置
+snapshot: {}
+
+# Changelog配置
+changelog:
+  use: git
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^update:"
