@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { MainPage } from './pages/MainPage';
 import { MainLayout } from './pages/MainLayout';
 import { Connections } from './pages/Connections';
 import { QueryEditor } from './pages/QueryEditor';
@@ -11,7 +12,8 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Connections />} />
+        <Route path="/" element={<MainPage />} />
+        <Route path="/connections" element={<Connections />} />
         <Route element={<MainLayout />}>
           <Route path="/query/:connectionId?" element={<QueryEditor />} />
           <Route path="/table/:connectionId/:tableName" element={<QueryEditor />} />

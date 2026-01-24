@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { Outlet, useNavigate } from 'react-router-dom';
 import { Connection, Table } from '../types';
 import { connectionService } from '../services/connectionService';
 import { tableService } from '../services/tableService';
@@ -12,7 +12,6 @@ export const MainLayout: React.FC = () => {
   const [selectedTable, setSelectedTable] = useState<string | undefined>();
   const [tables, setTables] = useState<Table[]>([]);
   const navigate = useNavigate();
-  const location = useLocation();
 
   useEffect(() => {
     loadConnections();

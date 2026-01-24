@@ -14,16 +14,6 @@ export const QueryEditor: React.FC = () => {
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [showOptimized, setShowOptimized] = useState(false);
   const editorRef = useRef<HTMLTextAreaElement>(null);
-  const [lineNumbers, setLineNumbers] = useState<string[]>(['1']);
-
-  useEffect(() => {
-    updateLineNumbers();
-  }, [sql]);
-
-  const updateLineNumbers = () => {
-    const lines = sql.split('\n');
-    setLineNumbers(lines.map((_, i) => (i + 1).toString()));
-  };
 
   const handleExecute = async () => {
     if (!sql.trim()) return;

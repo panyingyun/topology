@@ -32,7 +32,7 @@ export function highlightSQL(sql: string): HighlightedToken[] {
 
   // Find comments
   const commentRegex = /(--.*$|\/\*[\s\S]*?\*\/)/gm;
-  let match;
+  let match: RegExpExecArray | null;
   while ((match = commentRegex.exec(sql)) !== null) {
     matches.push({
       start: match.index,
@@ -56,12 +56,13 @@ export function highlightSQL(sql: string): HighlightedToken[] {
   // Find numbers
   const numberRegex = /\b\d+\.?\d*\b/g;
   while ((match = numberRegex.exec(sql)) !== null) {
+    const matchIndex = match.index;
     // Check if it's not inside a string or comment
     const isInsideString = matches.some(
-      m => m.type === 'string' && match!.index >= m.start && match!.index < m.end
+      m => m.type === 'string' && matchIndex >= m.start && matchIndex < m.end
     );
     const isInsideComment = matches.some(
-      m => m.type === 'comment' && match!.index >= m.start && match!.index < m.end
+      m => m.type === 'comment' && matchIndex >= m.start && matchIndex < m.end
     );
     if (!isInsideString && !isInsideComment) {
       matches.push({
@@ -76,12 +77,13 @@ export function highlightSQL(sql: string): HighlightedToken[] {
   // Find keywords
   const keywordRegex = new RegExp(`\\b(${SQL_KEYWORDS.join('|')})\\b`, 'gi');
   while ((match = keywordRegex.exec(sql)) !== null) {
+    const matchIndex = match.index;
     // Check if it's not inside a string or comment
     const isInsideString = matches.some(
-      m => m.type === 'string' && match!.index >= m.start && match!.index < m.end
+      m => m.type === 'string' && matchIndex >= m.start && matchIndex < m.end
     );
     const isInsideComment = matches.some(
-      m => m.type === 'comment' && match!.index >= m.start && match!.index < m.end
+      m => m.type === 'comment' && matchIndex >= m.start && matchIndex < m.end
     );
     if (!isInsideString && !isInsideComment) {
       matches.push({

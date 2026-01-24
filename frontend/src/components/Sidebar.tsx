@@ -39,7 +39,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <span className="material-symbols-outlined">database</span>
         </div>
         <div>
-          <h1 className="font-bold text-lg leading-tight tracking-tight">DB Studio</h1>
+          <h1 className="font-bold text-lg leading-tight tracking-tight">Topology</h1>
           <p className="text-[10px] text-[#616289] font-semibold dark:text-gray-400 uppercase tracking-widest">Enterprise</p>
         </div>
       </div>

@@ -3,6 +3,7 @@ import { QueryResult } from '../types';
 
 interface DataTableProps {
   data: QueryResult;
+  queryText?: string;
   onUpdate?: (rowIndex: number, column: string, value: any) => void;
   onAddRow?: () => void;
   onDeleteRow?: (rowIndex: number) => void;
@@ -11,6 +12,7 @@ interface DataTableProps {
 
 export const DataTable: React.FC<DataTableProps> = ({
   data,
+  queryText,
   onUpdate,
   onAddRow,
   onDeleteRow,

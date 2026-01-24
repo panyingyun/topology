@@ -63,42 +63,42 @@ type Index struct {
 }
 
 type ForeignKey struct {
-	Name             string   `json:"name"`
-	Columns          []string `json:"columns"`
-	ReferencedTable  string   `json:"referencedTable"`
+	Name              string   `json:"name"`
+	Columns           []string `json:"columns"`
+	ReferencedTable   string   `json:"referencedTable"`
 	ReferencedColumns []string `json:"referencedColumns"`
-	OnDelete         string   `json:"onDelete,omitempty"`
-	OnUpdate         string   `json:"onUpdate,omitempty"`
+	OnDelete          string   `json:"onDelete,omitempty"`
+	OnUpdate          string   `json:"onUpdate,omitempty"`
 }
 
 type TableSchema struct {
-	Name        string      `json:"name"`
-	Columns     []Column    `json:"columns"`
-	Indexes     []Index     `json:"indexes"`
+	Name        string       `json:"name"`
+	Columns     []Column     `json:"columns"`
+	Indexes     []Index      `json:"indexes"`
 	ForeignKeys []ForeignKey `json:"foreignKeys"`
 }
 
 type QueryResult struct {
-	Columns      []string               `json:"columns"`
-	Rows         []map[string]interface{} `json:"rows"`
-	RowCount     int                    `json:"rowCount"`
-	ExecutionTime int                   `json:"executionTime,omitempty"`
-	Error        string                 `json:"error,omitempty"`
+	Columns       []string                 `json:"columns"`
+	Rows          []map[string]interface{} `json:"rows"`
+	RowCount      int                      `json:"rowCount"`
+	ExecutionTime int                      `json:"executionTime,omitempty"`
+	Error         string                   `json:"error,omitempty"`
 }
 
 type OptimizedSQL struct {
-	Original      string   `json:"original"`
-	Optimized     string   `json:"optimized"`
-	Suggestions   []string `json:"suggestions"`
-	PerformanceGain string `json:"performanceGain,omitempty"`
+	Original        string   `json:"original"`
+	Optimized       string   `json:"optimized"`
+	Suggestions     []string `json:"suggestions"`
+	PerformanceGain string   `json:"performanceGain,omitempty"`
 }
 
 type TableData struct {
-	Columns   []string               `json:"columns"`
+	Columns   []string                 `json:"columns"`
 	Rows      []map[string]interface{} `json:"rows"`
-	TotalRows int                    `json:"totalRows"`
-	Page      int                    `json:"page"`
-	PageSize  int                    `json:"pageSize"`
+	TotalRows int                      `json:"totalRows"`
+	Page      int                      `json:"page"`
+	PageSize  int                      `json:"pageSize"`
 }
 
 // Mock data storage
@@ -215,7 +215,7 @@ func (a *App) ExecuteQuery(connectionID, sql string) string {
 				"created_at": "2023-10-24 14:10:02",
 			},
 		},
-		RowCount:     1000,
+		RowCount:      1000,
 		ExecutionTime: 42,
 	}
 
@@ -236,8 +236,8 @@ func (a *App) OptimizeSQL(sql string) string {
 	}
 
 	result := OptimizedSQL{
-		Original:    sql,
-		Optimized:   optimized,
+		Original:  sql,
+		Optimized: optimized,
 		Suggestions: []string{
 			"Added index hint for primary key range",
 			"Filtered specific columns instead of SELECT *",

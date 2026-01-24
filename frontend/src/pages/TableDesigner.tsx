@@ -70,7 +70,7 @@ export const TableDesigner: React.FC = () => {
             <span className="material-symbols-outlined">database</span>
           </div>
           <div>
-            <h1 className="font-bold text-lg leading-tight">DB Studio</h1>
+            <h1 className="font-bold text-lg leading-tight">Topology</h1>
             <p className="text-xs text-[#616289] dark:text-gray-400">Pro Workspace</p>
           </div>
         </div>
