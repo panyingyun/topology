@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Import &amp; Export Wizard - DB Studio</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#6467f2",
+                        "emerald-status": "#10B981",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#101122",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.5rem",
+                        "lg": "1rem",
+                        "xl": "1.5rem",
+                        "3xl": "1.5rem",
+                        "full": "9999px"
+                    },
+                    boxShadow: {
+                        'neu-flat': '20px 20px 60px #d1d1d6, -20px -20px 60px #ffffff',
+                        'neu-inset': 'inset 6px 6px 12px #d1d1d6, inset -6px -6px 12px #ffffff',
+                        'glass': '0 8px 32px 0 rgba(31, 38, 135, 0.07)',
+                    }
+                },
+            },
+        }
+    </script>
+<style type="text/tailwindcss">
+        @layer base {
+            body {
+                @apply bg-background-light text-[#111118] font-['Inter'] dark:bg-background-dark dark:text-white transition-colors duration-300;
+            }
+        }
+        .glass-sidebar {
+            background: rgba(255, 255, 255, 0.4);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-right: 1px solid #E2E8F0;
+        }
+        .dark .glass-sidebar {
+            background: rgba(16, 17, 34, 0.6);
+            border-right: 1px solid #1e293b;
+        }
+        .neumorphic-card {
+            background: #f6f6f8;
+            box-shadow: 20px 20px 60px #d1d1d6, -20px -20px 60px #ffffff;
+        }
+        .dark .neumorphic-card {
+            background: #101122;
+            box-shadow: 10px 10px 30px #080811, -10px -10px 30px #181a33;
+        }
+        .neumorphic-inset {
+            box-shadow: inset 4px 4px 8px #d1d1d6, inset -4px -4px 8px #ffffff;
+        }
+        .dark .neumorphic-inset {
+            box-shadow: inset 4px 4px 8px #080811, inset -4px -4px 8px #181a33;
+        }
+        .glass-modal {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .dark .glass-modal {
+            background: rgba(16, 17, 34, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #e2e8f0;
+            border-radius: 10px;
+        }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #1e293b;
+        }
+    </style>
+</head>
+<body class="min-h-screen overflow-hidden">
+<div class="flex h-screen overflow-hidden">
+<aside class="glass-sidebar w-72 flex flex-col z-10">
+<div class="p-6 flex items-center gap-3">
+<div class="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-white">
+<span class="material-symbols-outlined">database</span>
+</div>
+<div>
+<h1 class="font-bold text-lg leading-tight">DB Studio</h1>
+<p class="text-xs text-[#616289] dark:text-gray-400">Pro Workspace</p>
+</div>
+</div>
+<div class="px-6 py-4">
+<div class="neumorphic-inset bg-background-light dark:bg-background-dark rounded-xl flex items-center px-4 h-11">
+<span class="material-symbols-outlined text-gray-400 text-[20px]">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-sm w-full placeholder:text-gray-400" placeholder="Search databases..." type="text"/>
+</div>
+</div>
+<nav class="flex-1 overflow-y-auto px-4 custom-scrollbar">
+<div class="space-y-6">
+<div>
+<div class="flex items-center justify-between px-2 mb-2">
+<span class="text-[11px] font-bold uppercase tracking-wider text-[#616289]">Data Operations</span>
+</div>
+<div class="space-y-1">
+<div class="flex items-center gap-3 px-3 py-2 rounded-xl bg-primary/10 text-primary border border-primary/20">
+<span class="material-symbols-outlined text-[20px]">swap_vertical_circle</span>
+<span class="text-sm font-medium">Import &amp; Export</span>
+</div>
+<div class="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer group">
+<span class="material-symbols-outlined text-[20px] text-[#616289]">schema</span>
+<span class="text-sm font-medium">Schema Sync</span>
+</div>
+<div class="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer group">
+<span class="material-symbols-outlined text-[20px] text-[#616289]">history</span>
+<span class="text-sm font-medium">Backup Logs</span>
+</div>
+</div>
+</div>
+<div>
+<div class="flex items-center justify-between px-2 mb-2">
+<span class="text-[11px] font-bold uppercase tracking-wider text-[#616289]">Sources</span>
+<span class="material-symbols-outlined text-[16px] cursor-pointer">expand_more</span>
+</div>
+<div class="space-y-1">
+<div class="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-[20px] text-[#616289]">storage</span>
+<span class="text-sm font-medium">Production PG</span>
+<div class="ml-auto w-2 h-2 rounded-full bg-emerald-status shadow-[0_0_8px_#10B981]"></div>
+</div>
+</div>
+</div>
+</div>
+</nav>
+<div class="p-4 border-t border-[#E2E8F0] dark:border-gray-800">
+<div class="flex items-center gap-3 p-2 rounded-xl bg-white/30 dark:bg-white/5">
+<div class="w-8 h-8 rounded-full bg-center bg-cover" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAwOcKqRMBcLN5N7pVZ4mO0JqaNpv93zlHW63aZLcefcG8nZnGPpF2yiFtt1vUtMxni-BgeA01hLC2pbn8xQ1B3xicYepji3Ltmysuyxj5RHlLkWABI8-qlmmif1kFgzqOVMk17i9ayVC9ayb2_1CxSNozF8WdLVGFnNcTDPIfhWPZou8fBPHj8GAf9cVwFJO669Sijy59c2xOIYhsNi_E4PFUQdj23vrUVXYl9d7zMIVNIeqqNodorpZB_tZEzhlgpQbWf9wT_dr0')"></div>
+<div class="flex-1 min-w-0">
+<p class="text-xs font-bold truncate">Alex Rivera</p>
+<p class="text-[10px] text-[#616289]">Admin Access</p>
+</div>
+<span class="material-symbols-outlined text-[18px] text-[#616289]">settings</span>
+</div>
+</div>
+</aside>
+<main class="flex-1 overflow-y-auto bg-background-light dark:bg-background-dark relative blur-sm grayscale-[0.2] brightness-75">
+<div class="px-10 pt-8 flex items-center justify-between">
+<div class="flex items-center gap-2 text-sm">
+<a class="text-[#616289] hover:text-primary transition-colors" href="#">Data Ops</a>
+<span class="text-[#616289]">/</span>
+<span class="font-semibold text-[#111118] dark:text-white">Import &amp; Export Wizard</span>
+</div>
+<div class="flex gap-4">
+<button class="w-10 h-10 rounded-xl neumorphic-card flex items-center justify-center text-[#616289]">
+<span class="material-symbols-outlined">help_outline</span>
+</button>
+<button class="flex items-center gap-2 px-4 py-2 rounded-xl neumorphic-card text-[#616289] font-medium text-sm">
+<span class="material-symbols-outlined text-[20px]">schedule</span>
+                    History
+                </button>
+</div>
+</div>
+<div class="max-w-6xl mx-auto px-10 py-10">
+<div class="mb-10 text-center">
+<h2 class="text-4xl font-extrabold text-[#111118] dark:text-white tracking-tight mb-3">Import &amp; Export Wizard</h2>
+<p class="text-[#616289] dark:text-gray-400">Migrate your data effortlessly between formats and clusters.</p>
+</div>
+<div class="grid grid-cols-2 gap-8 mb-12">
+<div class="neumorphic-card p-8 rounded-3xl border-2 border-primary ring-4 ring-primary/5 cursor-pointer relative overflow-hidden group">
+<div class="flex items-start justify-between">
+<div>
+<div class="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary mb-6">
+<span class="material-symbols-outlined text-4xl">upload_file</span>
+</div>
+<h3 class="text-2xl font-bold mb-2">Data Import</h3>
+<p class="text-sm text-[#616289] leading-relaxed">Import CSV, JSON, or SQL dump files directly into your selected database tables.</p>
+</div>
+<div class="absolute -right-4 -bottom-4 opacity-10 group-hover:opacity-20 transition-opacity">
+<span class="material-symbols-outlined text-9xl">download</span>
+</div>
+</div>
+</div>
+<div class="neumorphic-card p-8 rounded-3xl border border-white/40 dark:border-white/5 cursor-pointer hover:scale-[1.01] transition-transform relative overflow-hidden group">
+<div class="flex items-start justify-between">
+<div>
+<div class="w-14 h-14 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 mb-6">
+<span class="material-symbols-outlined text-4xl">download_for_offline</span>
+</div>
+<h3 class="text-2xl font-bold mb-2">Data Export</h3>
+<p class="text-sm text-[#616289] leading-relaxed">Extract tables or query results into structured formats including Excel, Parquet, and XML.</p>
+</div>
+<div class="absolute -right-4 -bottom-4 opacity-10 group-hover:opacity-20 transition-opacity">
+<span class="material-symbols-outlined text-9xl">file_export</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
+<div class="glass-modal w-[600px] rounded-[24px] shadow-2xl p-8 transform scale-100 opacity-100">
+<div class="flex justify-between items-start mb-8">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-2xl bg-emerald-status/10 flex items-center justify-center text-emerald-status">
+<span class="material-symbols-outlined text-3xl">file_export</span>
+</div>
+<div>
+<h2 class="text-2xl font-bold text-[#111118] dark:text-white">Data Export Wizard</h2>
+<p class="text-sm text-[#616289] dark:text-gray-400">Configure your data extraction parameters</p>
+</div>
+</div>
+<button class="w-10 h-10 rounded-full hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-center text-[#616289] transition-colors">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<div class="space-y-8">
+<section>
+<label class="block text-sm font-bold text-[#616289] mb-4 uppercase tracking-wider">Export Format</label>
+<div class="grid grid-cols-3 gap-4">
+<button class="flex flex-col items-center gap-2 p-4 rounded-2xl neumorphic-inset bg-background-light dark:bg-background-dark border-2 border-emerald-status/50 text-emerald-status ring-2 ring-emerald-status/10">
+<span class="material-symbols-outlined text-2xl">csv</span>
+<span class="text-xs font-bold">CSV</span>
+</button>
+<button class="flex flex-col items-center gap-2 p-4 rounded-2xl neumorphic-card hover:bg-white/50 transition-all text-[#616289]">
+<span class="material-symbols-outlined text-2xl">table_view</span>
+<span class="text-xs font-bold">Excel</span>
+</button>
+<button class="flex flex-col items-center gap-2 p-4 rounded-2xl neumorphic-card hover:bg-white/50 transition-all text-[#616289]">
+<span class="material-symbols-outlined text-2xl">terminal</span>
+<span class="text-xs font-bold">SQL Dump</span>
+</button>
+</div>
+</section>
+<section>
+<label class="block text-sm font-bold text-[#616289] mb-4 uppercase tracking-wider">Target Source</label>
+<div class="neumorphic-inset bg-background-light dark:bg-background-dark rounded-2xl p-2">
+<div class="flex items-center gap-3 p-3 rounded-xl bg-white dark:bg-[#1a1c36] shadow-sm">
+<div class="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-xl">database</span>
+</div>
+<div class="flex-1">
+<p class="text-sm font-bold">production_db_replica</p>
+<p class="text-[10px] text-[#616289]">Public Schema • 24 Tables</p>
+</div>
+<span class="material-symbols-outlined text-[#616289] cursor-pointer">expand_more</span>
+</div>
+</div>
+</section>
+<section>
+<label class="block text-sm font-bold text-[#616289] mb-4 uppercase tracking-wider">Data Range Settings</label>
+<div class="grid grid-cols-2 gap-4">
+<div>
+<p class="text-xs font-semibold text-[#616289] mb-2 px-1">Row Limit</p>
+<div class="neumorphic-inset bg-background-light dark:bg-background-dark rounded-xl h-11 flex items-center px-4">
+<input class="bg-transparent border-none focus:ring-0 text-sm font-bold w-full" type="number" value="1000"/>
+</div>
+</div>
+<div>
+<p class="text-xs font-semibold text-[#616289] mb-2 px-1">Filter by Date</p>
+<div class="neumorphic-inset bg-background-light dark:bg-background-dark rounded-xl h-11 flex items-center px-4">
+<select class="bg-transparent border-none focus:ring-0 w-full text-sm font-medium appearance-none">
+<option>Last 30 Days</option>
+<option>All Time</option>
+<option>Custom Range</option>
+</select>
+</div>
+</div>
+</div>
+</section>
+<div class="flex gap-4 pt-4">
+<button class="flex-1 py-4 rounded-2xl bg-emerald-status text-white font-bold shadow-xl shadow-emerald-500/20 hover:shadow-emerald-500/30 transition-all transform active:scale-[0.98] flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-xl">bolt</span>
+                        Start Export
+                    </button>
+<button class="px-8 py-4 rounded-2xl neumorphic-card text-[#616289] font-bold hover:text-red-500 transition-colors">
+                        Cancel
+                    </button>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+</body></html>

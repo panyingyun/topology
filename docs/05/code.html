@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Table Schema Designer - DB Studio</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#6467f2",
+                        "emerald-status": "#10B981",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#101122",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.5rem",
+                        "lg": "1rem",
+                        "xl": "1.5rem",
+                        "3xl": "1.5rem", 
+                        "full": "9999px"
+                    }
+                },
+            },
+        }
+    </script>
+<style type="text/tailwindcss">
+        @layer base {
+            body {
+                font-family: 'Inter', sans-serif;
+            }
+        }
+        .glass-sidebar {
+            background: rgba(255, 255, 255, 0.4);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-right: 1px solid #E2E8F0;
+        }
+        .dark .glass-sidebar {
+            background: rgba(16, 17, 34, 0.6);
+            border-right: 1px solid #1e293b;
+        }
+        .neumorphic-card {
+            background: #f6f6f8;
+            box-shadow: 10px 10px 30px #d1d1d6, -10px -10px 30px #ffffff;
+        }
+        .dark .neumorphic-card {
+            background: #101122;
+            box-shadow: 10px 10px 30px #080811, -10px -10px 30px #181a33;
+        }
+        .neumorphic-inset {
+            box-shadow: inset 4px 4px 8px #d1d1d6, inset -4px -4px 8px #ffffff;
+        }
+        .dark .neumorphic-inset {
+            box-shadow: inset 4px 4px 8px #080811, inset -4px -4px 8px #181a33;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(100, 103, 242, 0.2);
+            border-radius: 10px;
+        }
+        .modal-overlay {
+            backdrop-filter: blur(12px);
+            background: rgba(0, 0, 0, 0.3);
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark min-h-screen text-[#111118] dark:text-white transition-colors duration-300">
+<div class="flex h-screen overflow-hidden">
+<aside class="glass-sidebar w-72 flex flex-col z-10">
+<div class="p-6 flex items-center gap-3">
+<div class="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/20">
+<span class="material-symbols-outlined">database</span>
+</div>
+<div>
+<h1 class="font-bold text-lg leading-tight">DB Studio</h1>
+<p class="text-xs text-[#616289] dark:text-gray-400">Pro Workspace</p>
+</div>
+</div>
+<div class="px-6 py-4">
+<div class="neumorphic-inset bg-background-light dark:bg-background-dark rounded-xl flex items-center px-4 h-11">
+<span class="material-symbols-outlined text-gray-400 text-[20px]">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-sm w-full placeholder:text-gray-400" placeholder="Search tables..." type="text"/>
+</div>
+</div>
+<nav class="flex-1 overflow-y-auto px-4 custom-scrollbar">
+<div class="space-y-6">
+<div>
+<div class="flex items-center justify-between px-2 mb-2">
+<span class="text-[11px] font-bold uppercase tracking-wider text-[#616289]">ecommerce_prod</span>
+<span class="material-symbols-outlined text-[16px] cursor-pointer">settings</span>
+</div>
+<div class="space-y-1">
+<div class="flex items-center gap-3 px-3 py-2 rounded-xl bg-primary/10 text-primary border border-primary/20">
+<span class="material-symbols-outlined text-[20px]">table_rows</span>
+<span class="text-sm font-medium">users</span>
+</div>
+<div class="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer group">
+<span class="material-symbols-outlined text-[20px] text-[#616289]">table_rows</span>
+<span class="text-sm font-medium">orders</span>
+</div>
+<div class="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer group">
+<span class="material-symbols-outlined text-[20px] text-[#616289]">table_rows</span>
+<span class="text-sm font-medium">products</span>
+</div>
+</div>
+</div>
+</div>
+</nav>
+<div class="p-4 border-t border-[#E2E8F0] dark:border-gray-800">
+<button class="w-full bg-primary text-white font-semibold py-3 rounded-xl shadow-lg shadow-primary/30 flex items-center justify-center gap-2 hover:brightness-110 transition-all">
+<span class="material-symbols-outlined text-[20px]">add_box</span>
+                New Table
+            </button>
+</div>
+</aside>
+<main class="flex-1 overflow-y-auto bg-background-light dark:bg-background-dark p-10">
+<div class="flex items-center justify-between mb-8">
+<div class="flex items-center gap-2 text-sm">
+<a class="text-[#616289] hover:text-primary transition-colors" href="#">ecommerce_prod</a>
+<span class="text-[#616289]">/</span>
+<span class="font-semibold text-[#111118] dark:text-white">Tables</span>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-3 bg-white/50 dark:bg-white/5 px-3 py-1.5 rounded-full border border-white/20">
+<div class="w-7 h-7 rounded-full bg-center bg-cover" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBFEHjg4FN8H2lHSuO1kCPx53xHY5eyHanGY-KGZAqbdNT67WwABGoc68mQN5FU-MtI43R4mGOGHpaPE4T3AEmHyWxoPC5sfyrPx7ftP4T0CIJZFNZB5ufEigFmCJdJ69ehusZBsJI7caKpUuGdmYrr7zfRAlyYXvTQ4uUI8lbcxv5d3Ge6aaQMzMKbByTjblZwHehEK4VBUzEPp6Y6APUXLHEq4XR1jdboQY54e5csgW88oxLQGlViu18jtLFD24kHpuLOxA5RiW4')"></div>
+<span class="text-sm font-medium">Alex Rivera</span>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-3 gap-6">
+<div class="neumorphic-card h-40 rounded-3xl p-6"></div>
+<div class="neumorphic-card h-40 rounded-3xl p-6"></div>
+<div class="neumorphic-card h-40 rounded-3xl p-6"></div>
+</div>
+</main>
+<div class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 lg:p-8 modal-overlay">
+<div class="bg-[#FFFFFF] dark:bg-[#101122] w-full max-w-5xl max-h-[90vh] flex flex-col rounded-[24px] border border-[#E2E8F0] dark:border-[#1e293b] shadow-2xl overflow-hidden">
+<div class="px-8 py-6 border-b border-[#E2E8F0] dark:border-white/5 flex items-center justify-between bg-white/50 dark:bg-white/5 backdrop-blur-sm">
+<div>
+<div class="flex items-center gap-3 mb-1">
+<span class="material-symbols-outlined text-primary text-2xl font-bold">table_rows</span>
+<h2 class="text-2xl font-bold text-[#111118] dark:text-white tracking-tight">Table Designer</h2>
+</div>
+<p class="text-sm text-[#616289] dark:text-gray-400">Editing <span class="font-mono bg-primary/10 text-primary px-2 py-0.5 rounded">users</span> schema</p>
+</div>
+<button class="w-10 h-10 rounded-full hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-center transition-colors">
+<span class="material-symbols-outlined text-[#616289]">close</span>
+</button>
+</div>
+<div class="flex-1 overflow-y-auto p-8 custom-scrollbar">
+<div class="border border-[#E2E8F0] dark:border-white/5 rounded-2xl overflow-hidden mb-8">
+<div class="overflow-x-auto">
+<table class="w-full text-left">
+<thead class="bg-gray-50 dark:bg-white/5">
+<tr>
+<th class="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-[#616289]">Name</th>
+<th class="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-[#616289]">Type</th>
+<th class="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-[#616289]">PK</th>
+<th class="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-[#616289]">Not Null</th>
+<th class="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-[#616289]">Unique</th>
+<th class="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-[#616289]">Default</th>
+<th class="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-[#616289]"></th>
+</tr>
+</thead>
+<tbody class="divide-y divide-black/5 dark:divide-white/5">
+<tr class="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors">
+<td class="px-6 py-3">
+<input class="bg-transparent border-none focus:ring-1 focus:ring-primary rounded text-sm font-medium w-full" type="text" value="id"/>
+</td>
+<td class="px-6 py-3">
+<select class="bg-transparent border-none focus:ring-1 focus:ring-primary rounded text-sm w-full">
+<option>BIGINT (AUTO_INC)</option>
+<option>INT</option>
+<option>VARCHAR</option>
+</select>
+</td>
+<td class="px-6 py-3"><input checked="" class="rounded text-primary focus:ring-primary h-4 w-4" type="checkbox"/></td>
+<td class="px-6 py-3"><input checked="" class="rounded text-primary focus:ring-primary h-4 w-4" type="checkbox"/></td>
+<td class="px-6 py-3"><input checked="" class="rounded text-primary focus:ring-primary h-4 w-4" type="checkbox"/></td>
+<td class="px-6 py-3"><span class="text-xs text-[#616289] italic">NULL</span></td>
+<td class="px-6 py-3 text-right">
+<button class="text-[#616289] hover:text-red-500"><span class="material-symbols-outlined text-sm">delete</span></button>
+</td>
+</tr>
+<tr class="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors">
+<td class="px-6 py-3">
+<input class="bg-transparent border-none focus:ring-1 focus:ring-primary rounded text-sm font-medium w-full" type="text" value="email"/>
+</td>
+<td class="px-6 py-3">
+<select class="bg-transparent border-none focus:ring-1 focus:ring-primary rounded text-sm w-full">
+<option>VARCHAR(255)</option>
+<option>TEXT</option>
+</select>
+</td>
+<td class="px-6 py-3"><input class="rounded text-primary focus:ring-primary h-4 w-4" type="checkbox"/></td>
+<td class="px-6 py-3"><input checked="" class="rounded text-primary focus:ring-primary h-4 w-4" type="checkbox"/></td>
+<td class="px-6 py-3"><input checked="" class="rounded text-primary focus:ring-primary h-4 w-4" type="checkbox"/></td>
+<td class="px-6 py-3"><span class="text-xs text-[#616289] italic">NULL</span></td>
+<td class="px-6 py-3 text-right">
+<button class="text-[#616289] hover:text-red-500"><span class="material-symbols-outlined text-sm">delete</span></button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="p-3 bg-gray-50/50 dark:bg-white/5 border-t border-black/5 dark:border-white/5 flex justify-center">
+<button class="flex items-center gap-2 text-primary font-bold text-sm hover:underline">
+<span class="material-symbols-outlined">add</span> Add New Column
+                        </button>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<div class="p-6 rounded-2xl border border-[#E2E8F0] dark:border-white/5 bg-gray-50/30 dark:bg-white/2">
+<h3 class="font-bold mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">key</span>
+                            Indexes &amp; Keys
+                        </h3>
+<div class="space-y-3">
+<div class="flex items-center justify-between p-3 neumorphic-inset rounded-xl bg-background-light dark:bg-background-dark">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-emerald-status text-lg">check_circle</span>
+<div>
+<p class="text-sm font-semibold">PRIMARY_KEY</p>
+<p class="text-[10px] text-[#616289]">Columns: id</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-sm text-[#616289] cursor-pointer hover:text-primary">edit</span>
+</div>
+<div class="flex items-center justify-between p-3 neumorphic-inset rounded-xl bg-background-light dark:bg-background-dark">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-emerald-status text-lg">check_circle</span>
+<div>
+<p class="text-sm font-semibold">idx_users_email</p>
+<p class="text-[10px] text-[#616289]">Columns: email (Unique)</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-sm text-[#616289] cursor-pointer hover:text-primary">edit</span>
+</div>
+</div>
+</div>
+<div class="p-6 rounded-2xl border border-[#E2E8F0] dark:border-white/5 bg-gray-50/30 dark:bg-white/2">
+<h3 class="font-bold mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">link</span>
+                            Foreign Keys
+                        </h3>
+<div class="flex flex-col items-center justify-center h-28 border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-xl">
+<span class="material-symbols-outlined text-gray-400 mb-2">add_link</span>
+<p class="text-xs text-[#616289]">No relations defined</p>
+<button class="mt-2 text-[10px] font-bold text-primary uppercase tracking-wider">Add Foreign Key</button>
+</div>
+</div>
+</div>
+</div>
+<div class="px-8 py-6 border-t border-[#E2E8F0] dark:border-white/5 flex items-center justify-between bg-gray-50 dark:bg-white/2">
+<div class="flex gap-3">
+<button class="px-6 py-2.5 rounded-xl border border-[#E2E8F0] dark:border-white/10 font-semibold text-[#616289] hover:bg-white dark:hover:bg-white/5 transition-all flex items-center gap-2">
+                        Cancel
+                    </button>
+</div>
+<div class="flex gap-3">
+<button class="px-6 py-2.5 rounded-xl neumorphic-card font-semibold text-[#616289] flex items-center gap-2 hover:brightness-105">
+<span class="material-symbols-outlined text-sm">code</span> SQL Preview
+                    </button>
+<button class="px-8 py-2.5 rounded-xl bg-primary text-white font-bold shadow-xl shadow-primary/25 hover:shadow-primary/40 transition-all flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">save</span> Apply Changes
+                    </button>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+</body></html>

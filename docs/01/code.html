@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SQL Editor with AI Optimization Integration</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#6366F1",
+                        "emerald-status": "#10B981",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#101122",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.5rem",
+                        "lg": "1rem",
+                        "xl": "1.5rem",
+                        "3xl": "1.5rem",
+                        "full": "9999px"
+                    },
+                    boxShadow: {
+                        'neu-flat': '20px 20px 60px #d1d1d6, -20px -20px 60px #ffffff',
+                        'neu-inset': 'inset 6px 6px 12px #d1d1d6, inset -6px -6px 12px #ffffff',
+                    }
+                },
+            },
+        }
+    </script>
+<style type="text/tailwindcss">
+        @layer base {
+            body {
+                @apply bg-background-light dark:bg-background-dark text-[#111118] dark:text-white font-['Inter'];
+            }
+        }
+        .glass-sidebar {
+            background: rgba(255, 255, 255, 0.4);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-right: 1px solid #E2E8F0;
+        }
+        .dark .glass-sidebar {
+            background: rgba(16, 17, 34, 0.6);
+            border-right: 1px solid #1e293b;
+        }
+        .glass-header {
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid #E2E8F0;
+        }
+        .dark .glass-header {
+            background: rgba(16, 17, 34, 0.7);
+            border-bottom: 1px solid #1e293b;
+        }
+        .neumorphic-card {
+            background: #f6f6f8;
+            box-shadow: 10px 10px 20px #d1d1d6, -10px -10px 20px #ffffff;
+        }
+        .dark .neumorphic-card {
+            background: #101122;
+            box-shadow: 8px 8px 16px #080811, -8px -8px 16px #181a33;
+        }
+        .neumorphic-inset {
+            box-shadow: inset 4px 4px 8px #d1d1d6, inset -4px -4px 8px #ffffff;
+        }
+        .dark .neumorphic-inset {
+            box-shadow: inset 4px 4px 8px #080811, inset -4px -4px 8px #181a33;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #e2e8f0;
+            border-radius: 10px;
+        }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #1e293b;
+        }
+        .editable-cell:focus-within {
+            @apply ring-2 ring-primary/50 border-primary shadow-lg outline-none bg-white z-10;
+        }
+        .editing-row {
+            @apply bg-primary/5;
+        }
+        .sql-comment {
+            @apply text-gray-400 italic;
+        }
+        .sql-keyword {
+            @apply text-primary font-bold;
+        }
+        .sql-string {
+            @apply text-emerald-status;
+        }
+        .sql-number {
+            @apply text-orange-500;
+        }
+    </style>
+</head>
+<body class="min-h-screen transition-colors duration-300">
+<div class="flex flex-col h-screen overflow-hidden">
+<header class="h-16 flex items-center justify-between px-6 glass-header z-30 shrink-0">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/20">
+<span class="material-symbols-outlined">database</span>
+</div>
+<div>
+<h1 class="font-bold text-lg leading-tight tracking-tight">DB Studio</h1>
+<p class="text-[10px] text-[#616289] font-semibold dark:text-gray-400 uppercase tracking-widest">Enterprise</p>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<button class="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold shadow-lg shadow-primary/30 hover:brightness-110 transition-all">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                New Connection
+            </button>
+<div class="flex items-center gap-4 border-r border-gray-200 dark:border-gray-800 pr-6">
+<button class="w-10 h-10 rounded-full neumorphic-card flex items-center justify-center text-[#616289] hover:text-primary transition-colors relative group">
+<span class="material-symbols-outlined text-[22px]">notifications</span>
+<span class="absolute top-2.5 right-2.5 w-2 h-2 bg-primary rounded-full border-2 border-[#f6f6f8] dark:border-[#101122]"></span>
+</button>
+</div>
+<div class="flex items-center gap-3 p-1 rounded-full bg-white/40 dark:bg-white/5 border border-white/20 hover:border-primary/30 transition-all cursor-pointer group pr-4">
+<div class="w-9 h-9 rounded-full bg-center bg-cover" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuB9CyX-5k-0-ZU9ryDgs8nx8RPwYOZGfU0kAQWRAjNtzMW2CvQarl-FTHWEoKA3r7ZGsnvJDVtlYk94ccFFROaezPj_2yj5-Amx-BMZDX2BvQiXpkF4yXI6vvbOSlAP1AUlhJLqpD5NTM-Z47encW2k8ju0C-dQEkpjvr0d1nX67BhvrEJ2dNEU4j4xwyhIS4Vwf2KotvdHiTs6TBw2iCMxB37IHzFEixiHSe7SLAzSYUFXvV-Bix_gx_GNVKjvsaOhtY4g8ZL1LTk')"></div>
+<div class="hidden sm:block">
+<p class="text-xs font-bold leading-none">Alex Rivera</p>
+</div>
+</div>
+</div>
+</header>
+<div class="flex flex-1 overflow-hidden">
+<aside class="glass-sidebar w-72 flex flex-col z-20">
+<nav class="flex-1 overflow-y-auto px-4 custom-scrollbar">
+<div class="space-y-6 pt-6">
+<div>
+<div class="flex items-center justify-between px-2 mb-4">
+<span class="text-[11px] font-bold uppercase tracking-wider text-[#616289]">Connected DBs</span>
+<span class="material-symbols-outlined text-[16px] cursor-pointer text-[#616289] hover:text-primary transition-colors">refresh</span>
+</div>
+<div class="space-y-4">
+<div>
+<div class="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-primary/10 text-primary border border-primary/20 cursor-pointer group">
+<span class="material-symbols-outlined text-[20px]">storage</span>
+<span class="text-sm font-semibold">Main Postgres</span>
+<span class="material-symbols-outlined text-[18px] ml-auto transition-transform">expand_more</span>
+</div>
+<div class="mt-2 ml-4 border-l border-gray-200 dark:border-gray-800 space-y-1">
+<div class="flex items-center gap-2 px-3 py-2 ml-3 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer text-sm group">
+<span class="material-symbols-outlined text-[18px] text-gray-400 group-hover:text-primary">table_chart</span>
+<span class="text-gray-700 dark:text-gray-300">users</span>
+</div>
+<div class="flex items-center gap-2 px-3 py-2 ml-3 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer text-sm group">
+<span class="material-symbols-outlined text-[18px] text-gray-400 group-hover:text-primary">table_chart</span>
+<span class="text-gray-700 dark:text-gray-300">orders</span>
+</div>
+<div class="flex items-center gap-2 px-3 py-2 ml-3 rounded-lg bg-primary/5 text-primary border border-primary/10 cursor-pointer text-sm">
+<span class="material-symbols-outlined text-[18px]">table_chart</span>
+<span class="font-medium">transactions</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</nav>
+<div class="p-6 border-t border-[#E2E8F0] dark:border-gray-800">
+<button class="w-full flex items-center justify-center gap-2 p-3 rounded-xl neumorphic-card text-xs font-bold text-[#616289] hover:text-primary transition-all">
+<span class="material-symbols-outlined text-[18px]">settings</span>
+                    Settings
+                </button>
+</div>
+</aside>
+<main class="flex-1 flex flex-col overflow-hidden bg-background-light dark:bg-background-dark">
+<header class="h-14 flex items-center justify-between px-6 border-b border-[#E2E8F0] dark:border-gray-800 bg-white/20 dark:bg-black/10 backdrop-blur-md">
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-emerald-status"></div>
+<span class="text-xs font-bold uppercase tracking-wider text-[#616289]">Main Postgres</span>
+</div>
+<div class="h-4 w-px bg-gray-300 dark:bg-gray-700"></div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[20px]">table_chart</span>
+<span class="text-sm font-semibold">transactions</span>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<button class="flex items-center gap-2 px-4 py-1.5 rounded-lg border border-primary/30 bg-primary/5 text-primary text-xs font-bold hover:bg-primary/10 transition-all">
+<span class="material-symbols-outlined text-[18px]">auto_awesome</span>
+                        AI Optimize
+                    </button>
+<button class="flex items-center gap-2 px-4 py-1.5 rounded-lg bg-primary text-white text-xs font-bold shadow-lg shadow-primary/20 hover:brightness-110 transition-all">
+<span class="material-symbols-outlined text-[16px]">play_arrow</span>
+                        Run
+                    </button>
+<button class="flex items-center gap-2 px-3 py-1.5 rounded-lg neumorphic-card text-xs font-bold text-[#616289] hover:text-primary transition-all">
+<span class="material-symbols-outlined text-[16px]">save</span>
+                        Save
+                    </button>
+</div>
+</header>
+<div class="flex-1 flex flex-col min-w-0">
+<div class="flex-1 p-6 font-mono text-sm overflow-y-auto custom-scrollbar bg-white/50 dark:bg-black/20">
+<div class="space-y-1">
+<div class="flex">
+<div class="w-10 text-gray-400 text-right pr-4 select-none opacity-50">1</div>
+<div class="flex-1 text-[#111118] dark:text-blue-100">
+<span class="sql-keyword">SELECT</span> * <span class="sql-keyword">FROM</span> transactions <span class="sql-keyword">LIMIT</span> <span class="sql-number">1000</span>;
+                            </div>
+</div>
+<div class="flex">
+<div class="w-10 text-gray-400 text-right pr-4 select-none opacity-50">2</div>
+<div class="flex-1"></div>
+</div>
+<div class="flex">
+<div class="w-10 text-gray-400 text-right pr-4 select-none opacity-50">3</div>
+<div class="flex-1 sql-comment">-- AI Optimized Version</div>
+</div>
+<div class="flex">
+<div class="w-10 text-gray-400 text-right pr-4 select-none opacity-50">4</div>
+<div class="flex-1 sql-comment">-- Optimization notes: Added index hint for primary key range and filtered specific columns.</div>
+</div>
+<div class="flex">
+<div class="w-10 text-gray-400 text-right pr-4 select-none opacity-50">5</div>
+<div class="flex-1 text-[#111118] dark:text-blue-300">
+<span class="sql-keyword">SELECT</span> id, user_id, amount, status, created_at
+                            </div>
+</div>
+<div class="flex">
+<div class="w-10 text-gray-400 text-right pr-4 select-none opacity-50">6</div>
+<div class="flex-1 text-[#111118] dark:text-blue-300">
+<span class="sql-keyword">FROM</span> transactions <span class="sql-keyword">USE INDEX</span> (idx_transactions_created_at)
+                            </div>
+</div>
+<div class="flex">
+<div class="w-10 text-gray-400 text-right pr-4 select-none opacity-50">7</div>
+<div class="flex-1 text-[#111118] dark:text-blue-300">
+<span class="sql-keyword">ORDER BY</span> created_at <span class="sql-keyword">DESC</span>
+</div>
+</div>
+<div class="flex">
+<div class="w-10 text-gray-400 text-right pr-4 select-none opacity-50">8</div>
+<div class="flex-1 text-[#111118] dark:text-blue-300">
+<span class="sql-keyword">LIMIT</span> <span class="sql-number">1000</span>;
+                            </div>
+</div>
+</div>
+</div>
+<div class="h-[60%] border-t border-[#E2E8F0] dark:border-gray-800 bg-white/40 dark:bg-black/30 overflow-hidden flex flex-col">
+<div class="px-6 h-12 flex items-center justify-between bg-white/60 dark:bg-white/5 border-b border-[#E2E8F0] dark:border-gray-800">
+<div class="flex items-center gap-3">
+<span class="text-[10px] font-bold uppercase tracking-widest text-[#616289]">Data View</span>
+<div class="flex items-center gap-1 bg-primary/10 px-2 py-0.5 rounded text-[10px] text-primary font-bold">
+<span>LIVE</span>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<div class="flex items-center gap-2 border-r border-gray-200 dark:border-gray-700 pr-3">
+<button class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white dark:bg-gray-900 border border-[#E2E8F0] dark:border-gray-800 text-[11px] font-bold text-[#616289] hover:text-primary hover:border-primary/30 transition-all">
+<span class="material-symbols-outlined text-[16px]">add_row_below</span>
+                                    Add Row
+                                </button>
+<button class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white dark:bg-gray-900 border border-[#E2E8F0] dark:border-gray-800 text-[11px] font-bold text-red-500 hover:bg-red-50 hover:border-red-200 transition-all">
+<span class="material-symbols-outlined text-[16px]">delete</span>
+                                    Delete Row
+                                </button>
+</div>
+<button class="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-[#6366F1] text-white text-[11px] font-bold shadow-lg shadow-indigo-500/30 hover:brightness-110 transition-all">
+<span class="material-symbols-outlined text-[16px]">publish</span>
+                                Commit Changes
+                            </button>
+</div>
+</div>
+<div class="flex-1 overflow-auto p-0 custom-scrollbar">
+<table class="w-full text-left text-xs border-collapse">
+<thead class="text-gray-400 bg-white/30 dark:bg-black/10 sticky top-0 backdrop-blur-sm z-20">
+<tr>
+<th class="py-3 px-6 font-medium border-b border-gray-100 dark:border-gray-800">id</th>
+<th class="py-3 px-6 font-medium border-b border-gray-100 dark:border-gray-800">user_id</th>
+<th class="py-3 px-6 font-medium border-b border-gray-100 dark:border-gray-800">amount</th>
+<th class="py-3 px-6 font-medium border-b border-gray-100 dark:border-gray-800">status</th>
+<th class="py-3 px-6 font-medium border-b border-gray-100 dark:border-gray-800">created_at</th>
+<th class="py-3 px-6 font-medium border-b border-gray-100 dark:border-gray-800 w-20 text-center">Action</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-gray-50 dark:divide-gray-800">
+<tr class="hover:bg-primary/5 transition-colors group">
+<td class="py-2 px-6 font-mono relative editable-cell">
+<input class="w-full bg-transparent border-none p-0 focus:ring-0 text-xs font-mono" type="text" value="TXN_8841"/>
+</td>
+<td class="py-2 px-6 font-mono text-gray-500 editable-cell">
+<input class="w-full bg-transparent border-none p-0 focus:ring-0 text-xs font-mono" type="text" value="USR_2291"/>
+</td>
+<td class="py-2 px-6 font-bold editable-cell">
+<input class="w-full bg-transparent border-none p-0 focus:ring-0 text-xs font-bold" type="text" value="$1,250.00"/>
+</td>
+<td class="py-2 px-6 editable-cell">
+<select class="w-full bg-transparent border-none p-0 focus:ring-0 text-[10px] font-bold appearance-none">
+<option selected="">COMPLETED</option>
+<option>PENDING</option>
+<option>FAILED</option>
+</select>
+</td>
+<td class="py-2 px-6 text-gray-400 editable-cell">
+<input class="w-full bg-transparent border-none p-0 focus:ring-0 text-xs" type="text" value="2023-10-24 14:22:10"/>
+</td>
+<td class="py-2 px-6 text-center">
+<button class="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-primary hover:bg-primary/10 transition-all mx-auto">
+<span class="material-symbols-outlined text-[18px]">edit_square</span>
+</button>
+</td>
+</tr>
+<tr class="hover:bg-primary/5 transition-colors group editing-row">
+<td class="py-2 px-6 font-mono editable-cell ring-2 ring-primary/50 bg-white dark:bg-gray-900 border-primary rounded-sm">
+<input class="w-full bg-transparent border-none p-0 focus:ring-0 text-xs font-mono" type="text" value="TXN_8842"/>
+</td>
+<td class="py-2 px-6 font-mono text-gray-500 editable-cell">
+<input class="w-full bg-transparent border-none p-0 focus:ring-0 text-xs font-mono" type="text" value="USR_4102"/>
+</td>
+<td class="py-2 px-6 font-bold editable-cell">
+<input class="w-full bg-transparent border-none p-0 focus:ring-0 text-xs font-bold" type="text" value="$745.50"/>
+</td>
+<td class="py-2 px-6 editable-cell">
+<select class="w-full bg-transparent border-none p-0 focus:ring-0 text-[10px] font-bold appearance-none">
+<option selected="">COMPLETED</option>
+<option>PENDING</option>
+<option>FAILED</option>
+</select>
+</td>
+<td class="py-2 px-6 text-gray-400 editable-cell">
+<input class="w-full bg-transparent border-none p-0 focus:ring-0 text-xs" type="text" value="2023-10-24 14:15:05"/>
+</td>
+<td class="py-2 px-6 text-center">
+<button class="w-8 h-8 rounded-lg flex items-center justify-center text-primary bg-primary/10 transition-all mx-auto">
+<span class="material-symbols-outlined text-[18px]">check</span>
+</button>
+</td>
+</tr>
+<tr class="hover:bg-primary/5 transition-colors group">
+<td class="py-2 px-6 font-mono editable-cell">
+<input class="w-full bg-transparent border-none p-0 focus:ring-0 text-xs font-mono" type="text" value="TXN_8843"/>
+</td>
+<td class="py-2 px-6 font-mono text-gray-500 editable-cell">
+<input class="w-full bg-transparent border-none p-0 focus:ring-0 text-xs font-mono" type="text" value="USR_8812"/>
+</td>
+<td class="py-2 px-6 font-bold editable-cell">
+<input class="w-full bg-transparent border-none p-0 focus:ring-0 text-xs font-bold" type="text" value="$920.00"/>
+</td>
+<td class="py-2 px-6 editable-cell">
+<select class="w-full bg-transparent border-none p-0 focus:ring-0 text-[10px] font-bold appearance-none">
+<option>COMPLETED</option>
+<option selected="">PENDING</option>
+<option>FAILED</option>
+</select>
+</td>
+<td class="py-2 px-6 text-gray-400 editable-cell">
+<input class="w-full bg-transparent border-none p-0 focus:ring-0 text-xs" type="text" value="2023-10-24 14:12:44"/>
+</td>
+<td class="py-2 px-6 text-center">
+<button class="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-primary hover:bg-primary/10 transition-all mx-auto">
+<span class="material-symbols-outlined text-[18px]">edit_square</span>
+</button>
+</td>
+</tr>
+<tr class="hover:bg-primary/5 transition-colors group">
+<td class="py-2 px-6 font-mono editable-cell">
+<input class="w-full bg-transparent border-none p-0 focus:ring-0 text-xs font-mono" type="text" value="TXN_8844"/>
+</td>
+<td class="py-2 px-6 font-mono text-gray-500 editable-cell">
+<input class="w-full bg-transparent border-none p-0 focus:ring-0 text-xs font-mono" type="text" value="USR_3301"/>
+</td>
+<td class="py-2 px-6 font-bold editable-cell">
+<input class="w-full bg-transparent border-none p-0 focus:ring-0 text-xs font-bold" type="text" value="$2,100.00"/>
+</td>
+<td class="py-2 px-6 editable-cell">
+<select class="w-full bg-transparent border-none p-0 focus:ring-0 text-[10px] font-bold appearance-none">
+<option selected="">COMPLETED</option>
+<option>PENDING</option>
+<option>FAILED</option>
+</select>
+</td>
+<td class="py-2 px-6 text-gray-400 editable-cell">
+<input class="w-full bg-transparent border-none p-0 focus:ring-0 text-xs" type="text" value="2023-10-24 14:10:02"/>
+</td>
+<td class="py-2 px-6 text-center">
+<button class="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-primary hover:bg-primary/10 transition-all mx-auto">
+<span class="material-symbols-outlined text-[18px]">edit_square</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="h-10 shrink-0 flex items-center justify-between px-6 bg-white dark:bg-black/40 border-t border-[#E2E8F0] dark:border-gray-800 text-[10px] font-medium text-[#616289]">
+<div class="flex items-center gap-2 overflow-hidden mr-4">
+<span class="material-symbols-outlined text-[14px] shrink-0">terminal</span>
+<span class="truncate italic opacity-70">SELECT * FROM transactions LIMIT 1000;</span>
+</div>
+<div class="flex items-center gap-4 shrink-0">
+<div class="flex items-center gap-2 text-emerald-status">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-status animate-pulse"></span>
+<span class="uppercase tracking-widest font-bold">Editor Ready</span>
+</div>
+<div class="h-3 w-px bg-gray-200 dark:bg-gray-700"></div>
+<span class="flex items-center gap-1">
+<span class="font-bold text-primary">1,000</span> records found
+                            </span>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</div>
+
+</body></html>

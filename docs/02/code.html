@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Database Connections Manager</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#6467f2",
+                        "emerald-status": "#10B981",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#101122",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.5rem",
+                        "lg": "1rem",
+                        "xl": "1.5rem",
+                        "3xl": "1.5rem",
+                        "full": "9999px"
+                    },
+                    boxShadow: {
+                        'neu-flat': '20px 20px 60px #d1d1d6, -20px -20px 60px #ffffff',
+                        'neu-inset': 'inset 6px 6px 12px #d1d1d6, inset -6px -6px 12px #ffffff',
+                    }
+                },
+            },
+        }
+    </script>
+<style type="text/tailwindcss">
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .glass-sidebar {
+            background: rgba(255, 255, 255, 0.4);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-right: 1px solid #E2E8F0;
+        }
+        .dark .glass-sidebar {
+            background: rgba(16, 17, 34, 0.6);
+            border-right: 1px solid #1e293b;
+        }
+        .neumorphic-card {
+            background: #f6f6f8;
+            box-shadow: 20px 20px 60px #d1d1d6, -20px -20px 60px #ffffff;
+        }
+        .dark .neumorphic-card {
+            background: #101122;
+            box-shadow: 10px 10px 30px #080811, -10px -10px 30px #181a33;
+        }
+        .neumorphic-inset {
+            box-shadow: inset 4px 4px 8px #d1d1d6, inset -4px -4px 8px #ffffff;
+        }
+        .dark .neumorphic-inset {
+            box-shadow: inset 4px 4px 8px #080811, inset -4px -4px 8px #181a33;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark min-h-screen text-[#111118] dark:text-white transition-colors duration-300">
+<div class="flex h-screen overflow-hidden relative">
+<aside class="glass-sidebar w-72 flex flex-col z-10">
+<div class="p-6 flex items-center gap-3">
+<div class="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-white">
+<span class="material-symbols-outlined">database</span>
+</div>
+<div>
+<h1 class="font-bold text-lg leading-tight">DB Studio</h1>
+<p class="text-xs text-[#616289] dark:text-gray-400">Pro Workspace</p>
+</div>
+</div>
+<div class="px-6 py-4">
+<div class="neumorphic-inset bg-background-light dark:bg-background-dark rounded-xl flex items-center px-4 h-11">
+<span class="material-symbols-outlined text-gray-400 text-[20px]">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-sm w-full placeholder:text-gray-400" placeholder="Search databases..." type="text"/>
+</div>
+</div>
+<nav class="flex-1 overflow-y-auto px-4 custom-scrollbar">
+<div class="space-y-6">
+<div>
+<div class="flex items-center justify-between px-2 mb-2">
+<span class="text-[11px] font-bold uppercase tracking-wider text-[#616289]">Production</span>
+<span class="material-symbols-outlined text-[16px] cursor-pointer">expand_more</span>
+</div>
+<div class="space-y-1">
+<div class="flex items-center gap-3 px-3 py-2 rounded-xl bg-primary/10 text-primary border border-primary/20">
+<span class="material-symbols-outlined text-[20px]">storage</span>
+<span class="text-sm font-medium">Main Postgres</span>
+<div class="ml-auto w-2 h-2 rounded-full bg-emerald-status shadow-[0_0_8px_#10B981]"></div>
+</div>
+<div class="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer group">
+<span class="material-symbols-outlined text-[20px] text-[#616289]">database</span>
+<span class="text-sm font-medium">Analytics Replica</span>
+<div class="ml-auto w-2 h-2 rounded-full bg-emerald-status opacity-50"></div>
+</div>
+</div>
+</div>
+<div>
+<div class="flex items-center justify-between px-2 mb-2">
+<span class="text-[11px] font-bold uppercase tracking-wider text-[#616289]">Development</span>
+<span class="material-symbols-outlined text-[16px] cursor-pointer text-[#616289]">expand_more</span>
+</div>
+<div class="space-y-1">
+<div class="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-[20px] text-[#616289]">code</span>
+<span class="text-sm font-medium text-[#111118] dark:text-gray-300">Staging Cluster</span>
+</div>
+</div>
+</div>
+</div>
+</nav>
+<div class="p-4 border-t border-[#E2E8F0] dark:border-gray-800">
+<button class="w-full bg-primary text-white font-semibold py-3 rounded-xl shadow-lg shadow-primary/30 flex items-center justify-center gap-2 hover:brightness-110 transition-all">
+<span class="material-symbols-outlined text-[20px]">add_circle</span>
+                    New Cluster
+                </button>
+</div>
+</aside>
+<main class="flex-1 overflow-y-auto bg-background-light dark:bg-background-dark filter brightness-75 grayscale-[20%] transition-all">
+<div class="px-10 pt-8 flex items-center justify-between">
+<div class="flex items-center gap-2 text-sm">
+<a class="text-[#616289] hover:text-primary transition-colors" href="#">Connections</a>
+<span class="text-[#616289]">/</span>
+<span class="font-semibold text-[#111118] dark:text-white">Overview</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="w-10 h-10 rounded-full neumorphic-card flex items-center justify-center text-[#616289]">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<div class="flex items-center gap-3 bg-white/50 dark:bg-white/5 px-3 py-1.5 rounded-full border border-white/20">
+<div class="w-7 h-7 rounded-full bg-center bg-cover" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCfKkfBjhiryq9mVzuGpa_rvz9vLEjckRalEmcOaxbCz74Jy_zncAavZF6qIoZhjFo0oZWtjHUUomHQa2ZhQs_wuucEjDDDFV9sd8jUGvzg-xf3NR-9z-gSs-AqAMwCLw10Q3W_8RvNGZoPXcCJKaSkCT2t5CkquHuUo_BRsCT5R95o1KhNxTyLI22FP_3lYGmiVBpY7bFPdqbNespMf16Pb1NfgFzQ32V6rqp0AdmE2h3wToxrhU5mualxEaTVClPO5uaTjGgDAL4')"></div>
+<span class="text-sm font-medium">Alex Rivera</span>
+</div>
+</div>
+</div>
+<div class="max-w-6xl mx-auto px-10 py-12">
+<div class="grid grid-cols-3 gap-8 mb-12">
+<div class="neumorphic-card p-8 rounded-3xl h-48 flex flex-col justify-end">
+<p class="text-sm text-[#616289]">Active Sessions</p>
+<h3 class="text-3xl font-bold">1,284</h3>
+</div>
+<div class="neumorphic-card p-8 rounded-3xl h-48 flex flex-col justify-end">
+<p class="text-sm text-[#616289]">Query Speed</p>
+<h3 class="text-3xl font-bold">42ms</h3>
+</div>
+<div class="neumorphic-card p-8 rounded-3xl h-48 flex flex-col justify-end">
+<p class="text-sm text-[#616289]">Uptime</p>
+<h3 class="text-3xl font-bold">99.9%</h3>
+</div>
+</div>
+</div>
+</main>
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md p-6 overflow-y-auto">
+<div class="bg-white dark:bg-[#101122] w-full max-w-4xl rounded-[24px] border border-[#E2E8F0] dark:border-white/10 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+<div class="px-8 pt-8 pb-4 flex items-center justify-between flex-shrink-0">
+<div>
+<h2 class="text-3xl font-extrabold text-[#111118] dark:text-white tracking-tight">Create New Connection</h2>
+<p class="text-[#616289] dark:text-gray-400 mt-1">Configure your database connection settings.</p>
+</div>
+<button class="w-10 h-10 rounded-full hover:bg-gray-100 dark:hover:bg-white/5 flex items-center justify-center transition-colors">
+<span class="material-symbols-outlined text-gray-500">close</span>
+</button>
+</div>
+<div class="flex-1 overflow-y-auto px-8 pb-8 custom-scrollbar">
+<div class="space-y-10 pt-4">
+<div>
+<label class="block text-xs font-bold uppercase tracking-widest text-[#616289] mb-4 px-1">1. Choose Database Engine</label>
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+<div class="neumorphic-card p-5 rounded-[20px] border border-white/40 dark:border-white/5 cursor-pointer hover:border-primary/50 transition-all flex flex-col items-center text-center">
+<div class="w-12 h-12 rounded-2xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 mb-3">
+<span class="material-symbols-outlined text-2xl">database</span>
+</div>
+<h3 class="font-bold text-sm">PostgreSQL</h3>
+<p class="text-[10px] text-[#616289] mt-1">v12 - v16</p>
+</div>
+<div class="bg-primary/5 p-5 rounded-[20px] border-2 border-primary ring-4 ring-primary/5 cursor-pointer flex flex-col items-center text-center">
+<div class="w-12 h-12 rounded-2xl bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center text-orange-600 mb-3">
+<span class="material-symbols-outlined text-2xl">table_chart</span>
+</div>
+<h3 class="font-bold text-sm">MySQL</h3>
+<p class="text-[10px] text-[#616289] mt-1">v8.0.x</p>
+</div>
+<div class="neumorphic-card p-5 rounded-[20px] border border-white/40 dark:border-white/5 cursor-pointer opacity-70 hover:opacity-100 transition-all flex flex-col items-center text-center">
+<div class="w-12 h-12 rounded-2xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-red-600 mb-3">
+<span class="material-symbols-outlined text-2xl">bolt</span>
+</div>
+<h3 class="font-bold text-sm">Redis</h3>
+<p class="text-[10px] text-[#616289] mt-1">Cache</p>
+</div>
+<div class="neumorphic-card p-5 rounded-[20px] border border-white/40 dark:border-white/5 cursor-pointer opacity-70 hover:opacity-100 transition-all flex flex-col items-center text-center">
+<div class="w-12 h-12 rounded-2xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-green-600 mb-3">
+<span class="material-symbols-outlined text-2xl">schema</span>
+</div>
+<h3 class="font-bold text-sm">MongoDB</h3>
+<p class="text-[10px] text-[#616289] mt-1">NoSQL</p>
+</div>
+</div>
+</div>
+<div>
+<label class="block text-xs font-bold uppercase tracking-widest text-[#616289] mb-4 px-1">2. Connection Details (MySQL)</label>
+<div class="neumorphic-card p-8 rounded-3xl border border-white/40 dark:border-white/5">
+<div class="grid grid-cols-2 gap-x-8 gap-y-6">
+<div>
+<label class="block text-xs font-semibold text-[#616289] mb-2 px-1">Host Address</label>
+<div class="neumorphic-inset bg-background-light dark:bg-background-dark rounded-xl h-12 flex items-center px-4">
+<span class="material-symbols-outlined text-gray-400 mr-3 text-sm">dns</span>
+<input class="bg-transparent border-none focus:ring-0 w-full font-medium text-sm" type="text" value="127.0.0.1"/>
+</div>
+</div>
+<div>
+<label class="block text-xs font-semibold text-[#616289] mb-2 px-1">Port</label>
+<div class="neumorphic-inset bg-background-light dark:bg-background-dark rounded-xl h-12 flex items-center px-4">
+<span class="material-symbols-outlined text-gray-400 mr-3 text-sm">numbers</span>
+<input class="bg-transparent border-none focus:ring-0 w-full font-medium text-sm" type="text" value="3306"/>
+</div>
+</div>
+<div>
+<label class="block text-xs font-semibold text-[#616289] mb-2 px-1">Username</label>
+<div class="neumorphic-inset bg-background-light dark:bg-background-dark rounded-xl h-12 flex items-center px-4">
+<span class="material-symbols-outlined text-gray-400 mr-3 text-sm">person</span>
+<input class="bg-transparent border-none focus:ring-0 w-full font-medium text-sm" type="text" value="root"/>
+</div>
+</div>
+<div>
+<label class="block text-xs font-semibold text-[#616289] mb-2 px-1">Password</label>
+<div class="neumorphic-inset bg-background-light dark:bg-background-dark rounded-xl h-12 flex items-center px-4">
+<span class="material-symbols-outlined text-gray-400 mr-3 text-sm">lock</span>
+<input class="bg-transparent border-none focus:ring-0 w-full font-medium text-sm" type="password" value="********"/>
+<span class="material-symbols-outlined text-gray-400 cursor-pointer text-sm">visibility</span>
+</div>
+</div>
+<div class="col-span-2">
+<label class="block text-xs font-semibold text-[#616289] mb-2 px-1">Database Name</label>
+<div class="neumorphic-inset bg-background-light dark:bg-background-dark rounded-xl h-12 flex items-center px-4">
+<span class="material-symbols-outlined text-gray-400 mr-3 text-sm">folder</span>
+<input class="bg-transparent border-none focus:ring-0 w-full font-medium text-sm" placeholder="Optional" type="text"/>
+</div>
+</div>
+</div>
+<div class="mt-6">
+<label class="flex items-center gap-3 cursor-pointer">
+<div class="w-10 h-5 rounded-full bg-primary/20 relative transition-all">
+<div class="absolute left-1 top-1 w-3 h-3 bg-primary rounded-full translate-x-5"></div>
+</div>
+<span class="text-xs font-medium text-[#616289]">Save password in keychain</span>
+</label>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="p-6 border-t border-[#E2E8F0] dark:border-gray-800 flex items-center justify-between bg-gray-50/50 dark:bg-white/5 flex-shrink-0">
+<div class="flex items-center gap-2 text-emerald-status font-medium text-xs">
+<span class="material-symbols-outlined text-[16px]">verified_user</span>
+                        SSH Tunnel: Enabled
+                    </div>
+<div class="flex gap-3">
+<button class="px-6 py-2.5 rounded-xl font-semibold text-[#616289] hover:bg-gray-100 dark:hover:bg-white/5 transition-colors text-sm">
+                            Test
+                        </button>
+<button class="px-8 py-2.5 rounded-xl bg-primary text-white font-bold shadow-lg shadow-primary/25 hover:brightness-110 active:scale-95 transition-all text-sm">
+                            Connect
+                        </button>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+</body></html>
