@@ -1,78 +1,26 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-@layer base {
-  body {
-    @apply bg-background-light dark:bg-background-dark text-[#111118] dark:text-white font-['Inter'];
-  }
+html {
+    background-color: rgba(27, 38, 54, 1);
+    text-align: center;
+    color: white;
 }
 
-@layer components {
-  .glass-sidebar {
-    background: rgba(255, 255, 255, 0.4);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border-right: 1px solid #E2E8F0;
-  }
-  .dark .glass-sidebar {
-    background: rgba(16, 17, 34, 0.6);
-    border-right: 1px solid #1e293b;
-  }
-  .glass-header {
-    background: rgba(255, 255, 255, 0.6);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border-bottom: 1px solid #E2E8F0;
-  }
-  .dark .glass-header {
-    background: rgba(16, 17, 34, 0.7);
-    border-bottom: 1px solid #1e293b;
-  }
-  .neumorphic-card {
-    background: #f6f6f8;
-    box-shadow: 20px 20px 60px #d1d1d6, -20px -20px 60px #ffffff;
-  }
-  .dark .neumorphic-card {
-    background: #101122;
-    box-shadow: 10px 10px 30px #080811, -10px -10px 30px #181a33;
-  }
-  .neumorphic-inset {
-    box-shadow: inset 4px 4px 8px #d1d1d6, inset -4px -4px 8px #ffffff;
-  }
-  .dark .neumorphic-inset {
-    box-shadow: inset 4px 4px 8px #080811, inset -4px -4px 8px #181a33;
-  }
-  .custom-scrollbar::-webkit-scrollbar {
-    width: 4px;
-    height: 4px;
-  }
-  .custom-scrollbar::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: #e2e8f0;
-    border-radius: 10px;
-  }
-  .dark .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: #1e293b;
-  }
-  .editable-cell:focus-within {
-    @apply ring-2 ring-primary/50 border-primary shadow-lg outline-none bg-white z-10;
-  }
-  .editing-row {
-    @apply bg-primary/5;
-  }
-  .sql-comment {
-    @apply text-gray-400 italic;
-  }
-  .sql-keyword {
-    @apply text-primary font-bold;
-  }
-  .sql-string {
-    @apply text-emerald-status;
-  }
-  .sql-number {
-    @apply text-orange-500;
-  }
+body {
+    margin: 0;
+    color: white;
+    font-family: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
+    "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
+    sans-serif;
+}
+
+@font-face {
+    font-family: "Nunito";
+    font-style: normal;
+    font-weight: 400;
+    src: local(""),
+    url("assets/fonts/nunito-v16-latin-regular.woff2") format("woff2");
+}
+
+#app {
+    height: 100vh;
+    text-align: center;
 }
