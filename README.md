@@ -5,7 +5,7 @@
 ![Status](https://img.shields.io/badge/status-in%20development-yellow)
 ![Go Version](https://img.shields.io/badge/go-1.23.1-blue)
 ![Vue Version](https://img.shields.io/badge/vue-3.2.37-green)
-![License](https://img.shields.io/badge/license-MIT-blue)
+![License](https://img.shields.io/badge/license-GPLv3-blue)
 
 ## ✨ 功能特性
 
@@ -232,7 +232,7 @@ npm run build
 
 ## 📄 许可证
 
-MIT License
+[GNU General Public License v3.0](LICENSE) (GPLv3)
 
 ## 🔗 相关链接
 
