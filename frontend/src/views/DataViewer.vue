@@ -13,10 +13,13 @@ const props = defineProps<{
   connectionId: string
   database: string
   tableName: string
+  /** 由父组件设置以打开导入弹窗（如从表名右键菜单选择「导入」） */
+  importTrigger?: { connectionId: string; database: string; tableName: string } | null
 }>()
 
 const emit = defineEmits<{
   (e: 'update', updates: UpdateRecord[]): void
+  (e: 'clear-import-trigger'): void
 }>()
 
 const showImporter = ref(false)
@@ -127,6 +130,21 @@ watch(
   () => [props.connectionId, props.database, props.tableName],
   () => {
     loadTableData(1)
+  }
+)
+
+watch(
+  () => props.importTrigger,
+  (trigger) => {
+    if (
+      trigger &&
+      trigger.connectionId === props.connectionId &&
+      trigger.database === props.database &&
+      trigger.tableName === props.tableName
+    ) {
+      showImporter.value = true
+      emit('clear-import-trigger')
+    }
   }
 )
 </script>

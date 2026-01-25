@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, shallowRef } from 'vue'
+import { ref, onMounted, onUnmounted, shallowRef, watch } from 'vue'
 import { Play, Square, FileCode, Save, History, Sparkles } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import * as monaco from 'monaco-editor'
@@ -14,11 +14,17 @@ const { t } = useI18n()
 const props = defineProps<{
   connectionId?: string
   connection?: Connection
+  /** One-shot SQL to inject into editor (e.g. from table right-click "Query") */
+  initialSql?: string
+  /** Current context: database and table (e.g. when opened from table right-click "Query") */
+  database?: string
+  tableName?: string
 }>()
 
 const emit = defineEmits<{
   (e: 'query-result', result: QueryResult): void
   (e: 'editor-position', line: number, column: number): void
+  (e: 'initial-sql-applied'): void
 }>()
 
 const editorContainer = ref<HTMLElement | null>(null)
@@ -60,8 +66,19 @@ onMounted(async () => {
     editor.value.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
       runExecute()
     })
+
+    applyInitialSql()
   }
 })
+
+watch(() => props.initialSql, () => applyInitialSql())
+
+function applyInitialSql() {
+  if (!props.initialSql || !editor.value) return
+  editor.value.setValue(props.initialSql)
+  sqlQuery.value = props.initialSql
+  emit('initial-sql-applied')
+}
 
 onUnmounted(() => {
   if (editor.value) {
@@ -127,6 +144,17 @@ const handleHistorySelect = (sql: string) => {
     <!-- Toolbar -->
     <div class="h-10 flex items-center justify-between px-4 bg-[#252526] border-b border-[#333]">
       <div class="flex items-center gap-3">
+        <span
+          v-if="database && tableName"
+          class="flex items-center gap-1.5 px-3 py-1 rounded text-xs bg-[#3c3c3c] text-gray-400 font-mono border border-[#404040]"
+          :title="`库: ${database} / 表: ${tableName}`"
+        >
+          <span class="text-gray-500">库</span>
+          <span class="text-gray-300">{{ database }}</span>
+          <span class="text-gray-600">/</span>
+          <span class="text-gray-500">表</span>
+          <span class="text-gray-300">{{ tableName }}</span>
+        </span>
         <button
           @click="runExecute"
           :disabled="isRunning"
@@ -187,11 +215,6 @@ const handleHistorySelect = (sql: string) => {
           <Sparkles :size="14" class="inline mr-1" />
           {{ t('query.analyzeSQL') }}
         </button>
-      </div>
-
-      <div class="flex items-center gap-4 text-[10px] text-gray-500 font-mono italic">
-        <span>Dialect: <b class="text-[#1677ff]">PostgreSQL</b></span>
-        <span>Schema: public</span>
       </div>
     </div>
 

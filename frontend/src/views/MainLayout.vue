@@ -11,6 +11,7 @@ import ConnectionManager from './ConnectionManager.vue'
 import TableDesigner from '../components/TableDesigner.vue'
 import { connectionService } from '../services/connectionService'
 import { queryService } from '../services/queryService'
+import { dataService } from '../services/dataService'
 import type { TabItem, Connection, QueryResult } from '../types'
 
 const { t } = useI18n()
@@ -21,6 +22,7 @@ const connectionManagerMode = ref<'create' | 'edit'>('create')
 const editingConnection = ref<Connection | null>(null)
 const showTableDesigner = ref(false)
 const tableDesignerContext = ref<{ connectionId: string; database: string } | null>(null)
+const tableImportTrigger = ref<{ connectionId: string; database: string; tableName: string } | null>(null)
 const connections = ref<Connection[]>([])
 const tabs = ref<TabItem[]>([])
 const activeTabId = ref('')
@@ -107,6 +109,40 @@ const handleConnectionConnect = async (connection: Connection) => {
   activeTabId.value = tabId
 }
 
+/** Build default SELECT SQL for a table, driver-specific identifier quoting */
+function defaultTableQuerySql(driver: string, database: string, tableName: string): string {
+  const limit = ' LIMIT 100'
+  if (driver === 'mysql') {
+    return `SELECT * FROM \`${database}\`.\`${tableName}\`${limit};`
+  }
+  if (driver === 'postgresql' || driver === 'sqlite') {
+    return `SELECT * FROM "${database}"."${tableName}"${limit};`
+  }
+  return `SELECT * FROM ${database}.${tableName}${limit};`
+}
+
+const handleTableQuery = (connectionId: string, database: string, tableName: string) => {
+  const conn = connections.value.find((c) => c.id === connectionId)
+  if (!conn) return
+
+  const tabId = `query-${connectionId}`
+  let tab = tabs.value.find((t) => t.id === tabId)
+  if (!tab) {
+    tab = {
+      id: tabId,
+      type: 'query',
+      title: `Query - ${conn.name}`,
+      connectionId,
+      sql: 'SELECT * FROM users LIMIT 50;',
+    }
+    tabs.value.push(tab)
+  }
+  tab.initialSql = defaultTableQuerySql(conn.type ?? 'mysql', database, tableName)
+  tab.database = database
+  tab.tableName = tableName
+  activeTabId.value = tabId
+}
+
 const handleTableSelected = (connectionId: string, database: string, tableName: string) => {
   const conn = connections.value.find((c) => c.id === connectionId)
   if (!conn) return
@@ -126,6 +162,29 @@ const handleTableSelected = (connectionId: string, database: string, tableName: 
     }
     tabs.value.push(newTab)
     activeTabId.value = tabId
+  }
+}
+
+const handleTableImport = (connectionId: string, database: string, tableName: string) => {
+  handleTableSelected(connectionId, database, tableName)
+  tableImportTrigger.value = { connectionId, database, tableName }
+}
+
+const clearTableImportTrigger = () => {
+  tableImportTrigger.value = null
+}
+
+const handleTableExport = async (connectionId: string, database: string, tableName: string) => {
+  try {
+    const result = await dataService.exportData(connectionId, database, tableName, 'csv')
+    if (result.success) {
+      alert(t('common.success') + ': ' + (result.filename ?? 'Export completed'))
+    } else {
+      alert(t('common.error') + ': ' + (result.error ?? 'Export failed'))
+    }
+  } catch (error) {
+    console.error('Export error:', error)
+    alert(t('common.error') + ': ' + (error instanceof Error ? error.message : 'Unknown error'))
   }
 }
 
@@ -202,10 +261,13 @@ const activeTab = computed(() => {
         @update:width="sidebarWidth = $event"
         @new-connection="handleNewConnection"
         @table-selected="handleTableSelected"
+        @table-query="handleTableQuery"
         @edit-connection="handleEditConnection"
         @refresh-connection="handleRefreshConnection"
         @delete-connection="handleDeleteConnection"
         @new-table="handleNewTable"
+        @table-import="handleTableImport"
+        @table-export="handleTableExport"
       />
 
       <div class="flex-1 flex flex-col overflow-hidden">
@@ -224,8 +286,12 @@ const activeTab = computed(() => {
             :key="activeTab.id"
             :connection-id="activeTab.connectionId"
             :connection="currentConnection"
+            :initial-sql="activeTab.initialSql"
+            :database="activeTab.database"
+            :table-name="activeTab.tableName"
             @query-result="handleQueryResult"
             @editor-position="handleEditorPosition"
+            @initial-sql-applied="() => { if (activeTab) delete activeTab.initialSql }"
           />
           <DataViewer
             v-else-if="activeTab?.type === 'table' && activeTab.connectionId && activeTab.database && activeTab.tableName"
@@ -233,7 +299,9 @@ const activeTab = computed(() => {
             :connection-id="activeTab.connectionId"
             :database="activeTab.database"
             :table-name="activeTab.tableName"
+            :import-trigger="tableImportTrigger"
             @update="(updates) => console.log('Table updates:', updates)"
+            @clear-import-trigger="clearTableImportTrigger"
           />
           <div v-else class="h-full flex flex-col items-center justify-center text-gray-500">
             <p class="mb-4">{{ $t('tabs.noTabs') }}</p>

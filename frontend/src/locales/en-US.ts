@@ -58,6 +58,11 @@ export default {
     noResults: 'No results yet',
     executeQuery: 'Execute a query to see results',
   },
+  tableContext: {
+    query: 'Query',
+    import: 'Import',
+    export: 'Export',
+  },
   table: {
     title: 'Table Data',
     totalRows: 'Total rows',

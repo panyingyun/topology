@@ -58,6 +58,11 @@ export default {
     noResults: '暂无结果',
     executeQuery: '执行查询以查看结果',
   },
+  tableContext: {
+    query: '查询',
+    import: '导入',
+    export: '导出',
+  },
   table: {
     title: '表数据',
     totalRows: '总行数',

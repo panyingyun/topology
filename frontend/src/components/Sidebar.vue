@@ -16,10 +16,13 @@ const emit = defineEmits<{
   (e: 'update:width', width: number): void
   (e: 'new-connection'): void
   (e: 'table-selected', connectionId: string, database: string, tableName: string): void
+  (e: 'table-query', connectionId: string, database: string, tableName: string): void
   (e: 'edit-connection', connection: Connection): void
   (e: 'refresh-connection', connectionId: string): void
   (e: 'delete-connection', connectionId: string): void
   (e: 'new-table', connectionId: string, database: string): void
+  (e: 'table-import', connectionId: string, database: string, tableName: string): void
+  (e: 'table-export', connectionId: string, database: string, tableName: string): void
 }>()
 
 const searchQuery = ref('')
@@ -75,10 +78,13 @@ const startResize = (e: MouseEvent) => {
         :search-query="searchQuery"
         :connections="connections"
         @table-selected="(connId, db, tableName) => emit('table-selected', connId, db, tableName)"
+        @table-query="(connId, db, tableName) => emit('table-query', connId, db, tableName)"
         @edit-connection="(conn) => emit('edit-connection', conn)"
         @refresh-connection="(id) => emit('refresh-connection', id)"
         @delete-connection="(id) => emit('delete-connection', id)"
         @new-table="(connId, database) => emit('new-table', connId, database)"
+        @table-import="(connId, db, tableName) => emit('table-import', connId, db, tableName)"
+        @table-export="(connId, db, tableName) => emit('table-export', connId, db, tableName)"
       />
     </div>
 

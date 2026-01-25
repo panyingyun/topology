@@ -14,10 +14,13 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'table-selected', connectionId: string, database: string, tableName: string): void
+  (e: 'table-query', connectionId: string, database: string, tableName: string): void
   (e: 'edit-connection', connection: Connection): void
   (e: 'refresh-connection', connectionId: string): void
   (e: 'delete-connection', connectionId: string): void
   (e: 'new-table', connectionId: string, database: string): void
+  (e: 'table-import', connectionId: string, database: string, tableName: string): void
+  (e: 'table-export', connectionId: string, database: string, tableName: string): void
 }>()
 
 const connections = ref<Connection[]>([])
@@ -30,10 +33,11 @@ const contextMenu = ref<{
   show: boolean
   x: number
   y: number
-  type: 'connection' | 'database'
+  type: 'connection' | 'database' | 'table'
   connection: Connection | null
   connectionId?: string
   database?: string
+  tableName?: string
 }>({
   show: false,
   x: 0,
@@ -132,6 +136,21 @@ const handleDatabaseContextMenu = (e: MouseEvent, conn: Connection, database: st
   }
 }
 
+const handleTableContextMenu = (e: MouseEvent, conn: Connection, database: string, tableName: string) => {
+  e.preventDefault()
+  e.stopPropagation()
+  contextMenu.value = {
+    show: true,
+    x: e.clientX,
+    y: e.clientY,
+    type: 'table',
+    connection: conn,
+    connectionId: conn.id,
+    database,
+    tableName,
+  }
+}
+
 const closeContextMenu = () => {
   contextMenu.value.show = false
 }
@@ -160,6 +179,27 @@ const handleDeleteConnection = () => {
 const handleNewTable = () => {
   if (contextMenu.value.type === 'database' && contextMenu.value.connectionId && contextMenu.value.database) {
     emit('new-table', contextMenu.value.connectionId, contextMenu.value.database)
+  }
+  closeContextMenu()
+}
+
+const handleTableQuery = () => {
+  if (contextMenu.value.type === 'table' && contextMenu.value.connectionId && contextMenu.value.database && contextMenu.value.tableName) {
+    emit('table-query', contextMenu.value.connectionId, contextMenu.value.database, contextMenu.value.tableName)
+  }
+  closeContextMenu()
+}
+
+const handleTableImport = () => {
+  if (contextMenu.value.type === 'table' && contextMenu.value.connectionId && contextMenu.value.database && contextMenu.value.tableName) {
+    emit('table-import', contextMenu.value.connectionId, contextMenu.value.database, contextMenu.value.tableName)
+  }
+  closeContextMenu()
+}
+
+const handleTableExport = () => {
+  if (contextMenu.value.type === 'table' && contextMenu.value.connectionId && contextMenu.value.database && contextMenu.value.tableName) {
+    emit('table-export', contextMenu.value.connectionId, contextMenu.value.database, contextMenu.value.tableName)
   }
   closeContextMenu()
 }
@@ -232,6 +272,7 @@ onUnmounted(() => {
               v-for="table in tablesCache[dbKey(conn.id, dbName)] || []"
               :key="table.name"
               @click="handleTableClick(conn.id, dbName, table.name)"
+              @contextmenu="handleTableContextMenu($event, conn, dbName, table.name)"
               class="flex items-center gap-2 px-2 py-1 rounded hover:bg-[#37373d] cursor-pointer group transition-colors"
             >
               <TableIcon :size="12" class="text-gray-500 group-hover:text-[#1677ff] shrink-0" />
@@ -284,6 +325,28 @@ onUnmounted(() => {
             >
               <Database :size="12" />
               {{ t('sidebar.newTable') }}
+            </button>
+          </template>
+          <!-- 表右键菜单：查询、导入、导出 -->
+          <template v-else-if="contextMenu.type === 'table'">
+            <button
+              @click="handleTableQuery"
+              class="w-full px-4 py-2 text-left text-xs text-gray-300 hover:bg-[#37373d] transition-colors flex items-center gap-2"
+            >
+              <TableIcon :size="12" />
+              {{ t('tableContext.query') }}
+            </button>
+            <button
+              @click="handleTableImport"
+              class="w-full px-4 py-2 text-left text-xs text-gray-300 hover:bg-[#37373d] transition-colors flex items-center gap-2"
+            >
+              {{ t('tableContext.import') }}
+            </button>
+            <button
+              @click="handleTableExport"
+              class="w-full px-4 py-2 text-left text-xs text-gray-300 hover:bg-[#37373d] transition-colors flex items-center gap-2"
+            >
+              {{ t('tableContext.export') }}
             </button>
           </template>
         </div>

@@ -109,6 +109,8 @@ export interface TabItem {
   database?: string;
   tableName?: string;
   sql?: string;
+  /** One-shot: inject this SQL into the query editor when opening from table context menu */
+  initialSql?: string;
   queryResult?: QueryResult;
 }
 
