@@ -230,7 +230,7 @@ onUnmounted(() => {
             @click="handleEditConnection"
             class="w-full px-4 py-2 text-left text-xs text-gray-300 hover:bg-[#37373d] transition-colors"
           >
-            {{ t('connection.edit') }}
+            {{ t('connection.editConnection') }}
           </button>
           <button
             @click="handleRefreshConnection"
