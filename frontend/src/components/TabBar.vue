@@ -24,16 +24,16 @@ const handleTabClose = (e: MouseEvent, tabId: string) => {
 </script>
 
 <template>
-  <div class="flex items-center bg-[#2d2d30] border-b border-[#333] overflow-x-auto custom-scrollbar">
+  <div class="flex items-center theme-bg-panel border-b theme-border overflow-x-auto custom-scrollbar">
     <div
       v-for="tab in tabs"
       :key="tab.id"
       @click="handleTabClick(tab.id)"
       :class="[
-        'flex items-center gap-2 px-4 py-2 text-xs cursor-pointer border-r border-[#333] transition-colors min-w-[120px] select-none',
+        'flex items-center gap-2 px-4 py-2 text-xs cursor-pointer border-r theme-border transition-colors min-w-[120px] select-none',
         activeTabId === tab.id
-          ? 'bg-[#1e1e1e] text-gray-200 border-b-2 border-[#1677ff]'
-          : 'bg-[#2d2d30] text-gray-400 hover:bg-[#37373d] hover:text-gray-300'
+          ? 'theme-bg-content theme-text border-b-2 border-[#1677ff]'
+          : 'theme-bg-panel theme-text-muted theme-bg-hover'
       ]"
       draggable="true"
       @dragstart="(e: DragEvent) => {
@@ -60,7 +60,7 @@ const handleTabClose = (e: MouseEvent, tabId: string) => {
       <span class="truncate">{{ tab.title }}</span>
       <button
         @click="handleTabClose($event, tab.id)"
-        class="ml-auto hover:bg-[#424242] rounded p-0.5 transition-colors"
+        class="ml-auto theme-bg-hover rounded p-0.5 transition-colors"
       >
         <X :size="12" />
       </button>

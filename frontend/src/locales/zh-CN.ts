@@ -17,6 +17,14 @@ export default {
     warning: '警告',
     optional: '可选',
   },
+  window: {
+    maximize: '最大化',
+    restore: '还原',
+  },
+  theme: {
+    light: '亮色主题',
+    dark: '暗色主题',
+  },
   connection: {
     title: '连接管理',
     newConnection: '新建连接',

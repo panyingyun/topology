@@ -13,12 +13,12 @@ const props = defineProps<{
 </script>
 
 <template>
-  <div class="h-6 flex items-center justify-between px-4 bg-[#252526] border-t border-[#333] text-[10px] text-gray-400 font-mono">
+  <div class="h-6 flex items-center justify-between px-4 theme-bg-panel border-t theme-border text-[10px] theme-text-muted font-mono">
     <div class="flex items-center gap-4">
       <span v-if="currentConnection">
         {{ currentConnection.host }}:{{ currentConnection.port }} / {{ currentConnection.username }}
       </span>
-      <span v-else class="text-gray-600">{{ t('statusBar.notConnected') }}</span>
+      <span v-else class="opacity-70">{{ t('statusBar.notConnected') }}</span>
     </div>
 
     <div class="flex items-center gap-4">

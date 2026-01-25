@@ -251,7 +251,7 @@ const activeTab = computed(() => {
 </script>
 
 <template>
-  <div class="flex h-screen w-screen flex-col bg-[#1e1e1e] text-gray-200 overflow-hidden select-none font-sans">
+  <div class="flex h-screen w-screen flex-col theme-bg-content theme-text overflow-hidden select-none font-sans">
     <TitleBar />
 
     <div class="flex flex-1 overflow-hidden">

@@ -52,7 +52,7 @@ const startResize = (e: MouseEvent) => {
 <template>
   <aside
     :style="{ width: width + 'px' }"
-    class="flex flex-col bg-[#252526] border-r border-[#333] transition-[width] duration-75 relative"
+    class="flex flex-col theme-bg-panel border-r theme-border transition-[width] duration-75 relative"
   >
     <div class="p-3 space-y-3">
       <button

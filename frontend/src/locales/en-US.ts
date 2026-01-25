@@ -17,6 +17,14 @@ export default {
     warning: 'Warning',
     optional: 'optional',
   },
+  window: {
+    maximize: 'Maximize',
+    restore: 'Restore',
+  },
+  theme: {
+    light: 'Light theme',
+    dark: 'Dark theme',
+  },
   connection: {
     title: 'Connection Manager',
     newConnection: 'New Connection',

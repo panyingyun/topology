@@ -140,9 +140,9 @@ const handleHistorySelect = (sql: string) => {
 </script>
 
 <template>
-  <div class="flex flex-col h-full bg-[#1e1e1e] overflow-hidden">
+  <div class="flex flex-col h-full theme-bg-content overflow-hidden">
     <!-- Toolbar -->
-    <div class="h-10 flex items-center justify-between px-4 bg-[#252526] border-b border-[#333]">
+    <div class="h-10 flex items-center justify-between px-4 theme-bg-panel border-b theme-border">
       <div class="flex items-center gap-3">
         <span
           v-if="database && tableName"
@@ -220,13 +220,13 @@ const handleHistorySelect = (sql: string) => {
 
     <!-- Editor and Results -->
     <div class="flex-1 flex flex-col min-h-0">
-      <!-- SQL Editor (60%) -->
-      <div class="flex-[6] relative border-b border-[#333]">
+      <!-- SQL Editor (50%) -->
+      <div class="flex-1 relative border-b theme-border min-h-0">
         <div ref="editorContainer" class="absolute inset-0"></div>
       </div>
 
-      <!-- Results (40%) -->
-      <div class="flex-[4] overflow-hidden min-h-0">
+      <!-- Results (50%) -->
+      <div class="flex-1 overflow-hidden min-h-0">
         <DataGrid
           v-if="queryResult && queryResult.rows.length > 0"
           :data="queryResult"
