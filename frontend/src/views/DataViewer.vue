@@ -33,21 +33,41 @@ const isLoading = ref(false)
 const currentPage = ref(1)
 const pageSize = ref(100)
 
+const LOAD_TIMEOUT_MS = 15000
+
 const loadTableData = async (page: number = 1) => {
   isLoading.value = true
   try {
     const offset = (page - 1) * pageSize.value
-    const data = await dataService.getTableData(
+    const dataPromise = dataService.getTableData(
       props.connectionId,
       props.database,
       props.tableName,
       pageSize.value,
       offset
     )
-    tableData.value = data
+    const timeoutPromise = new Promise<TableData>((_, reject) =>
+      setTimeout(() => reject(new Error('timeout')), LOAD_TIMEOUT_MS)
+    )
+    const data = await Promise.race([dataPromise, timeoutPromise])
+    tableData.value = {
+      columns: data?.columns ?? [],
+      rows: data?.rows ?? [],
+      totalRows: data?.totalRows ?? 0,
+      page: data?.page ?? page,
+      pageSize: data?.pageSize ?? pageSize.value,
+    }
     currentPage.value = page
   } catch (error) {
     console.error('Failed to load table data:', error)
+    tableData.value = {
+      columns: [],
+      rows: [],
+      totalRows: 0,
+      page: 1,
+      pageSize: pageSize.value,
+    }
+    currentPage.value = 1
   } finally {
     isLoading.value = false
   }

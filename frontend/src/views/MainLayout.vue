@@ -20,6 +20,7 @@ const showConnectionManager = ref(false)
 const connectionManagerMode = ref<'create' | 'edit'>('create')
 const editingConnection = ref<Connection | null>(null)
 const showTableDesigner = ref(false)
+const tableDesignerContext = ref<{ connectionId: string; database: string } | null>(null)
 const connections = ref<Connection[]>([])
 const tabs = ref<TabItem[]>([])
 const activeTabId = ref('')
@@ -159,16 +160,25 @@ const handleEditorPosition = (line: number, column: number) => {
   editorColumn.value = column
 }
 
+const handleNewTable = (connectionId: string, database: string) => {
+  tableDesignerContext.value = { connectionId, database }
+  showTableDesigner.value = true
+}
+
 const handleCreateTable = async (sql: string) => {
-  if (!currentConnection.value) {
+  const connId = tableDesignerContext.value?.connectionId ?? currentConnection.value?.id
+  if (!connId) {
     alert(t('common.error') + ': ' + 'Please select a connection first')
     return
   }
+  const database = tableDesignerContext.value?.database
+  const driver = (tableDesignerContext.value ? connections.value.find(c => c.id === tableDesignerContext.value!.connectionId) : currentConnection.value)?.type
+  const sqlToRun = database && driver === 'mysql' ? `USE \`${database}\`;\n${sql}` : sql
   try {
-    await queryService.executeQuery(currentConnection.value.id, sql)
+    await queryService.executeQuery(connId, sqlToRun)
     alert(t('common.success') + ': ' + 'Table created successfully!')
     showTableDesigner.value = false
-    // Refresh connections to show new table
+    tableDesignerContext.value = null
     await loadConnections()
   } catch (error) {
     console.error('Failed to create table:', error)
@@ -195,7 +205,7 @@ const activeTab = computed(() => {
         @edit-connection="handleEditConnection"
         @refresh-connection="handleRefreshConnection"
         @delete-connection="handleDeleteConnection"
-        @new-table="showTableDesigner = true"
+        @new-table="handleNewTable"
       />
 
       <div class="flex-1 flex flex-col overflow-hidden">
@@ -251,10 +261,10 @@ const activeTab = computed(() => {
 
     <TableDesigner
       :show="showTableDesigner"
-      :connection-id="currentConnection?.id"
-      :database="currentConnection?.database"
-      :driver="currentConnection?.type"
-      @close="showTableDesigner = false"
+      :connection-id="tableDesignerContext?.connectionId ?? currentConnection?.id"
+      :database="tableDesignerContext?.database ?? currentConnection?.database"
+      :driver="(tableDesignerContext ? connections.find(c => c.id === tableDesignerContext?.connectionId) : currentConnection)?.type"
+      @close="showTableDesigner = false; tableDesignerContext = null"
       @create="handleCreateTable"
     />
   </div>

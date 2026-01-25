@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { Search, Plus, Database } from 'lucide-vue-next'
+import { Search, Plus } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import ConnectionTree from './ConnectionTree.vue'
 import type { Connection } from '../types'
@@ -19,7 +19,7 @@ const emit = defineEmits<{
   (e: 'edit-connection', connection: Connection): void
   (e: 'refresh-connection', connectionId: string): void
   (e: 'delete-connection', connectionId: string): void
-  (e: 'new-table'): void
+  (e: 'new-table', connectionId: string, database: string): void
 }>()
 
 const searchQuery = ref('')
@@ -59,13 +59,6 @@ const startResize = (e: MouseEvent) => {
         <Plus :size="14" />
         {{ t('sidebar.newConnection') }}
       </button>
-      <button
-        @click="emit('new-table')"
-        class="w-full bg-[#3c3c3c] hover:bg-[#4c4c4c] text-gray-300 text-xs py-2 rounded-md font-bold transition-all active:scale-[0.98] flex items-center justify-center gap-2"
-      >
-        <Database :size="14" />
-        {{ t('sidebar.newTable') }}
-      </button>
       <div class="relative">
         <Search :size="14" class="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
         <input
@@ -85,6 +78,7 @@ const startResize = (e: MouseEvent) => {
         @edit-connection="(conn) => emit('edit-connection', conn)"
         @refresh-connection="(id) => emit('refresh-connection', id)"
         @delete-connection="(id) => emit('delete-connection', id)"
+        @new-table="(connId, database) => emit('new-table', connId, database)"
       />
     </div>
 

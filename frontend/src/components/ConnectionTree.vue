@@ -17,6 +17,7 @@ const emit = defineEmits<{
   (e: 'edit-connection', connection: Connection): void
   (e: 'refresh-connection', connectionId: string): void
   (e: 'delete-connection', connectionId: string): void
+  (e: 'new-table', connectionId: string, database: string): void
 }>()
 
 const connections = ref<Connection[]>([])
@@ -29,11 +30,15 @@ const contextMenu = ref<{
   show: boolean
   x: number
   y: number
+  type: 'connection' | 'database'
   connection: Connection | null
+  connectionId?: string
+  database?: string
 }>({
   show: false,
   x: 0,
   y: 0,
+  type: 'connection',
   connection: null,
 })
 
@@ -108,7 +113,22 @@ const handleConnectionContextMenu = (e: MouseEvent, conn: Connection) => {
     show: true,
     x: e.clientX,
     y: e.clientY,
+    type: 'connection',
     connection: conn,
+  }
+}
+
+const handleDatabaseContextMenu = (e: MouseEvent, conn: Connection, database: string) => {
+  e.preventDefault()
+  e.stopPropagation()
+  contextMenu.value = {
+    show: true,
+    x: e.clientX,
+    y: e.clientY,
+    type: 'database',
+    connection: conn,
+    connectionId: conn.id,
+    database,
   }
 }
 
@@ -133,6 +153,13 @@ const handleRefreshConnection = () => {
 const handleDeleteConnection = () => {
   if (contextMenu.value.connection) {
     emit('delete-connection', contextMenu.value.connection.id)
+  }
+  closeContextMenu()
+}
+
+const handleNewTable = () => {
+  if (contextMenu.value.type === 'database' && contextMenu.value.connectionId && contextMenu.value.database) {
+    emit('new-table', contextMenu.value.connectionId, contextMenu.value.database)
   }
   closeContextMenu()
 }
@@ -184,6 +211,7 @@ onUnmounted(() => {
         <div v-for="dbName in databasesCache[conn.id] || []" :key="dbKey(conn.id, dbName)" class="select-none">
           <div
             @click="toggleDatabase(conn.id, dbName)"
+            @contextmenu="handleDatabaseContextMenu($event, conn, dbName)"
             class="flex items-center gap-2 px-2 py-1 rounded hover:bg-[#37373d] cursor-pointer group transition-colors"
           >
             <component
@@ -226,25 +254,38 @@ onUnmounted(() => {
           :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }"
           @click.stop
         >
-          <button
-            @click="handleEditConnection"
-            class="w-full px-4 py-2 text-left text-xs text-gray-300 hover:bg-[#37373d] transition-colors"
-          >
-            {{ t('connection.editConnection') }}
-          </button>
-          <button
-            @click="handleRefreshConnection"
-            class="w-full px-4 py-2 text-left text-xs text-gray-300 hover:bg-[#37373d] transition-colors"
-          >
-            {{ t('connection.refresh') }}
-          </button>
-          <div class="h-px bg-[#333] my-1"></div>
-          <button
-            @click="handleDeleteConnection"
-            class="w-full px-4 py-2 text-left text-xs text-red-400 hover:bg-[#37373d] transition-colors"
-          >
-            {{ t('connection.delete') }}
-          </button>
+          <!-- 连接右键菜单 -->
+          <template v-if="contextMenu.type === 'connection'">
+            <button
+              @click="handleEditConnection"
+              class="w-full px-4 py-2 text-left text-xs text-gray-300 hover:bg-[#37373d] transition-colors"
+            >
+              {{ t('connection.editConnection') }}
+            </button>
+            <button
+              @click="handleRefreshConnection"
+              class="w-full px-4 py-2 text-left text-xs text-gray-300 hover:bg-[#37373d] transition-colors"
+            >
+              {{ t('connection.refresh') }}
+            </button>
+            <div class="h-px bg-[#333] my-1"></div>
+            <button
+              @click="handleDeleteConnection"
+              class="w-full px-4 py-2 text-left text-xs text-red-400 hover:bg-[#37373d] transition-colors"
+            >
+              {{ t('connection.delete') }}
+            </button>
+          </template>
+          <!-- 数据库右键菜单 -->
+          <template v-else-if="contextMenu.type === 'database'">
+            <button
+              @click="handleNewTable"
+              class="w-full px-4 py-2 text-left text-xs text-gray-300 hover:bg-[#37373d] transition-colors flex items-center gap-2"
+            >
+              <Database :size="12" />
+              {{ t('sidebar.newTable') }}
+            </button>
+          </template>
         </div>
       </Transition>
       <div
