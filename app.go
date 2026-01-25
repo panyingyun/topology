@@ -20,6 +20,7 @@ import (
 	"gorm.io/gorm"
 
 	"topology/internal/db"
+	"topology/internal/sshtunnel"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -303,8 +304,37 @@ func buildDSN(c *Connection) (string, error) {
 	return db.BuildDSN(c.Type, c.Host, c.Port, c.Username, c.Password, c.Database)
 }
 
+// effectiveHostPort returns (host, port) for building DSN. When SSH tunnel is enabled for MySQL, starts tunnel and returns 127.0.0.1:localPort.
+func effectiveHostPort(connID string, c *Connection) (host string, port int, err error) {
+	host, port = c.Host, c.Port
+	if c.Type != "mysql" {
+		return host, port, nil
+	}
+	if c.SSHTunnel == nil || !c.SSHTunnel.Enabled {
+		return host, port, nil
+	}
+	sshPort := c.SSHTunnel.Port
+	if sshPort <= 0 {
+		sshPort = 22
+	}
+	localPort, err := sshtunnel.GetOrStart(connID, sshtunnel.Config{
+		SSHHost:     c.SSHTunnel.Host,
+		SSHPort:     sshPort,
+		SSHUser:     c.SSHTunnel.Username,
+		SSHPassword: c.SSHTunnel.Password,
+		SSHKey:      c.SSHTunnel.PrivateKey,
+		DBHost:      c.Host,
+		DBPort:      c.Port,
+	})
+	if err != nil {
+		return "", 0, fmt.Errorf("ssh tunnel: %w", err)
+	}
+	return "127.0.0.1", localPort, nil
+}
+
 // getOrOpenDB returns a working DB for the connection (and optional session). Uses cache if ping succeeds, otherwise reconnects.
 // Empty sessionID uses shared connection per connID; non-empty isolates per tab/session.
+// When SSH tunnel is enabled (MySQL only), DB traffic goes through the tunnel.
 func getOrOpenDB(connID, sessionID string) (*gorm.DB, error) {
 	conn := getConnByID(connID)
 	if conn == nil {
@@ -314,7 +344,11 @@ func getOrOpenDB(connID, sessionID string) (*gorm.DB, error) {
 	if driver != "mysql" && driver != "sqlite" {
 		return nil, fmt.Errorf("unsupported driver: %s (mysql/sqlite only)", driver)
 	}
-	dsn, err := buildDSN(conn)
+	host, port, err := effectiveHostPort(connID, conn)
+	if err != nil {
+		return nil, err
+	}
+	dsn, err := db.BuildDSN(driver, host, port, conn.Username, conn.Password, conn.Database)
 	if err != nil {
 		return nil, err
 	}
@@ -358,7 +392,7 @@ func (a *App) CreateConnection(connJSON string) error {
 	return saveConnectionsToFile(connections)
 }
 
-// TestConnection tests a database connection
+// TestConnection tests a database connection. When SSH tunnel is enabled, starts a temporary tunnel then closes it.
 func (a *App) TestConnection(connJSON string) bool {
 	var conn Connection
 	if err := json.Unmarshal([]byte(connJSON), &conn); err != nil {
@@ -368,9 +402,36 @@ func (a *App) TestConnection(connJSON string) bool {
 	if driver != "mysql" && driver != "sqlite" {
 		return false
 	}
-	dsn, err := buildDSN(&conn)
-	if err != nil {
-		return false
+	var dsn string
+	var err error
+	if driver == "mysql" && conn.SSHTunnel != nil && conn.SSHTunnel.Enabled {
+		testID := fmt.Sprintf("test-%d", time.Now().UnixNano())
+		sshPort := conn.SSHTunnel.Port
+		if sshPort <= 0 {
+			sshPort = 22
+		}
+		localPort, tunnelErr := sshtunnel.GetOrStart(testID, sshtunnel.Config{
+			SSHHost:     conn.SSHTunnel.Host,
+			SSHPort:     sshPort,
+			SSHUser:     conn.SSHTunnel.Username,
+			SSHPassword: conn.SSHTunnel.Password,
+			SSHKey:      conn.SSHTunnel.PrivateKey,
+			DBHost:      conn.Host,
+			DBPort:      conn.Port,
+		})
+		if tunnelErr != nil {
+			return false
+		}
+		defer sshtunnel.Stop(testID)
+		dsn, err = db.BuildDSN(driver, "127.0.0.1", localPort, conn.Username, conn.Password, conn.Database)
+		if err != nil {
+			return false
+		}
+	} else {
+		dsn, err = buildDSN(&conn)
+		if err != nil {
+			return false
+		}
 	}
 	return db.Ping(driver, dsn) == nil
 }
@@ -386,6 +447,7 @@ func (a *App) UpdateConnection(connJSON string) error {
 		return fmt.Errorf("connection ID required")
 	}
 	db.CloseConnection(conn.ID)
+	sshtunnel.Stop(conn.ID)
 	schemaMetaMu.Lock()
 	delete(schemaMetaCache, conn.ID)
 	schemaMetaMu.Unlock()
@@ -404,9 +466,10 @@ func (a *App) UpdateConnection(connJSON string) error {
 	return fmt.Errorf("connection not found")
 }
 
-// ReconnectConnection closes cached DB for the connection so it reconnects on next use.
+// ReconnectConnection closes cached DB and SSH tunnel for the connection so it reconnects on next use.
 func (a *App) ReconnectConnection(id string) error {
 	db.CloseConnection(id)
+	sshtunnel.Stop(id)
 	schemaMetaMu.Lock()
 	delete(schemaMetaCache, id)
 	schemaMetaMu.Unlock()
@@ -417,6 +480,7 @@ func (a *App) ReconnectConnection(id string) error {
 func (a *App) DeleteConnection(id string) error {
 	ensureConnectionsLoaded()
 	db.CloseConnection(id)
+	sshtunnel.Stop(id)
 	schemaMetaMu.Lock()
 	delete(schemaMetaCache, id)
 	schemaMetaMu.Unlock()
