@@ -16,6 +16,10 @@ const props = defineProps<{
   connection?: Connection
   /** One-shot SQL to inject into editor (e.g. from table right-click "Query") */
   initialSql?: string
+  /** Restore editor content when switching back to this tab */
+  restoreSql?: string
+  /** Restore query result when switching back to this tab */
+  savedQueryResult?: QueryResult
   /** Current context: database and table (e.g. when opened from table right-click "Query") */
   database?: string
   tableName?: string
@@ -24,12 +28,15 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'query-result', result: QueryResult): void
   (e: 'editor-position', line: number, column: number): void
+  (e: 'update-sql', sql: string): void
   (e: 'initial-sql-applied'): void
 }>()
 
+const DEFAULT_SQL = 'SELECT * FROM users LIMIT 50;'
+
 const editorContainer = ref<HTMLElement | null>(null)
 const editor = shallowRef<any>(null)
-const sqlQuery = ref("SELECT * FROM users LIMIT 50;")
+const sqlQuery = ref(DEFAULT_SQL)
 const isRunning = ref(false)
 const queryResult = ref<QueryResult | null>(null)
 const editorLine = ref(1)
@@ -37,10 +44,52 @@ const editorColumn = ref(1)
 const showHistory = ref(false)
 const showAnalyzer = ref(false)
 
+// SQL vs Results split: default 1/3 SQL, 2/3 results; user can drag to resize
+const SPLIT_STORAGE_KEY = 'query-console-split'
+const DEFAULT_SQL_PERCENT = 100 / 3
+const sqlHeightPercent = ref(
+  Math.min(85, Math.max(15, Number(localStorage.getItem(SPLIT_STORAGE_KEY)) || DEFAULT_SQL_PERCENT))
+)
+const splitContainerRef = ref<HTMLElement | null>(null)
+const isResizing = ref(false)
+
+const startResize = (e: MouseEvent) => {
+  if (!splitContainerRef.value) return
+  isResizing.value = true
+  const startY = e.clientY
+  const startPercent = sqlHeightPercent.value
+  const containerHeight = splitContainerRef.value.clientHeight
+
+  const onMove = (e: MouseEvent) => {
+    const delta = e.clientY - startY
+    const deltaPercent = (delta / containerHeight) * 100
+    let next = startPercent + deltaPercent
+    next = Math.min(85, Math.max(15, next))
+    sqlHeightPercent.value = next
+    editor.value?.layout?.()
+  }
+  const onUp = () => {
+    isResizing.value = false
+    document.removeEventListener('mousemove', onMove)
+    document.removeEventListener('mouseup', onUp)
+    document.body.style.cursor = ''
+    document.body.style.userSelect = ''
+    localStorage.setItem(SPLIT_STORAGE_KEY, String(sqlHeightPercent.value))
+    editor.value?.layout?.()
+  }
+
+  document.body.style.cursor = 'ns-resize'
+  document.body.style.userSelect = 'none'
+  document.addEventListener('mousemove', onMove)
+  document.addEventListener('mouseup', onUp)
+}
+
 onMounted(async () => {
   if (editorContainer.value) {
+    const initialValue = props.initialSql ?? props.restoreSql ?? DEFAULT_SQL
+    sqlQuery.value = initialValue
     editor.value = monaco.editor.create(editorContainer.value, {
-      value: sqlQuery.value,
+      value: initialValue,
       language: 'sql',
       theme: 'vs-dark',
       automaticLayout: true,
@@ -54,6 +103,7 @@ onMounted(async () => {
 
     editor.value.onDidChangeModelContent(() => {
       sqlQuery.value = editor.value.getValue()
+      emit('update-sql', sqlQuery.value)
     })
 
     editor.value.onDidChangeCursorPosition((e: any) => {
@@ -72,11 +122,20 @@ onMounted(async () => {
 })
 
 watch(() => props.initialSql, () => applyInitialSql())
+// Restore saved result when switching back to this tab (immediate so we sync on mount too)
+watch(
+  () => props.savedQueryResult,
+  (next) => {
+    queryResult.value = next !== undefined && next !== null ? next : null
+  },
+  { immediate: true }
+)
 
 function applyInitialSql() {
   if (!props.initialSql || !editor.value) return
   editor.value.setValue(props.initialSql)
   sqlQuery.value = props.initialSql
+  emit('update-sql', props.initialSql)
   emit('initial-sql-applied')
 }
 
@@ -89,7 +148,17 @@ onUnmounted(() => {
 const runExecute = async () => {
   if (!sqlQuery.value.trim() || isRunning.value) return
 
-  // Get selected text if any, otherwise use full query
+  const connectionId = props.connectionId
+  if (!connectionId) {
+    queryResult.value = {
+      columns: [],
+      rows: [],
+      rowCount: 0,
+      error: 'No connection selected',
+    }
+    return
+  }
+
   let queryToExecute = sqlQuery.value
   if (editor.value) {
     const selection = editor.value.getSelection()
@@ -100,19 +169,27 @@ const runExecute = async () => {
 
   isRunning.value = true
   try {
-    const result = await queryService.executeQuery(props.connectionId || '1', queryToExecute)
+    const result = await queryService.executeQuery(connectionId, queryToExecute)
     queryResult.value = result
     emit('query-result', result)
   } catch (error) {
     console.error('Query execution error:', error)
+    const errMsg = error instanceof Error ? error.message : 'Unknown error'
+    queryResult.value = {
+      columns: [],
+      rows: [],
+      rowCount: 0,
+      error: errMsg,
+    }
+    emit('query-result', queryResult.value)
   } finally {
     isRunning.value = false
   }
 }
 
 const stopQuery = () => {
-  // In real implementation, this would cancel the query
   isRunning.value = false
+  // Note: backend query cannot be cancelled; next run will work. User sees "Running" clear.
 }
 
 const formatSQL = async () => {
@@ -218,15 +295,26 @@ const handleHistorySelect = (sql: string) => {
       </div>
     </div>
 
-    <!-- Editor and Results -->
-    <div class="flex-1 flex flex-col min-h-0">
-      <!-- SQL Editor (50%) -->
-      <div class="flex-1 relative border-b theme-border min-h-0">
+    <!-- Editor and Results (resizable split: default SQL 1/3, Results 2/3) -->
+    <div ref="splitContainerRef" class="flex-1 flex flex-col min-h-0">
+      <!-- SQL Editor -->
+      <div
+        class="flex-shrink-0 relative min-h-0 theme-border"
+        :style="{ height: sqlHeightPercent + '%' }"
+      >
         <div ref="editorContainer" class="absolute inset-0"></div>
       </div>
 
-      <!-- Results (50%) -->
-      <div class="flex-1 overflow-hidden min-h-0">
+      <!-- Resize handle -->
+      <div
+        class="flex-shrink-0 h-1.5 cursor-ns-resize theme-bg-panel border-y theme-border flex items-center justify-center hover:bg-[#1677ff]/20 transition-colors"
+        @mousedown="startResize"
+      >
+        <div class="w-12 h-0.5 rounded theme-bg-hover" />
+      </div>
+
+      <!-- Results -->
+      <div class="flex-1 min-h-0 overflow-hidden">
         <DataGrid
           v-if="queryResult && queryResult.rows.length > 0"
           :data="queryResult"

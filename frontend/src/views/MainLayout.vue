@@ -214,6 +214,13 @@ const handleQueryResult = (result: QueryResult) => {
   }
 }
 
+const handleQuerySqlUpdate = (sql: string) => {
+  const activeTab = tabs.value.find(t => t.id === activeTabId.value)
+  if (activeTab?.type === 'query') {
+    activeTab.sql = sql
+  }
+}
+
 const handleEditorPosition = (line: number, column: number) => {
   editorLine.value = line
   editorColumn.value = column
@@ -287,10 +294,13 @@ const activeTab = computed(() => {
             :connection-id="activeTab.connectionId"
             :connection="currentConnection"
             :initial-sql="activeTab.initialSql"
+            :restore-sql="activeTab.sql"
+            :saved-query-result="activeTab.queryResult"
             :database="activeTab.database"
             :table-name="activeTab.tableName"
             @query-result="handleQueryResult"
             @editor-position="handleEditorPosition"
+            @update-sql="handleQuerySqlUpdate"
             @initial-sql-applied="() => { if (activeTab) delete activeTab.initialSql }"
           />
           <DataViewer
