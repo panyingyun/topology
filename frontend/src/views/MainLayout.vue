@@ -126,21 +126,20 @@ const handleTableQuery = (connectionId: string, database: string, tableName: str
   const conn = connections.value.find((c) => c.id === connectionId)
   if (!conn) return
 
-  const tabId = `query-${connectionId}`
-  let tab = tabs.value.find((t) => t.id === tabId)
-  if (!tab) {
-    tab = {
-      id: tabId,
-      type: 'query',
-      title: `Query - ${conn.name}`,
-      connectionId,
-      sql: 'SELECT * FROM users LIMIT 50;',
-    }
-    tabs.value.push(tab)
+  // Always create a new query tab (new session) so previous sessions stay open
+  const tabId = `query-${connectionId}-${Date.now()}`
+  const initialSql = defaultTableQuerySql(conn.type ?? 'mysql', database, tableName)
+  const newTab: TabItem = {
+    id: tabId,
+    type: 'query',
+    title: `Query - ${conn.name} / ${tableName}`,
+    connectionId,
+    sql: initialSql,
+    initialSql,
+    database,
+    tableName,
   }
-  tab.initialSql = defaultTableQuerySql(conn.type ?? 'mysql', database, tableName)
-  tab.database = database
-  tab.tableName = tableName
+  tabs.value.push(newTab)
   activeTabId.value = tabId
 }
 
