@@ -18,6 +18,8 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"topology/internal/db"
 )
 
@@ -135,10 +137,30 @@ type QueryHistory struct {
 	RowCount     int    `json:"rowCount,omitempty"`
 }
 
+// Schema metadata for SQL completion (tables + columns per connection).
+type SchemaTableMeta struct {
+	Name    string             `json:"name"`
+	Columns []SchemaColumnMeta `json:"columns"`
+}
+type SchemaColumnMeta struct {
+	Name string `json:"name"`
+	Type string `json:"type,omitempty"`
+}
+type SchemaDBMeta struct {
+	Name   string            `json:"name"`
+	Tables []SchemaTableMeta `json:"tables"`
+}
+type SchemaMetadata struct {
+	ConnectionID string         `json:"connectionId"`
+	Databases    []SchemaDBMeta `json:"databases"`
+}
+
 var (
 	connMu          sync.RWMutex
 	mockConnections []Connection
 	seedOnce        sync.Once
+	schemaMetaMu    sync.RWMutex
+	schemaMetaCache = make(map[string]SchemaMetadata)
 	connFileOnce    sync.Once
 	connFilePath    string
 	historyMu       sync.RWMutex
@@ -379,6 +401,9 @@ func (a *App) UpdateConnection(connJSON string) error {
 		return fmt.Errorf("connection ID required")
 	}
 	db.Close(conn.ID)
+	schemaMetaMu.Lock()
+	delete(schemaMetaCache, conn.ID)
+	schemaMetaMu.Unlock()
 	connMu.Lock()
 	defer connMu.Unlock()
 	for i, c := range mockConnections {
@@ -398,12 +423,18 @@ func (a *App) UpdateConnection(connJSON string) error {
 // ReconnectConnection closes cached DB for the connection so it reconnects on next use.
 func (a *App) ReconnectConnection(id string) error {
 	db.Close(id)
+	schemaMetaMu.Lock()
+	delete(schemaMetaCache, id)
+	schemaMetaMu.Unlock()
 	return nil
 }
 
 // DeleteConnection deletes a connection by ID
 func (a *App) DeleteConnection(id string) error {
 	db.Close(id)
+	schemaMetaMu.Lock()
+	delete(schemaMetaCache, id)
+	schemaMetaMu.Unlock()
 	connMu.Lock()
 	defer connMu.Unlock()
 	for i, c := range mockConnections {
@@ -479,6 +510,72 @@ func mustMarshalResult(cols []string, rows []map[string]interface{}, rowCount, e
 // FormatSQL formats a SQL query (no-op for now)
 func (a *App) FormatSQL(sql string) string {
 	return sql
+}
+
+// LoadSchemaMetadata starts a background goroutine to fetch all databases, tables, and columns for the connection.
+// When done, caches the result and emits "schema-metadata-ready" with connectionID for the frontend.
+func (a *App) LoadSchemaMetadata(connectionID string) {
+	go a.loadSchemaMetadataWorker(connectionID)
+}
+
+func (a *App) loadSchemaMetadataWorker(connectionID string) {
+	meta := SchemaMetadata{ConnectionID: connectionID}
+	g, err := getOrOpenDB(connectionID)
+	if err != nil {
+		schemaMetaMu.Lock()
+		schemaMetaCache[connectionID] = meta
+		schemaMetaMu.Unlock()
+		runtime.EventsEmit(a.ctx, "schema-metadata-ready", connectionID)
+		return
+	}
+	conn := getConnByID(connectionID)
+	if conn == nil {
+		schemaMetaMu.Lock()
+		schemaMetaCache[connectionID] = meta
+		schemaMetaMu.Unlock()
+		runtime.EventsEmit(a.ctx, "schema-metadata-ready", connectionID)
+		return
+	}
+	dbNames, err := db.DatabaseNames(g, conn.Type)
+	if err != nil {
+		dbNames = nil
+	}
+	for _, dbName := range dbNames {
+		dbMeta := SchemaDBMeta{Name: dbName}
+		tableNames, err := db.TableNames(g, conn.Type, dbName)
+		if err != nil {
+			meta.Databases = append(meta.Databases, dbMeta)
+			continue
+		}
+		for _, tblName := range tableNames {
+			tblMeta := SchemaTableMeta{Name: tblName}
+			schemaJSON := a.GetTableSchema(connectionID, dbName, tblName)
+			var ts TableSchema
+			if json.Unmarshal([]byte(schemaJSON), &ts) == nil {
+				for _, c := range ts.Columns {
+					tblMeta.Columns = append(tblMeta.Columns, SchemaColumnMeta{Name: c.Name, Type: c.Type})
+				}
+			}
+			dbMeta.Tables = append(dbMeta.Tables, tblMeta)
+		}
+		meta.Databases = append(meta.Databases, dbMeta)
+	}
+	schemaMetaMu.Lock()
+	schemaMetaCache[connectionID] = meta
+	schemaMetaMu.Unlock()
+	runtime.EventsEmit(a.ctx, "schema-metadata-ready", connectionID)
+}
+
+// GetSchemaMetadata returns cached schema metadata (JSON) for the connection. Empty object if not loaded yet.
+func (a *App) GetSchemaMetadata(connectionID string) string {
+	schemaMetaMu.RLock()
+	meta, ok := schemaMetaCache[connectionID]
+	schemaMetaMu.RUnlock()
+	if !ok {
+		return `{"connectionId":"` + connectionID + `","databases":[]}`
+	}
+	data, _ := json.Marshal(meta)
+	return string(data)
 }
 
 // GetDatabases returns database names for a connection (MySQL: SHOW DATABASES; SQLite: ["main"]).

@@ -4,6 +4,7 @@ import { Play, Square, FileCode, Save, History, Sparkles } from 'lucide-vue-next
 import { useI18n } from 'vue-i18n'
 import * as monaco from 'monaco-editor'
 import { queryService } from '../services/queryService'
+import { useSchemaMetadata } from '../composables/useSchemaMetadata'
 import DataGrid from '../components/DataGrid.vue'
 import QueryHistory from '../components/QueryHistory.vue'
 import SQLAnalyzer from '../components/SQLAnalyzer.vue'
@@ -43,6 +44,15 @@ const editorLine = ref(1)
 const editorColumn = ref(1)
 const showHistory = ref(false)
 const showAnalyzer = ref(false)
+
+const {
+  load: loadSchemaMetadata,
+  getAllTableNames,
+  getColumnsForTable,
+  getAllColumns,
+} = useSchemaMetadata()
+const connectionIdForCompletion = ref('')
+let completionProviderDisposable: monaco.IDisposable | null = null
 
 // SQL vs Results split: default 1/3 SQL, 2/3 results; user can drag to resize
 const SPLIT_STORAGE_KEY = 'query-console-split'
@@ -117,9 +127,96 @@ onMounted(async () => {
       runExecute()
     })
 
+    completionProviderDisposable = registerSQLCompletionProvider(editor.value)
     applyInitialSql()
   }
 })
+
+watch(() => props.connectionId, (id) => {
+  connectionIdForCompletion.value = id || ''
+  if (id) loadSchemaMetadata(id)
+}, { immediate: true })
+
+function registerSQLCompletionProvider(_editorInstance: any): monaco.IDisposable {
+  const kindTable = monaco.languages.CompletionItemKind.Class
+  const kindColumn = monaco.languages.CompletionItemKind.Field
+  const kindKeyword = monaco.languages.CompletionItemKind.Keyword
+
+  return monaco.languages.registerCompletionItemProvider('sql', {
+    triggerCharacters: ['.', ' ', ',', '\n'],
+    provideCompletionItems(model, position) {
+      const connId = connectionIdForCompletion.value
+      const word = model.getWordUntilPosition(position)
+      const lineText = model.getLineContent(position.lineNumber).slice(0, position.column - 1)
+      const trimmedRight = lineText.replace(/\s+$/, '')
+      const suggestions: monaco.languages.CompletionItem[] = []
+
+      const range = {
+        startLineNumber: position.lineNumber,
+        endLineNumber: position.lineNumber,
+        startColumn: word.startColumn,
+        endColumn: word.endColumn,
+      }
+
+      // After "xxx." -> suggest columns for table xxx
+      const dotMatch = trimmedRight.match(/(\w+)\.\s*$/)
+      if (dotMatch && connId) {
+        const tableOrAlias = dotMatch[1]
+        const columns = getColumnsForTable(connId, tableOrAlias)
+        for (const col of columns) {
+          suggestions.push({
+            label: col.label,
+            kind: kindColumn,
+            detail: col.detail,
+            insertText: col.label,
+            range,
+          })
+        }
+        if (suggestions.length) return { suggestions }
+      }
+
+      // After FROM, JOIN, INTO -> prefer table names
+      const afterFrom = /\b(?:FROM|JOIN|INTO|UPDATE)\s+$/i.test(trimmedRight)
+      if (connId) {
+        const tables = getAllTableNames(connId)
+        for (const name of tables) {
+          suggestions.push({
+            label: name,
+            kind: kindTable,
+            detail: 'table',
+            insertText: name,
+            range,
+          })
+        }
+        if (!afterFrom) {
+          const columns = getAllColumns(connId)
+          for (const col of columns) {
+            suggestions.push({
+              label: col.label,
+              kind: kindColumn,
+              detail: col.detail,
+              insertText: col.label,
+              range,
+            })
+          }
+        }
+      }
+
+      const sqlKeywords = ['SELECT', 'FROM', 'WHERE', 'JOIN', 'LEFT', 'RIGHT', 'INNER', 'ON', 'GROUP BY', 'ORDER BY', 'LIMIT', 'INSERT', 'INTO', 'VALUES', 'UPDATE', 'SET', 'DELETE', 'AS', 'AND', 'OR', 'ASC', 'DESC']
+      for (const kw of sqlKeywords) {
+        if (!word.word || kw.toLowerCase().startsWith(word.word.toLowerCase())) {
+          suggestions.push({
+            label: kw,
+            kind: kindKeyword,
+            insertText: kw,
+            range,
+          })
+        }
+      }
+      return { suggestions }
+    },
+  })
+}
 
 watch(() => props.initialSql, () => applyInitialSql())
 // Restore saved result when switching back to this tab (immediate so we sync on mount too)
@@ -140,6 +237,8 @@ function applyInitialSql() {
 }
 
 onUnmounted(() => {
+  completionProviderDisposable?.dispose()
+  completionProviderDisposable = null
   if (editor.value) {
     editor.value.dispose()
   }

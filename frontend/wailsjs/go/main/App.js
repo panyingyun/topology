@@ -46,6 +46,10 @@ export function GetQueryHistory(arg1, arg2, arg3) {
   return window['go']['main']['App']['GetQueryHistory'](arg1, arg2, arg3);
 }
 
+export function GetSchemaMetadata(arg1) {
+  return window['go']['main']['App']['GetSchemaMetadata'](arg1);
+}
+
 export function GetTableData(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['main']['App']['GetTableData'](arg1, arg2, arg3, arg4, arg5);
 }
@@ -68,6 +72,10 @@ export function ImportData(arg1, arg2, arg3, arg4, arg5, arg6) {
 
 export function ImportDataPreview(arg1, arg2) {
   return window['go']['main']['App']['ImportDataPreview'](arg1, arg2);
+}
+
+export function LoadSchemaMetadata(arg1) {
+  return window['go']['main']['App']['LoadSchemaMetadata'](arg1);
 }
 
 export function ReconnectConnection(arg1) {
