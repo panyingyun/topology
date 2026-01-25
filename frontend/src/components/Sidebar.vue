@@ -2,15 +2,20 @@
 import { ref } from 'vue'
 import { Search, Plus } from 'lucide-vue-next'
 import ConnectionTree from './ConnectionTree.vue'
+import type { Connection } from '../types'
 
 const props = defineProps<{
   width: number
+  connections: Connection[]
 }>()
 
 const emit = defineEmits<{
   (e: 'update:width', width: number): void
   (e: 'new-connection'): void
   (e: 'table-selected', connectionId: string, database: string, tableName: string): void
+  (e: 'edit-connection', connection: Connection): void
+  (e: 'refresh-connection', connectionId: string): void
+  (e: 'delete-connection', connectionId: string): void
 }>()
 
 const searchQuery = ref('')
@@ -64,7 +69,11 @@ const startResize = (e: MouseEvent) => {
     <div class="flex-1 overflow-y-auto custom-scrollbar px-2">
       <ConnectionTree
         :search-query="searchQuery"
+        :connections="connections"
         @table-selected="(connId, db, tableName) => emit('table-selected', connId, db, tableName)"
+        @edit-connection="(conn) => emit('edit-connection', conn)"
+        @refresh-connection="(id) => emit('refresh-connection', id)"
+        @delete-connection="(id) => emit('delete-connection', id)"
       />
     </div>
 

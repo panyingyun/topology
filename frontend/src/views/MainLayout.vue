@@ -11,6 +11,8 @@ import type { TabItem, Connection, QueryResult } from '../types'
 
 const sidebarWidth = ref(260)
 const showConnectionManager = ref(false)
+const connectionManagerMode = ref<'create' | 'edit'>('create')
+const editingConnection = ref<Connection | null>(null)
 const connections = ref<Connection[]>([])
 const tabs = ref<TabItem[]>([])
 const activeTabId = ref('')
@@ -33,7 +35,48 @@ const loadConnections = async () => {
 }
 
 const handleNewConnection = () => {
+  connectionManagerMode.value = 'create'
+  editingConnection.value = null
   showConnectionManager.value = true
+}
+
+const handleEditConnection = (connection: Connection) => {
+  connectionManagerMode.value = 'edit'
+  editingConnection.value = connection
+  showConnectionManager.value = true
+}
+
+const handleConnectionUpdate = async (connection: Connection) => {
+  try {
+    await connectionService.updateConnection(connection)
+    await loadConnections()
+    showConnectionManager.value = false
+    editingConnection.value = null
+  } catch (error) {
+    console.error('Failed to update connection:', error)
+  }
+}
+
+const handleRefreshConnection = async (connectionId: string) => {
+  try {
+    await connectionService.reconnectConnection(connectionId)
+    await loadConnections()
+  } catch (error) {
+    console.error('Failed to refresh connection:', error)
+  }
+}
+
+const handleDeleteConnection = async (connectionId: string) => {
+  try {
+    await connectionService.deleteConnection(connectionId)
+    await loadConnections()
+    tabs.value = tabs.value.filter((t) => t.connectionId !== connectionId)
+    if (activeTabId.value && tabs.value.find((t) => t.id === activeTabId.value) === undefined) {
+      activeTabId.value = tabs.value.length > 0 ? tabs.value[0].id : ''
+    }
+  } catch (error) {
+    console.error('Failed to delete connection:', error)
+  }
 }
 
 const handleConnectionConnect = async (connection: Connection) => {
@@ -110,9 +153,13 @@ const activeTab = computed(() => {
     <div class="flex flex-1 overflow-hidden">
       <Sidebar
         :width="sidebarWidth"
+        :connections="connections"
         @update:width="sidebarWidth = $event"
         @new-connection="handleNewConnection"
         @table-selected="handleTableSelected"
+        @edit-connection="handleEditConnection"
+        @refresh-connection="handleRefreshConnection"
+        @delete-connection="handleDeleteConnection"
       />
 
       <div class="flex-1 flex flex-col overflow-hidden">
@@ -149,8 +196,11 @@ const activeTab = computed(() => {
 
     <ConnectionManager
       :show="showConnectionManager"
-      @close="showConnectionManager = false"
+      :mode="connectionManagerMode"
+      :edit-connection="editingConnection"
+      @close="showConnectionManager = false; editingConnection = null"
       @connect="handleConnectionConnect"
+      @update="handleConnectionUpdate"
     />
   </div>
 </template>

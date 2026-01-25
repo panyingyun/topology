@@ -257,6 +257,37 @@ func (a *App) TestConnection(connJSON string) bool {
 	return db.Ping(driver, dsn) == nil
 }
 
+// UpdateConnection updates an existing connection by ID. ID must exist.
+func (a *App) UpdateConnection(connJSON string) error {
+	var conn Connection
+	if err := json.Unmarshal([]byte(connJSON), &conn); err != nil {
+		return err
+	}
+	if conn.ID == "" {
+		return fmt.Errorf("connection ID required")
+	}
+	db.Close(conn.ID)
+	connMu.Lock()
+	defer connMu.Unlock()
+	for i, c := range mockConnections {
+		if c.ID == conn.ID {
+			conn.CreatedAt = c.CreatedAt
+			if conn.Status == "" {
+				conn.Status = c.Status
+			}
+			mockConnections[i] = conn
+			return nil
+		}
+	}
+	return fmt.Errorf("connection not found")
+}
+
+// ReconnectConnection closes cached DB for the connection so it reconnects on next use.
+func (a *App) ReconnectConnection(id string) error {
+	db.Close(id)
+	return nil
+}
+
 // DeleteConnection deletes a connection by ID
 func (a *App) DeleteConnection(id string) error {
 	db.Close(id)

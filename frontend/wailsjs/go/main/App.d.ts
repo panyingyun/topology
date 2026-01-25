@@ -23,6 +23,10 @@ export function GetTables(arg1:string,arg2:string):Promise<string>;
 
 export function Greet(arg1:string):Promise<string>;
 
+export function ReconnectConnection(arg1:string):Promise<void>;
+
 export function TestConnection(arg1:string):Promise<boolean>;
+
+export function UpdateConnection(arg1:string):Promise<void>;
 
 export function UpdateTableData(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;

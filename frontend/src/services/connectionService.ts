@@ -1,6 +1,13 @@
 import type { Connection } from '../types'
 
-import { GetConnections, CreateConnection, TestConnection, DeleteConnection } from '../../wailsjs/go/main/App'
+import {
+  GetConnections,
+  CreateConnection,
+  TestConnection,
+  DeleteConnection,
+  UpdateConnection,
+  ReconnectConnection,
+} from '../../wailsjs/go/main/App'
 
 export const connectionService = {
   async getConnections(): Promise<Connection[]> {
@@ -16,13 +23,17 @@ export const connectionService = {
   async createConnection(connection: Omit<Connection, 'id' | 'status' | 'createdAt'>): Promise<Connection> {
     const connJSON = JSON.stringify(connection)
     await CreateConnection(connJSON)
-    // Return the created connection (in real implementation, backend would return it)
     return {
       ...connection,
       id: Date.now().toString(),
       status: 'disconnected',
       createdAt: new Date().toISOString(),
     }
+  },
+
+  async updateConnection(connection: Connection): Promise<void> {
+    const connJSON = JSON.stringify(connection)
+    await UpdateConnection(connJSON)
   },
 
   async testConnection(connection: Omit<Connection, 'id' | 'status' | 'createdAt'>): Promise<boolean> {
@@ -33,6 +44,10 @@ export const connectionService = {
       console.error('Failed to test connection:', error)
       return false
     }
+  },
+
+  async reconnectConnection(id: string): Promise<void> {
+    await ReconnectConnection(id)
   },
 
   async deleteConnection(id: string): Promise<void> {

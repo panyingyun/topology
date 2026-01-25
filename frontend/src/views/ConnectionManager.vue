@@ -1,16 +1,19 @@
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref, reactive, watch, computed } from 'vue'
 import { Database, CheckCircle, XCircle, Loader } from 'lucide-vue-next'
 import { connectionService } from '../services/connectionService'
 import type { Connection, DatabaseType } from '../types'
 
 const props = defineProps<{
   show: boolean
+  mode?: 'create' | 'edit'
+  editConnection?: Connection | null
 }>()
 
 const emit = defineEmits<{
   (e: 'close'): void
   (e: 'connect', connection: Connection): void
+  (e: 'update', connection: Connection): void
 }>()
 
 const activeDbType = ref<DatabaseType>('mysql')
@@ -25,6 +28,35 @@ const form = reactive({
   password: '',
   database: '',
   useSSL: false,
+})
+
+const isEditMode = computed(() => props.mode === 'edit' && props.editConnection)
+
+watch([() => props.show, () => props.editConnection], () => {
+  if (props.show) {
+    if (isEditMode.value && props.editConnection) {
+      const conn = props.editConnection
+      activeDbType.value = (conn.type as DatabaseType) || 'mysql'
+      form.name = conn.name || ''
+      form.host = conn.host || '127.0.0.1'
+      form.port = conn.port || (activeDbType.value === 'mysql' ? 3306 : 5432)
+      form.username = conn.username || 'root'
+      form.password = conn.password || ''
+      form.database = conn.database || ''
+      form.useSSL = conn.useSSL || false
+    } else {
+      activeDbType.value = 'mysql'
+      form.name = ''
+      form.host = '127.0.0.1'
+      form.port = 3306
+      form.username = 'root'
+      form.password = ''
+      form.database = ''
+      form.useSSL = false
+    }
+    testStatus.value = 'idle'
+    errorMessage.value = ''
+  }
 })
 
 const handleTypeChange = (type: DatabaseType) => {
@@ -82,6 +114,29 @@ const handleConnect = async () => {
   }
 }
 
+const handleUpdate = async () => {
+  if (!isEditMode.value || !props.editConnection) return
+  try {
+    const updated: Connection = {
+      ...props.editConnection,
+      name: form.name,
+      type: activeDbType.value,
+      host: form.host,
+      port: form.port,
+      username: form.username,
+      password: form.password,
+      database: form.database || undefined,
+      useSSL: form.useSSL,
+    }
+    await connectionService.updateConnection(updated)
+    emit('update', updated)
+    emit('close')
+  } catch (error) {
+    console.error('Failed to update connection:', error)
+    errorMessage.value = error instanceof Error ? error.message : 'Failed to update connection'
+  }
+}
+
 const dbTypes: Array<{ type: DatabaseType; label: string; icon: string; color: string }> = [
   { type: 'mysql', label: 'MySQL', icon: '🐬', color: '#4479a1' },
   { type: 'postgresql', label: 'PostgreSQL', icon: '🐘', color: '#336791' },
@@ -98,7 +153,9 @@ const dbTypes: Array<{ type: DatabaseType; label: string; icon: string; color: s
     >
       <div class="bg-[#252526] rounded-lg border border-[#333] w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         <div class="px-6 py-4 border-b border-[#333] flex items-center justify-between">
-          <h2 class="text-lg font-semibold text-gray-200">New Connection</h2>
+          <h2 class="text-lg font-semibold text-gray-200">
+            {{ isEditMode ? '编辑连接' : 'New Connection' }}
+          </h2>
           <button
             @click="emit('close')"
             class="text-gray-400 hover:text-gray-200 transition-colors"
@@ -232,10 +289,18 @@ const dbTypes: Array<{ type: DatabaseType; label: string; icon: string; color: s
               Cancel
             </button>
             <button
+              v-if="!isEditMode"
               @click="handleConnect"
               class="px-6 py-2 rounded text-xs font-semibold bg-[#1677ff] hover:bg-[#4096ff] text-white transition-colors"
             >
               Connect
+            </button>
+            <button
+              v-else
+              @click="handleUpdate"
+              class="px-6 py-2 rounded text-xs font-semibold bg-[#1677ff] hover:bg-[#4096ff] text-white transition-colors"
+            >
+              更新
             </button>
           </div>
         </div>

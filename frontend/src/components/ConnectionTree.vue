@@ -1,16 +1,19 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { ChevronRight, ChevronDown, Database, Table as TableIcon, Circle, FolderOpen } from 'lucide-vue-next'
-import { connectionService } from '../services/connectionService'
 import { dataService } from '../services/dataService'
 import type { Connection, Table } from '../types'
 
 const props = defineProps<{
   searchQuery: string
+  connections: Connection[]
 }>()
 
 const emit = defineEmits<{
   (e: 'table-selected', connectionId: string, database: string, tableName: string): void
+  (e: 'edit-connection', connection: Connection): void
+  (e: 'refresh-connection', connectionId: string): void
+  (e: 'delete-connection', connectionId: string): void
 }>()
 
 const connections = ref<Connection[]>([])
@@ -19,22 +22,37 @@ const expandedDatabases = ref<Set<string>>(new Set())
 const databasesCache = ref<Record<string, string[]>>({})
 const tablesCache = ref<Record<string, Table[]>>({})
 
+const contextMenu = ref<{
+  show: boolean
+  x: number
+  y: number
+  connection: Connection | null
+}>({
+  show: false,
+  x: 0,
+  y: 0,
+  connection: null,
+})
+
 function dbKey(connId: string, db: string) {
   return `${connId}:${db}`
 }
 
-const loadConnections = async () => {
-  try {
-    const conns = await connectionService.getConnections()
-    connections.value = conns
-    if (connections.value.length > 0) {
-      expandedConnections.value.add(connections.value[0].id)
-      await loadDatabases(connections.value[0].id)
-    }
-  } catch (error) {
-    console.error('Failed to load connections:', error)
+watch(() => props.connections, (newConns) => {
+  if (newConns && newConns.length > 0 && expandedConnections.value.size === 0) {
+    expandedConnections.value.add(newConns[0].id)
+    loadDatabases(newConns[0].id)
   }
-}
+  // Clear caches for deleted connections
+  const connIds = new Set(newConns?.map(c => c.id) || [])
+  Object.keys(databasesCache.value).forEach(id => {
+    if (!connIds.has(id)) delete databasesCache.value[id]
+  })
+  Object.keys(tablesCache.value).forEach(key => {
+    const [connId] = key.split(':')
+    if (!connIds.has(connId)) delete tablesCache.value[key]
+  })
+}, { immediate: true })
 
 const loadDatabases = async (connectionId: string) => {
   if (databasesCache.value[connectionId]) return
@@ -80,16 +98,57 @@ const handleTableClick = (connectionId: string, database: string, tableName: str
   emit('table-selected', connectionId, database, tableName)
 }
 
+const handleConnectionContextMenu = (e: MouseEvent, conn: Connection) => {
+  e.preventDefault()
+  e.stopPropagation()
+  contextMenu.value = {
+    show: true,
+    x: e.clientX,
+    y: e.clientY,
+    connection: conn,
+  }
+}
+
+const closeContextMenu = () => {
+  contextMenu.value.show = false
+}
+
+const handleEditConnection = () => {
+  if (contextMenu.value.connection) {
+    emit('edit-connection', contextMenu.value.connection)
+  }
+  closeContextMenu()
+}
+
+const handleRefreshConnection = () => {
+  if (contextMenu.value.connection) {
+    emit('refresh-connection', contextMenu.value.connection.id)
+  }
+  closeContextMenu()
+}
+
+const handleDeleteConnection = () => {
+  if (contextMenu.value.connection) {
+    emit('delete-connection', contextMenu.value.connection.id)
+  }
+  closeContextMenu()
+}
+
 const filteredConnections = computed(() => {
-  if (!props.searchQuery) return connections.value
+  const conns = props.connections || []
+  if (!props.searchQuery) return conns
   const q = props.searchQuery.toLowerCase()
-  return connections.value.filter(
+  return conns.filter(
     (c) => c.name.toLowerCase().includes(q) || c.host.toLowerCase().includes(q)
   )
 })
 
 onMounted(() => {
-  loadConnections()
+  document.addEventListener('click', closeContextMenu)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', closeContextMenu)
 })
 </script>
 
@@ -99,6 +158,7 @@ onMounted(() => {
       <!-- Level 0: Connection -->
       <div
         @click="toggleConnection(conn.id)"
+        @contextmenu="handleConnectionContextMenu($event, conn)"
         class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-[#37373d] cursor-pointer group transition-colors"
       >
         <component
@@ -153,5 +213,54 @@ onMounted(() => {
         </div>
       </div>
     </div>
+
+    <!-- Context Menu -->
+    <Teleport to="body">
+      <Transition name="fade">
+        <div
+          v-if="contextMenu.show"
+          class="fixed z-[100] bg-[#252526] border border-[#333] rounded shadow-lg py-1 min-w-[160px]"
+          :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }"
+          @click.stop
+        >
+          <button
+            @click="handleEditConnection"
+            class="w-full px-4 py-2 text-left text-xs text-gray-300 hover:bg-[#37373d] transition-colors"
+          >
+            编辑连接
+          </button>
+          <button
+            @click="handleRefreshConnection"
+            class="w-full px-4 py-2 text-left text-xs text-gray-300 hover:bg-[#37373d] transition-colors"
+          >
+            更新连接
+          </button>
+          <div class="h-px bg-[#333] my-1"></div>
+          <button
+            @click="handleDeleteConnection"
+            class="w-full px-4 py-2 text-left text-xs text-red-400 hover:bg-[#37373d] transition-colors"
+          >
+            删除连接
+          </button>
+        </div>
+      </Transition>
+      <div
+        v-if="contextMenu.show"
+        class="fixed inset-0 z-[99]"
+        @click="closeContextMenu"
+      ></div>
+    </Teleport>
   </div>
 </template>
+
+<style scoped>
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+</style>

@@ -46,8 +46,16 @@ export function Greet(arg1) {
   return window['go']['main']['App']['Greet'](arg1);
 }
 
+export function ReconnectConnection(arg1) {
+  return window['go']['main']['App']['ReconnectConnection'](arg1);
+}
+
 export function TestConnection(arg1) {
   return window['go']['main']['App']['TestConnection'](arg1);
+}
+
+export function UpdateConnection(arg1) {
+  return window['go']['main']['App']['UpdateConnection'](arg1);
 }
 
 export function UpdateTableData(arg1, arg2, arg3, arg4) {
