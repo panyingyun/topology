@@ -71,9 +71,9 @@ archives:
       - LICENSE
       - README.md
 
-# 校验和配置（文件名含 Os、Arch）
+# 校验和配置（文件名含 Os、Arch，使用 Runtime.Goos/Goarch）
 checksum:
-  name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}_checksums.txt"
+  name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Runtime.Goos }}_{{ .Runtime.Goarch }}_checksums.txt"
   algorithm: sha256
 
 # 快照配置
