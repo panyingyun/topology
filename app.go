@@ -723,6 +723,290 @@ func (a *App) ClearQueryHistory() error {
 	return os.Remove(filePath)
 }
 
+// ImportDataPreview parses and returns preview of import data (first 10 rows)
+func (a *App) ImportDataPreview(filePath, format string) string {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return mustMarshalPreview(nil, nil, err.Error())
+	}
+
+	var columns []string
+	var rows []map[string]interface{}
+
+	switch strings.ToLower(format) {
+	case "csv":
+		cols, rowsData, err := parseCSV(data)
+		if err != nil {
+			return mustMarshalPreview(nil, nil, err.Error())
+		}
+		columns = cols
+		// Convert to map format
+		rows = make([]map[string]interface{}, 0, len(rowsData))
+		for _, row := range rowsData {
+			rowMap := make(map[string]interface{})
+			for i, col := range columns {
+				if i < len(row) {
+					rowMap[col] = row[i]
+				}
+			}
+			rows = append(rows, rowMap)
+		}
+	case "json":
+		var jsonData struct {
+			Columns []string                   `json:"columns"`
+			Rows    []map[string]interface{} `json:"rows"`
+		}
+		if err := json.Unmarshal(data, &jsonData); err != nil {
+			// Try array format
+			var arrayData []map[string]interface{}
+			if err2 := json.Unmarshal(data, &arrayData); err2 != nil {
+				return mustMarshalPreview(nil, nil, err.Error())
+			}
+			if len(arrayData) > 0 {
+				// Extract columns from first row
+				columns = make([]string, 0, len(arrayData[0]))
+				for k := range arrayData[0] {
+					columns = append(columns, k)
+				}
+				rows = arrayData
+			}
+		} else {
+			columns = jsonData.Columns
+			rows = jsonData.Rows
+		}
+	default:
+		return mustMarshalPreview(nil, nil, "unsupported format: "+format)
+	}
+
+	// Limit to first 10 rows for preview
+	previewRows := rows
+	if len(previewRows) > 10 {
+		previewRows = previewRows[:10]
+	}
+
+	return mustMarshalPreview(columns, previewRows, "")
+}
+
+func mustMarshalPreview(cols []string, rows []map[string]interface{}, errMsg string) string {
+	result := map[string]interface{}{
+		"columns": cols,
+		"rows":    rows,
+		"error":   errMsg,
+	}
+	data, _ := json.Marshal(result)
+	return string(data)
+}
+
+func parseCSV(data []byte) ([]string, [][]string, error) {
+	reader := csv.NewReader(strings.NewReader(string(data)))
+	records, err := reader.ReadAll()
+	if err != nil {
+		return nil, nil, err
+	}
+	if len(records) == 0 {
+		return nil, nil, fmt.Errorf("empty CSV file")
+	}
+	columns := records[0]
+	rows := records[1:]
+	return columns, rows, nil
+}
+
+// ImportData imports data into a table
+func (a *App) ImportData(connectionID, database, tableName, filePath, format string, columnMappingJSON string) string {
+	g, err := getOrOpenDB(connectionID)
+	if err != nil {
+		return importError(err.Error())
+	}
+	conn := getConnByID(connectionID)
+	if conn == nil {
+		return importError("connection not found")
+	}
+
+	// Parse column mapping
+	var columnMapping map[string]string
+	if columnMappingJSON != "" {
+		if err := json.Unmarshal([]byte(columnMappingJSON), &columnMapping); err != nil {
+			return importError("invalid column mapping: " + err.Error())
+		}
+	}
+
+	// Read and parse file
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return importError("failed to read file: " + err.Error())
+	}
+
+	var columns []string
+	var rows []map[string]interface{}
+
+	switch strings.ToLower(format) {
+	case "csv":
+		cols, rowsData, err := parseCSV(data)
+		if err != nil {
+			return importError("failed to parse CSV: " + err.Error())
+		}
+		columns = cols
+		rows = make([]map[string]interface{}, 0, len(rowsData))
+		for _, row := range rowsData {
+			rowMap := make(map[string]interface{})
+			for i, col := range columns {
+				if i < len(row) {
+					rowMap[col] = row[i]
+				}
+			}
+			rows = append(rows, rowMap)
+		}
+	case "json":
+		var jsonData struct {
+			Columns []string                   `json:"columns"`
+			Rows    []map[string]interface{} `json:"rows"`
+		}
+		if err := json.Unmarshal(data, &jsonData); err != nil {
+			// Try array format
+			var arrayData []map[string]interface{}
+			if err2 := json.Unmarshal(data, &arrayData); err2 != nil {
+				return importError("failed to parse JSON: " + err.Error())
+			}
+			if len(arrayData) > 0 {
+				columns = make([]string, 0, len(arrayData[0]))
+				for k := range arrayData[0] {
+					columns = append(columns, k)
+				}
+				rows = arrayData
+			}
+		} else {
+			columns = jsonData.Columns
+			rows = jsonData.Rows
+		}
+	default:
+		return importError("unsupported format: " + format)
+	}
+
+	// Apply column mapping if provided
+	if len(columnMapping) > 0 {
+		for i := range rows {
+			newRows := make(map[string]interface{})
+			for fileCol, dbCol := range columnMapping {
+				if val, ok := rows[i][fileCol]; ok {
+					newRows[dbCol] = val
+				}
+			}
+			rows[i] = newRows
+		}
+	}
+
+	// Get table columns to determine insert columns
+	tbl := db.QualTable(conn.Type, database, tableName)
+	tableCols, err := getTableColumns(g, conn.Type, database, tableName)
+	if err != nil {
+		return importError("failed to get table columns: " + err.Error())
+	}
+
+	// Build INSERT statements and execute in batches
+	batchSize := 100
+	inserted := 0
+	for i := 0; i < len(rows); i += batchSize {
+		end := i + batchSize
+		if end > len(rows) {
+			end = len(rows)
+		}
+		batch := rows[i:end]
+
+		// Build INSERT statement
+		insertCols := make([]string, 0)
+		for _, col := range tableCols {
+			// Check if this column exists in the data
+			for _, row := range batch {
+				if _, ok := row[col]; ok {
+					insertCols = append(insertCols, col)
+					break
+				}
+			}
+		}
+
+		if len(insertCols) == 0 {
+			continue
+		}
+
+		// Build VALUES clause
+		values := make([]string, 0, len(batch))
+		for _, row := range batch {
+			rowValues := make([]string, 0, len(insertCols))
+			for _, col := range insertCols {
+				val := row[col]
+				if val == nil {
+					rowValues = append(rowValues, "NULL")
+				} else {
+					valStr := escapeSQLValue(fmt.Sprint(val), conn.Type)
+					rowValues = append(rowValues, valStr)
+				}
+			}
+			values = append(values, "("+strings.Join(rowValues, ", ")+")")
+		}
+
+		quotedCols := make([]string, len(insertCols))
+		for i, col := range insertCols {
+			quotedCols[i] = quoteIdent(conn.Type, col)
+		}
+
+		sql := fmt.Sprintf("INSERT INTO %s (%s) VALUES %s",
+			tbl, strings.Join(quotedCols, ", "), strings.Join(values, ", "))
+		
+		if err := g.Exec(sql).Error; err != nil {
+			return importError(fmt.Sprintf("failed to insert batch: %v", err))
+		}
+		inserted += len(batch)
+	}
+
+	result := map[string]interface{}{
+		"success":   true,
+		"inserted":  inserted,
+		"totalRows": len(rows),
+	}
+	data2, _ := json.Marshal(result)
+	return string(data2)
+}
+
+func importError(msg string) string {
+	result := map[string]interface{}{
+		"success": false,
+		"error":   msg,
+	}
+	data, _ := json.Marshal(result)
+	return string(data)
+}
+
+func getTableColumns(g *gorm.DB, driver, database, tableName string) ([]string, error) {
+	var columns []string
+	if driver == "mysql" {
+		query := "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION"
+		if database == "" {
+			query = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = ? ORDER BY ORDINAL_POSITION"
+			if err := g.Raw(query, tableName).Scan(&columns).Error; err != nil {
+				return nil, err
+			}
+		} else {
+			if err := g.Raw(query, database, tableName).Scan(&columns).Error; err != nil {
+				return nil, err
+			}
+		}
+	} else if driver == "sqlite" {
+		query := fmt.Sprintf("PRAGMA table_info(%s)", quoteIdent(driver, tableName))
+		type ColumnInfo struct {
+			Name string `gorm:"column:name"`
+		}
+		var infos []ColumnInfo
+		if err := g.Raw(query).Scan(&infos).Error; err != nil {
+			return nil, err
+		}
+		columns = make([]string, len(infos))
+		for i, info := range infos {
+			columns[i] = info.Name
+		}
+	}
+	return columns, nil
+}
+
 // GetTableSchema returns table schema. database is optional (MySQL: scope by TABLE_SCHEMA).
 func (a *App) GetTableSchema(connectionID, database, tableName string) string {
 	g, err := getOrOpenDB(connectionID)

@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
+import { Upload } from 'lucide-vue-next'
 import DataGrid from '../components/DataGrid.vue'
+import DataImporter from '../components/DataImporter.vue'
 import { dataService } from '../services/dataService'
-import type { TableData, UpdateRecord, ExportFormat, QueryResult } from '../types'
+import type { TableData, UpdateRecord, ExportFormat, QueryResult, ImportResult } from '../types'
 
 const props = defineProps<{
   connectionId: string
@@ -13,6 +15,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update', updates: UpdateRecord[]): void
 }>()
+
+const showImporter = ref(false)
 
 const tableData = ref<TableData>({
   columns: [],
@@ -79,6 +83,11 @@ const handleExport = async (format: ExportFormat) => {
   }
 }
 
+const handleImportSuccess = (result: ImportResult) => {
+  // Reload table data after successful import
+  loadTableData(currentPage.value)
+}
+
 // Convert TableData to QueryResult format for DataGrid
 const queryResult = computed<QueryResult>(() => ({
   columns: tableData.value.columns,
@@ -110,6 +119,13 @@ watch(
       </div>
 
       <div class="flex items-center gap-2">
+        <button
+          @click="showImporter = true"
+          class="flex items-center gap-1.5 px-3 py-1 bg-[#1677ff] hover:bg-[#4096ff] text-white text-xs rounded transition-colors font-semibold"
+        >
+          <Upload :size="12" />
+          导入数据
+        </button>
         <button
           v-if="currentPage * pageSize < tableData.totalRows"
           @click="handleLoadMore"
@@ -152,5 +168,15 @@ watch(
         <p class="text-sm">No data available</p>
       </div>
     </div>
+
+    <!-- Data Importer -->
+    <DataImporter
+      :show="showImporter"
+      :connection-id="connectionId"
+      :database="database"
+      :table-name="tableName"
+      @close="showImporter = false"
+      @success="handleImportSuccess"
+    />
   </div>
 </template>

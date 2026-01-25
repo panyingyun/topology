@@ -125,3 +125,19 @@ export interface QueryHistory {
   duration?: number
   rowCount?: number
 }
+
+// Import types
+export type ImportFormat = 'csv' | 'json'
+
+export interface ImportPreview {
+  columns: string[]
+  rows: Record<string, any>[]
+  error?: string
+}
+
+export interface ImportResult {
+  success: boolean
+  inserted?: number
+  totalRows?: number
+  error?: string
+}
