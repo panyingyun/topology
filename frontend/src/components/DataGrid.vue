@@ -28,7 +28,7 @@ const gridOptions = ref<VxeGridProps>({
   height: '100%',
   columnConfig: { resizable: true },
   rowConfig: { isCurrent: true, isHover: true },
-  scrollY: { enabled: true, gt: 50 },
+  scrollY: { enabled: true, gt: 20 },
   editConfig: { trigger: 'dblclick', mode: 'cell' },
   filterConfig: { remote: false },
   columns: [],
@@ -68,24 +68,59 @@ const handleEditClosed = () => {
   }
 }
 
-const saveChanges = () => {
-  if (gridRef.value) {
-    try {
-      const recordset = gridRef.value.getRecordset()
-      if (recordset && recordset.updateRecords) {
-        const updates: UpdateRecord[] = recordset.updateRecords.map((record: any) => ({
-          rowIndex: record._X_ROW_KEY || 0,
-          column: '',
-          oldValue: record._X_ORIGIN_DATA || record,
-          newValue: record,
-        }))
-        emit('update', updates)
-        pendingChanges.value = 0
-        gridRef.value.reloadRow(recordset.updateRecords, null)
+function buildUpdatesFromRecordset(recordset: { updateRecords?: any[] }, columns: string[]): UpdateRecord[] {
+  const updates: UpdateRecord[] = []
+  const list = recordset.updateRecords || []
+  for (const record of list) {
+    const origin = record._X_ORIGIN_DATA as Record<string, unknown> | undefined
+    if (!origin) continue
+    for (const col of columns) {
+      const oldVal = origin[col]
+      const newVal = record[col]
+      if (oldVal !== newVal && JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
+        updates.push({
+          rowIndex: record._X_ROW_KEY ?? 0,
+          column: col,
+          oldValue: oldVal,
+          newValue: newVal,
+        })
       }
-    } catch (error) {
-      console.error('Error saving changes:', error)
     }
+  }
+  return updates
+}
+
+const commitChanges = () => {
+  if (!gridRef.value || !props.data?.columns) return
+  try {
+    const recordset = gridRef.value.getRecordset()
+    if (recordset?.updateRecords?.length) {
+      const updates = buildUpdatesFromRecordset(recordset, props.data.columns)
+      if (updates.length) {
+        emit('update', updates)
+      }
+      pendingChanges.value = 0
+      gridRef.value.reloadRow(recordset.updateRecords, null)
+    }
+  } catch (error) {
+    console.error('Error committing changes:', error)
+  }
+}
+
+const rollbackChanges = () => {
+  if (!gridRef.value || !props.data?.rows) return
+  try {
+    const recordset = gridRef.value.getRecordset()
+    if (recordset?.updateRecords?.length) {
+      const rows = props.data.rows.map((r: Record<string, unknown>) => ({ ...r }))
+      gridOptions.value.data = rows
+      if (typeof gridRef.value.reloadData === 'function') {
+        gridRef.value.reloadData(rows)
+      }
+      pendingChanges.value = 0
+    }
+  } catch (error) {
+    console.error('Error rolling back:', error)
   }
 }
 
@@ -129,10 +164,17 @@ onUnmounted(() => {
       <div class="flex items-center gap-2">
         <button
           v-if="pendingChanges > 0"
-          @click="saveChanges"
+          @click="commitChanges"
           class="px-3 py-1 bg-green-600 hover:bg-green-500 text-white text-xs rounded transition-colors"
         >
-          {{ t('dataGrid.saveChanges') }}
+          {{ t('dataGrid.commit') }}
+        </button>
+        <button
+          v-if="pendingChanges > 0"
+          @click="rollbackChanges"
+          class="px-3 py-1 bg-[#3c3c3c] hover:bg-[#4c4c4c] text-gray-300 text-xs rounded transition-colors"
+        >
+          {{ t('dataGrid.rollback') }}
         </button>
         <div class="relative" ref="exportMenuRef">
           <button

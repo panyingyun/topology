@@ -86,6 +86,8 @@ export default {
   dataGrid: {
     rows: 'Rows',
     pendingChanges: 'pending changes',
+    commit: 'Commit',
+    rollback: 'Rollback',
     saveChanges: 'Save Changes',
     export: 'Export',
     csv: 'CSV',

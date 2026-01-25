@@ -19,8 +19,9 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"topology/internal/db"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // App struct
@@ -641,11 +642,15 @@ func (a *App) GetTableData(connectionID, database, tableName string, limit, offs
 	return string(data)
 }
 
-// UpdateTableData updates table data. database is optional (MySQL: qualify db.table).
+// UpdateTableData updates table data in a single transaction. database is optional (MySQL: qualify db.table).
+// On any failure, the whole transaction is rolled back.
 func (a *App) UpdateTableData(connectionID, database, tableName, updatesJSON string) error {
 	var updates []UpdateRecord
 	if err := json.Unmarshal([]byte(updatesJSON), &updates); err != nil {
 		return err
+	}
+	if len(updates) == 0 {
+		return nil
 	}
 	g, err := getOrOpenDB(connectionID)
 	if err != nil {
@@ -656,14 +661,16 @@ func (a *App) UpdateTableData(connectionID, database, tableName, updatesJSON str
 		return fmt.Errorf("connection not found")
 	}
 	tbl := db.QualTable(conn.Type, database, tableName)
-	for _, u := range updates {
-		col := quoteIdent(conn.Type, u.Column)
-		q := fmt.Sprintf("UPDATE %s SET %s = ? WHERE %s = ? LIMIT 1", tbl, col, col)
-		if res := g.Exec(q, u.NewValue, u.OldValue); res.Error != nil {
-			return res.Error
+	return g.Transaction(func(tx *gorm.DB) error {
+		for _, u := range updates {
+			col := quoteIdent(conn.Type, u.Column)
+			q := fmt.Sprintf("UPDATE %s SET %s = ? WHERE %s = ? LIMIT 1", tbl, col, col)
+			if res := tx.Exec(q, u.NewValue, u.OldValue); res.Error != nil {
+				return res.Error
+			}
 		}
-	}
-	return nil
+		return nil
+	})
 }
 
 func quoteIdent(driver, name string) string {

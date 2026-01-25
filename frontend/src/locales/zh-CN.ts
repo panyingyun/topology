@@ -85,7 +85,9 @@ export default {
   },
   dataGrid: {
     rows: '行数',
-    pendingChanges: '待保存的更改',
+    pendingChanges: '待提交的更改',
+    commit: '提交',
+    rollback: '回滚',
     saveChanges: '保存更改',
     export: '导出',
     csv: 'CSV',
