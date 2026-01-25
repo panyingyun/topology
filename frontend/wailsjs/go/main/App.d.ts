@@ -23,6 +23,8 @@ export function GetConnections():Promise<string>;
 
 export function GetDatabases(arg1:string,arg2:string):Promise<string>;
 
+export function GetExecutionPlan(arg1:string,arg2:string,arg3:string):Promise<string>;
+
 export function GetQueryHistory(arg1:string,arg2:string,arg3:number):Promise<string>;
 
 export function GetSchemaMetadata(arg1:string):Promise<string>;
@@ -46,6 +48,10 @@ export function ReconnectConnection(arg1:string):Promise<void>;
 export function ReleaseSession(arg1:string,arg2:string):Promise<void>;
 
 export function SaveSnippet(arg1:string,arg2:string):Promise<void>;
+
+export function StartMonitor(arg1:string):Promise<string>;
+
+export function StopMonitor(arg1:string):Promise<void>;
 
 export function TestConnection(arg1:string):Promise<boolean>;
 

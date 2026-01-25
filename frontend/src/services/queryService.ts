@@ -1,6 +1,6 @@
-import type { QueryResult } from '../types'
+import type { QueryResult, ExecutionPlanResult } from '../types'
 
-import { ExecuteQuery, FormatSQL } from '../../wailsjs/go/main/App'
+import { ExecuteQuery, FormatSQL, GetExecutionPlan } from '../../wailsjs/go/main/App'
 
 const QUERY_TIMEOUT_MS = 120000 // 2 minutes
 
@@ -40,6 +40,21 @@ export const queryService = {
     } catch (error) {
       console.error('Failed to format SQL:', error)
       return sql
+    }
+  },
+
+  /** Get structured execution plan (EXPLAIN) for visualization. MySQL only. */
+  async getExecutionPlan(connectionId: string, sessionId: string, sql: string): Promise<ExecutionPlanResult> {
+    try {
+      const result = await GetExecutionPlan(connectionId, sessionId, sql)
+      return JSON.parse(result) as ExecutionPlanResult
+    } catch (error) {
+      console.error('Failed to get execution plan:', error)
+      return {
+        nodes: [],
+        summary: {},
+        error: error instanceof Error ? error.message : 'Unknown error',
+      }
     }
   },
 }

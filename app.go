@@ -114,6 +114,30 @@ type QueryResult struct {
 	Error         string                   `json:"error,omitempty"`
 }
 
+// ExecutionPlanNode represents one step in EXPLAIN result for visualization.
+type ExecutionPlanNode struct {
+	ID            string  `json:"id"`
+	ParentID      *string `json:"parentId,omitempty"`
+	Type          string  `json:"type"` // Scan, Join, Sort, Filter, etc.
+	Label         string  `json:"label"`
+	Detail        string  `json:"detail,omitempty"`
+	Rows          int64   `json:"rows,omitempty"`
+	Cost          string  `json:"cost,omitempty"`
+	Extra         string  `json:"extra,omitempty"`
+	FullTableScan bool    `json:"fullTableScan"`
+	IndexUsed     bool    `json:"indexUsed"`
+}
+
+// ExecutionPlanResult is the JSON returned by GetExecutionPlan.
+type ExecutionPlanResult struct {
+	Nodes   []ExecutionPlanNode `json:"nodes"`
+	Summary struct {
+		TotalDurationMs int      `json:"totalDurationMs,omitempty"`
+		Warnings        []string `json:"warnings,omitempty"`
+	} `json:"summary"`
+	Error string `json:"error,omitempty"`
+}
+
 type TableData struct {
 	Columns   []string                 `json:"columns"`
 	Rows      []map[string]interface{} `json:"rows"`
@@ -145,6 +169,26 @@ type Snippet struct {
 	Alias     string `json:"alias"`
 	SQL       string `json:"sql"`
 	CreatedAt string `json:"createdAt"`
+}
+
+// ProcessItem represents one row from SHOW FULL PROCESSLIST for live monitor.
+type ProcessItem struct {
+	ID      string `json:"id"`
+	User    string `json:"user"`
+	Host    string `json:"host"`
+	DB      string `json:"db"`
+	Command string `json:"command"`
+	Time    int    `json:"time"` // seconds
+	State   string `json:"state"`
+	Info    string `json:"info"`
+}
+
+// LiveStatsPayload is emitted to frontend via "live-stats" event for real-time monitor.
+type LiveStatsPayload struct {
+	ConnectionID     string        `json:"connectionId"`
+	ThreadsConnected int           `json:"threadsConnected"`
+	ProcessList      []ProcessItem `json:"processList"`
+	Error            string        `json:"error,omitempty"`
 }
 
 // Schema metadata for SQL completion (tables + columns per connection).
@@ -182,6 +226,8 @@ var (
 	snippets            []Snippet
 	snippetsFileOnce    sync.Once
 	snippetsFilePath    string
+	monitorMu           sync.Mutex
+	monitorStop         = make(map[string]chan struct{}) // connectionID -> stop channel
 )
 
 const (
@@ -546,6 +592,225 @@ func (a *App) ReleaseSession(connectionID, sessionID string) {
 		return
 	}
 	db.Close(connectionID, sessionID)
+}
+
+// StartMonitor starts a background goroutine that polls MySQL live stats every 5s and emits "live-stats" events.
+// Only MySQL is supported. Returns JSON object with "error" key on failure, or "{}" on success.
+func (a *App) StartMonitor(connectionID string) string {
+	conn := getConnByID(connectionID)
+	if conn == nil {
+		return `{"error":"connection not found"}`
+	}
+	if conn.Type != "mysql" {
+		return `{"error":"live monitor is only supported for MySQL"}`
+	}
+	monitorMu.Lock()
+	if monitorStop == nil {
+		monitorStop = make(map[string]chan struct{})
+	}
+	if _, running := monitorStop[connectionID]; running {
+		monitorMu.Unlock()
+		return `{}`
+	}
+	stopCh := make(chan struct{})
+	monitorStop[connectionID] = stopCh
+	monitorMu.Unlock()
+	go a.liveMonitorWorker(connectionID, stopCh)
+	return `{}`
+}
+
+// StopMonitor stops the background monitor for the given connection.
+func (a *App) StopMonitor(connectionID string) {
+	monitorMu.Lock()
+	ch, ok := monitorStop[connectionID]
+	if ok {
+		delete(monitorStop, connectionID)
+		close(ch)
+	}
+	monitorMu.Unlock()
+}
+
+const liveMonitorInterval = 5 * time.Second
+
+// liveMonitorWorker polls MySQL for Threads_connected and PROCESSLIST, then emits "live-stats".
+func (a *App) liveMonitorWorker(connectionID string, stopCh <-chan struct{}) {
+	ticker := time.NewTicker(liveMonitorInterval)
+	defer ticker.Stop()
+	emit := func(payload LiveStatsPayload) {
+		data, _ := json.Marshal(payload)
+		runtime.EventsEmit(a.ctx, "live-stats", string(data))
+	}
+	for {
+		payload := LiveStatsPayload{ConnectionID: connectionID}
+		conn := getConnByID(connectionID)
+		if conn == nil {
+			payload.Error = "connection not found"
+			emit(payload)
+			return
+		}
+		g, err := getOrOpenDB(connectionID, "")
+		if err != nil {
+			payload.Error = err.Error()
+			emit(payload)
+		} else {
+			// Threads_connected
+			_, rows, err := db.RawSelect(g, "SHOW GLOBAL STATUS LIKE 'Threads_connected'")
+			if err == nil && len(rows) > 0 {
+				for _, r := range rows {
+					for k, v := range r {
+						if strings.EqualFold(k, "Value") && v != nil {
+							if n, ok := v.(int64); ok {
+								payload.ThreadsConnected = int(n)
+							} else {
+								fmt.Sscanf(fmt.Sprint(v), "%d", &payload.ThreadsConnected)
+							}
+							break
+						}
+					}
+				}
+			}
+			// SHOW FULL PROCESSLIST
+			_, plRows, err := db.RawSelect(g, "SHOW FULL PROCESSLIST")
+			if err == nil {
+				getVal := func(row map[string]interface{}, keys ...string) string {
+					for _, key := range keys {
+						for k, v := range row {
+							if strings.EqualFold(k, key) && v != nil {
+								return fmt.Sprint(v)
+							}
+						}
+					}
+					return ""
+				}
+				getInt := func(row map[string]interface{}, keys ...string) int {
+					s := getVal(row, keys...)
+					var n int
+					fmt.Sscanf(s, "%d", &n)
+					return n
+				}
+				for _, row := range plRows {
+					payload.ProcessList = append(payload.ProcessList, ProcessItem{
+						ID:      getVal(row, "Id", "ID"),
+						User:    getVal(row, "User", "USER"),
+						Host:    getVal(row, "Host", "HOST"),
+						DB:      getVal(row, "db", "DB"),
+						Command: getVal(row, "Command", "COMMAND"),
+						Time:    getInt(row, "Time", "TIME"),
+						State:   getVal(row, "State", "STATE"),
+						Info:    getVal(row, "Info", "INFO"),
+					})
+				}
+			}
+			emit(payload)
+		}
+		select {
+		case <-stopCh:
+			return
+		case <-ticker.C:
+			// next loop
+		}
+	}
+}
+
+// GetExecutionPlan runs EXPLAIN on the given SQL (SELECT only) and returns a structured plan for visualization.
+// Only MySQL is supported; SQLite returns error in summary.
+func (a *App) GetExecutionPlan(connectionID, sessionID, sql string) string {
+	var out ExecutionPlanResult
+	conn := getConnByID(connectionID)
+	if conn == nil {
+		out.Error = "connection not found"
+		data, _ := json.Marshal(out)
+		return string(data)
+	}
+	sql = strings.TrimSpace(sql)
+	if !db.IsSelect(sql) || strings.HasPrefix(strings.ToUpper(sql), "EXPLAIN") {
+		out.Error = "only SELECT queries can be explained"
+		data, _ := json.Marshal(out)
+		return string(data)
+	}
+	if conn.Type != "mysql" {
+		out.Error = "execution plan is only supported for MySQL"
+		data, _ := json.Marshal(out)
+		return string(data)
+	}
+	g, err := getOrOpenDB(connectionID, sessionID)
+	if err != nil {
+		out.Error = err.Error()
+		data, _ := json.Marshal(out)
+		return string(data)
+	}
+	explainSQL := "EXPLAIN " + sql
+	cols, rows, err := db.RawSelect(g, explainSQL)
+	if err != nil {
+		out.Error = err.Error()
+		data, _ := json.Marshal(out)
+		return string(data)
+	}
+	_ = cols // column order not needed; we look up by name
+	getVal := func(row map[string]interface{}, keys ...string) string {
+		for _, k := range keys {
+			for mapK, v := range row {
+				if strings.EqualFold(mapK, k) && v != nil {
+					return fmt.Sprint(v)
+				}
+			}
+		}
+		return ""
+	}
+	getInt64 := func(row map[string]interface{}, key string) int64 {
+		s := getVal(row, key)
+		if s == "" {
+			return 0
+		}
+		var n int64
+		_, _ = fmt.Sscanf(s, "%d", &n)
+		return n
+	}
+	var warnings []string
+	nodes := make([]ExecutionPlanNode, 0, len(rows))
+	var lastID *string
+	for i, row := range rows {
+		id := fmt.Sprintf("%d", i+1)
+		typeVal := getVal(row, "type", "Type")
+		tableVal := getVal(row, "table", "Table")
+		keyVal := getVal(row, "key", "Key")
+		extraVal := getVal(row, "extra", "Extra")
+		selectType := getVal(row, "select_type", "select_type")
+		rowsEst := getInt64(row, "rows")
+		fullScan := typeVal == "ALL" || typeVal == "index"
+		indexUsed := keyVal != "" && keyVal != "NULL"
+		nodeType := "Table"
+		if strings.Contains(strings.ToLower(extraVal), "where") {
+			nodeType = "Filter"
+		}
+		if selectType == "SIMPLE" && tableVal != "" {
+			nodeType = "Scan"
+		}
+		label := tableVal
+		if label == "" {
+			label = typeVal
+		}
+		node := ExecutionPlanNode{
+			ID:            id,
+			ParentID:      lastID,
+			Type:          nodeType,
+			Label:         label,
+			Detail:        typeVal,
+			Rows:          rowsEst,
+			Extra:         extraVal,
+			FullTableScan: fullScan,
+			IndexUsed:     indexUsed,
+		}
+		nodes = append(nodes, node)
+		lastID = &id
+		if fullScan && !indexUsed && tableVal != "" {
+			warnings = append(warnings, "Full table scan on '"+tableVal+"'; consider adding an index")
+		}
+	}
+	out.Nodes = nodes
+	out.Summary.Warnings = warnings
+	data, _ := json.Marshal(out)
+	return string(data)
 }
 
 func mustMarshalResult(cols []string, rows []map[string]interface{}, rowCount, execMs int, errMsg string, affected ...int) string {

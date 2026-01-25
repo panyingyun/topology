@@ -9,6 +9,7 @@ import QueryConsole from './QueryConsole.vue'
 import DataViewer from './DataViewer.vue'
 import ConnectionManager from './ConnectionManager.vue'
 import TableDesigner from '../components/TableDesigner.vue'
+import LiveMonitor from '../components/LiveMonitor.vue'
 import { ReleaseSession } from '../../wailsjs/go/main/App'
 import { connectionService } from '../services/connectionService'
 import { queryService } from '../services/queryService'
@@ -24,6 +25,8 @@ const editingConnection = ref<Connection | null>(null)
 const showTableDesigner = ref(false)
 const tableDesignerContext = ref<{ connectionId: string; database: string } | null>(null)
 const tableImportTrigger = ref<{ connectionId: string; database: string; tableName: string } | null>(null)
+const showLiveMonitor = ref(false)
+const monitorConnection = ref<Connection | null>(null)
 const connections = ref<Connection[]>([])
 const tabs = ref<TabItem[]>([])
 const activeTabId = ref('')
@@ -79,7 +82,29 @@ const handleRefreshConnection = async (connectionId: string) => {
   }
 }
 
-const handleDeleteConnection = async (connectionId: string) => {
+const showDeleteConfirm = ref(false)
+const deleteConnectionId = ref<string | null>(null)
+const deleteConnectionName = ref('')
+
+const handleDeleteConnection = (connectionId: string) => {
+  const conn = connections.value.find((c) => c.id === connectionId)
+  deleteConnectionId.value = connectionId
+  deleteConnectionName.value = conn?.name ?? connectionId
+  showDeleteConfirm.value = true
+}
+
+const cancelDeleteConnection = () => {
+  showDeleteConfirm.value = false
+  deleteConnectionId.value = null
+  deleteConnectionName.value = ''
+}
+
+const confirmDeleteConnection = async () => {
+  const connectionId = deleteConnectionId.value
+  if (!connectionId) {
+    cancelDeleteConnection()
+    return
+  }
   try {
     await connectionService.deleteConnection(connectionId)
     await loadConnections()
@@ -89,6 +114,8 @@ const handleDeleteConnection = async (connectionId: string) => {
     }
   } catch (error) {
     console.error('Failed to delete connection:', error)
+  } finally {
+    cancelDeleteConnection()
   }
 }
 
@@ -230,6 +257,16 @@ const handleEditorPosition = (line: number, column: number) => {
   editorColumn.value = column
 }
 
+const handleOpenMonitor = (connection: Connection) => {
+  monitorConnection.value = connection
+  showLiveMonitor.value = true
+}
+
+const handleCloseLiveMonitor = () => {
+  showLiveMonitor.value = false
+  monitorConnection.value = null
+}
+
 const handleNewTable = (connectionId: string, database: string) => {
   tableDesignerContext.value = { connectionId, database }
   showTableDesigner.value = true
@@ -279,6 +316,7 @@ const activeTab = computed(() => {
         @new-table="handleNewTable"
         @table-import="handleTableImport"
         @table-export="handleTableExport"
+        @open-monitor="handleOpenMonitor"
       />
 
       <div class="flex-1 flex flex-col overflow-hidden">
@@ -351,5 +389,48 @@ const activeTab = computed(() => {
       @close="showTableDesigner = false; tableDesignerContext = null"
       @create="handleCreateTable"
     />
+
+    <LiveMonitor
+      :show="showLiveMonitor"
+      :connection-id="monitorConnection?.id ?? ''"
+      :connection-name="monitorConnection?.name ?? ''"
+      @close="handleCloseLiveMonitor"
+    />
+
+    <!-- 删除连接确认 -->
+    <Teleport to="body">
+      <Transition name="fade">
+        <div
+          v-if="showDeleteConfirm"
+          class="fixed inset-0 z-[200] flex items-center justify-center p-4 theme-bg-content/90"
+          @click.self="cancelDeleteConnection"
+        >
+          <div
+            class="theme-bg-panel border theme-border rounded-lg shadow-xl px-5 py-4 min-w-[320px]"
+            @click.stop
+          >
+            <p class="text-sm theme-text mb-4">
+              {{ t('connection.deleteConfirmMessage', { name: deleteConnectionName }) }}
+            </p>
+            <div class="flex justify-end gap-2">
+              <button
+                type="button"
+                class="text-xs px-3 py-1.5 rounded border theme-border theme-text hover:bg-[#37373d] transition-colors"
+                @click="cancelDeleteConnection"
+              >
+                {{ t('connection.no') }}
+              </button>
+              <button
+                type="button"
+                class="text-xs px-3 py-1.5 rounded bg-red-600 hover:bg-red-500 text-white transition-colors"
+                @click="confirmDeleteConnection"
+              >
+                {{ t('connection.yes') }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>

@@ -46,6 +46,10 @@ export function GetDatabases(arg1, arg2) {
   return window['go']['main']['App']['GetDatabases'](arg1, arg2);
 }
 
+export function GetExecutionPlan(arg1, arg2, arg3) {
+  return window['go']['main']['App']['GetExecutionPlan'](arg1, arg2, arg3);
+}
+
 export function GetQueryHistory(arg1, arg2, arg3) {
   return window['go']['main']['App']['GetQueryHistory'](arg1, arg2, arg3);
 }
@@ -92,6 +96,14 @@ export function ReleaseSession(arg1, arg2) {
 
 export function SaveSnippet(arg1, arg2) {
   return window['go']['main']['App']['SaveSnippet'](arg1, arg2);
+}
+
+export function StartMonitor(arg1) {
+  return window['go']['main']['App']['StartMonitor'](arg1);
+}
+
+export function StopMonitor(arg1) {
+  return window['go']['main']['App']['StopMonitor'](arg1);
 }
 
 export function TestConnection(arg1) {

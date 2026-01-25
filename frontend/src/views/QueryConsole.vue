@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, shallowRef, watch } from 'vue'
-import { Play, Square, FileCode, Save, History, Sparkles, Bookmark } from 'lucide-vue-next'
+import { Play, Square, FileCode, Save, History, Sparkles, Bookmark, GitBranch } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import * as monaco from 'monaco-editor'
 import { queryService } from '../services/queryService'
@@ -10,6 +10,7 @@ import DataGrid from '../components/DataGrid.vue'
 import QueryHistory from '../components/QueryHistory.vue'
 import Snippets from '../components/Snippets.vue'
 import SQLAnalyzer from '../components/SQLAnalyzer.vue'
+import ExecutionPlanViewer from '../components/ExecutionPlanViewer.vue'
 import type { QueryResult, Connection } from '../types'
 
 const { t } = useI18n()
@@ -50,6 +51,7 @@ const showHistory = ref(false)
 const showSnippets = ref(false)
 const snippetRefreshKey = ref(0)
 const showAnalyzer = ref(false)
+const showExplainPlan = ref(false)
 
 const {
   load: loadSchemaMetadata,
@@ -432,6 +434,15 @@ const handleSaveSnippet = async (alias: string) => {
           <Sparkles :size="14" class="inline mr-1" />
           {{ t('query.analyzeSQL') }}
         </button>
+
+        <button
+          @click="showExplainPlan = true"
+          class="px-3 py-1 rounded text-xs bg-[#3c3c3c] hover:bg-[#4c4c4c] text-gray-300 transition-colors"
+          :title="t('explainPlan.title')"
+        >
+          <GitBranch :size="14" class="inline mr-1" />
+          {{ t('explainPlan.viewPlan') }}
+        </button>
       </div>
     </div>
 
@@ -498,6 +509,16 @@ const handleSaveSnippet = async (alias: string) => {
       :sql="sqlQuery"
       :driver="connection?.type"
       @close="showAnalyzer = false"
+    />
+
+    <!-- Execution Plan -->
+    <ExecutionPlanViewer
+      :show="showExplainPlan"
+      :connection-id="connectionId ?? ''"
+      :tab-id="tabId ?? ''"
+      :sql="sqlQuery"
+      :driver="connection?.type"
+      @close="showExplainPlan = false"
     />
   </div>
 </template>

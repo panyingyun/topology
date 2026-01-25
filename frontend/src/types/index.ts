@@ -162,3 +162,45 @@ export interface SQLAnalysis {
     indexUsage?: string
   }
 }
+
+// Execution plan (EXPLAIN) for visualization
+export interface ExecutionPlanNode {
+  id: string
+  parentId?: string | null
+  type: string
+  label: string
+  detail?: string
+  rows?: number
+  cost?: string
+  extra?: string
+  fullTableScan: boolean
+  indexUsed: boolean
+}
+
+export interface ExecutionPlanResult {
+  nodes: ExecutionPlanNode[]
+  summary: {
+    totalDurationMs?: number
+    warnings?: string[]
+  }
+  error?: string
+}
+
+// Live monitor (MySQL): real-time stats pushed via "live-stats" event
+export interface ProcessItem {
+  id: string
+  user: string
+  host: string
+  db: string
+  command: string
+  time: number
+  state: string
+  info: string
+}
+
+export interface LiveStatsPayload {
+  connectionId: string
+  threadsConnected: number
+  processList: ProcessItem[]
+  error?: string
+}

@@ -21,6 +21,7 @@ const emit = defineEmits<{
   (e: 'new-table', connectionId: string, database: string): void
   (e: 'table-import', connectionId: string, database: string, tableName: string): void
   (e: 'table-export', connectionId: string, database: string, tableName: string): void
+  (e: 'open-monitor', connection: Connection): void
 }>()
 
 const connections = ref<Connection[]>([])
@@ -176,6 +177,13 @@ const handleDeleteConnection = () => {
   closeContextMenu()
 }
 
+const handleOpenMonitor = () => {
+  if (contextMenu.value.connection) {
+    emit('open-monitor', contextMenu.value.connection)
+  }
+  closeContextMenu()
+}
+
 const handleNewTable = () => {
   if (contextMenu.value.type === 'database' && contextMenu.value.connectionId && contextMenu.value.database) {
     emit('new-table', contextMenu.value.connectionId, contextMenu.value.database)
@@ -308,6 +316,12 @@ onUnmounted(() => {
               class="w-full px-4 py-2 text-left text-xs text-gray-300 hover:bg-[#37373d] transition-colors"
             >
               {{ t('connection.refresh') }}
+            </button>
+            <button
+              @click="handleOpenMonitor"
+              class="w-full px-4 py-2 text-left text-xs text-gray-300 hover:bg-[#37373d] transition-colors"
+            >
+              {{ t('monitor.openMonitor') }}
             </button>
             <div class="h-px bg-[#333] my-1"></div>
             <button

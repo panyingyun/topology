@@ -23,6 +23,7 @@ const emit = defineEmits<{
   (e: 'new-table', connectionId: string, database: string): void
   (e: 'table-import', connectionId: string, database: string, tableName: string): void
   (e: 'table-export', connectionId: string, database: string, tableName: string): void
+  (e: 'open-monitor', connection: import('../types').Connection): void
 }>()
 
 const searchQuery = ref('')
@@ -85,6 +86,7 @@ const startResize = (e: MouseEvent) => {
         @new-table="(connId, database) => emit('new-table', connId, database)"
         @table-import="(connId, db, tableName) => emit('table-import', connId, db, tableName)"
         @table-export="(connId, db, tableName) => emit('table-export', connId, db, tableName)"
+        @open-monitor="(conn) => emit('open-monitor', conn)"
       />
     </div>
 
