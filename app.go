@@ -2,9 +2,17 @@ package main
 
 import (
 	"context"
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
 	"time"
+
+	"gorm.io/gorm"
+	"topology/internal/db"
 )
 
 // App struct
@@ -25,26 +33,26 @@ func (a *App) startup(ctx context.Context) {
 
 // Connection types
 type Connection struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Type      string    `json:"type"`
-	Host      string    `json:"host"`
-	Port      int       `json:"port"`
-	Username  string    `json:"username"`
-	Password  string    `json:"password,omitempty"`
-	Database  string    `json:"database,omitempty"`
-	UseSSL    bool      `json:"useSSL,omitempty"`
+	ID        string     `json:"id"`
+	Name      string     `json:"name"`
+	Type      string     `json:"type"`
+	Host      string     `json:"host"`
+	Port      int        `json:"port"`
+	Username  string     `json:"username"`
+	Password  string     `json:"password,omitempty"`
+	Database  string     `json:"database,omitempty"`
+	UseSSL    bool       `json:"useSSL,omitempty"`
 	SSHTunnel *SSHTunnel `json:"sshTunnel,omitempty"`
-	Status   string    `json:"status"`
-	CreatedAt string   `json:"createdAt,omitempty"`
+	Status    string     `json:"status"`
+	CreatedAt string     `json:"createdAt,omitempty"`
 }
 
 type SSHTunnel struct {
-	Enabled   bool   `json:"enabled"`
-	Host      string `json:"host,omitempty"`
-	Port      int    `json:"port,omitempty"`
-	Username  string `json:"username,omitempty"`
-	Password  string `json:"password,omitempty"`
+	Enabled    bool   `json:"enabled"`
+	Host       string `json:"host,omitempty"`
+	Port       int    `json:"port,omitempty"`
+	Username   string `json:"username,omitempty"`
+	Password   string `json:"password,omitempty"`
 	PrivateKey string `json:"privateKey,omitempty"`
 }
 
@@ -81,65 +89,136 @@ type ForeignKey struct {
 }
 
 type TableSchema struct {
-	Name        string      `json:"name"`
-	Columns     []Column    `json:"columns"`
-	Indexes     []Index     `json:"indexes"`
+	Name        string       `json:"name"`
+	Columns     []Column     `json:"columns"`
+	Indexes     []Index      `json:"indexes"`
 	ForeignKeys []ForeignKey `json:"foreignKeys"`
 }
 
 type QueryResult struct {
-	Columns      []string                 `json:"columns"`
-	Rows         []map[string]interface{} `json:"rows"`
-	RowCount     int                      `json:"rowCount"`
-	ExecutionTime int                     `json:"executionTime,omitempty"`
-	AffectedRows int                      `json:"affectedRows,omitempty"`
-	Error        string                   `json:"error,omitempty"`
+	Columns       []string                 `json:"columns"`
+	Rows          []map[string]interface{} `json:"rows"`
+	RowCount      int                      `json:"rowCount"`
+	ExecutionTime int                      `json:"executionTime,omitempty"`
+	AffectedRows  int                      `json:"affectedRows,omitempty"`
+	Error         string                   `json:"error,omitempty"`
 }
 
 type TableData struct {
 	Columns   []string                 `json:"columns"`
 	Rows      []map[string]interface{} `json:"rows"`
-	TotalRows  int                      `json:"totalRows"`
+	TotalRows int                      `json:"totalRows"`
 	Page      int                      `json:"page"`
 	PageSize  int                      `json:"pageSize"`
 }
 
 type UpdateRecord struct {
-	RowIndex int                    `json:"rowIndex"`
-	Column   string                 `json:"column"`
-	OldValue interface{}            `json:"oldValue"`
-	NewValue interface{}            `json:"newValue"`
+	RowIndex int         `json:"rowIndex"`
+	Column   string      `json:"column"`
+	OldValue interface{} `json:"oldValue"`
+	NewValue interface{} `json:"newValue"`
 }
 
-// Mock data storage
-var mockConnections = []Connection{
-	{
-		ID:       "1",
-		Name:     "Production MySQL",
-		Type:     "mysql",
-		Host:     "localhost",
-		Port:     3306,
-		Username: "root",
-		Database: "production",
-		Status:   "connected",
-		CreatedAt: time.Now().Format(time.RFC3339),
-	},
-	{
-		ID:       "2",
-		Name:     "Staging PostgreSQL",
-		Type:     "postgresql",
-		Host:     "staging.example.com",
-		Port:     5432,
-		Username: "postgres",
-		Database: "staging",
-		Status:   "disconnected",
-		CreatedAt: time.Now().AddDate(0, 0, -1).Format(time.RFC3339),
-	},
+var (
+	connMu         sync.RWMutex
+	mockConnections []Connection
+	seedOnce        sync.Once
+)
+
+func seedTestConnections() {
+	seedOnce.Do(func() {
+		connMu.Lock()
+		defer connMu.Unlock()
+		mockConnections = make([]Connection, 0, 2)
+
+		// MySQL from testdb/mysql.url
+		if cfg, err := db.LoadMySQLTestConfig("testdb/mysql.url"); err == nil {
+			mockConnections = append(mockConnections, Connection{
+				ID:        "1",
+				Name:      "Test MySQL",
+				Type:      "mysql",
+				Host:      strings.TrimSpace(cfg.Host),
+				Port:      cfg.Port,
+				Username:  cfg.Username,
+				Password:  cfg.Password,
+				Database:  "mysql",
+				Status:    "disconnected",
+				CreatedAt: time.Now().Format(time.RFC3339),
+			})
+		} else {
+			mockConnections = append(mockConnections, Connection{
+				ID:        "1",
+				Name:      "Test MySQL (default)",
+				Type:      "mysql",
+				Host:      "127.0.0.1",
+				Port:      3306,
+				Username:  "root",
+				Password:  "",
+				Database:  "mysql",
+				Status:    "disconnected",
+				CreatedAt: time.Now().Format(time.RFC3339),
+			})
+		}
+
+		// SQLite from testdb/realm.db
+		mockConnections = append(mockConnections, Connection{
+			ID:        "2",
+			Name:      "Test SQLite",
+			Type:      "sqlite",
+			Host:      "",
+			Port:      0,
+			Username:  "",
+			Password:  "",
+			Database:  db.SQLiteTestPath(),
+			Status:    "disconnected",
+			CreatedAt: time.Now().Format(time.RFC3339),
+		})
+	})
+}
+
+func getConnByID(id string) *Connection {
+	connMu.RLock()
+	defer connMu.RUnlock()
+	for i := range mockConnections {
+		if mockConnections[i].ID == id {
+			c := mockConnections[i]
+			return &c
+		}
+	}
+	return nil
+}
+
+func buildDSN(c *Connection) (string, error) {
+	return db.BuildDSN(c.Type, c.Host, c.Port, c.Username, c.Password, c.Database)
+}
+
+func getOrOpenDB(connID string) (*gorm.DB, error) {
+	conn := getConnByID(connID)
+	if conn == nil {
+		return nil, fmt.Errorf("connection not found: %s", connID)
+	}
+	driver := conn.Type
+	if driver != "mysql" && driver != "sqlite" {
+		return nil, fmt.Errorf("unsupported driver: %s (mysql/sqlite only)", driver)
+	}
+	dsn, err := buildDSN(conn)
+	if err != nil {
+		return nil, err
+	}
+	if g, ok := db.Get(connID); ok {
+		return g, nil
+	}
+	return db.Open(connID, driver, dsn)
 }
 
 // GetConnections returns all database connections
 func (a *App) GetConnections() string {
-	data, err := json.Marshal(mockConnections)
+	seedTestConnections()
+	connMu.RLock()
+	list := make([]Connection, len(mockConnections))
+	copy(list, mockConnections)
+	connMu.RUnlock()
+	data, err := json.Marshal(list)
 	if err != nil {
 		return "[]"
 	}
@@ -155,7 +234,9 @@ func (a *App) CreateConnection(connJSON string) error {
 	conn.ID = fmt.Sprintf("%d", time.Now().UnixNano())
 	conn.Status = "disconnected"
 	conn.CreatedAt = time.Now().Format(time.RFC3339)
+	connMu.Lock()
 	mockConnections = append(mockConnections, conn)
+	connMu.Unlock()
 	return nil
 }
 
@@ -165,14 +246,24 @@ func (a *App) TestConnection(connJSON string) bool {
 	if err := json.Unmarshal([]byte(connJSON), &conn); err != nil {
 		return false
 	}
-	// Mock: always succeed for localhost
-	return conn.Host == "localhost" || conn.Host == "127.0.0.1"
+	driver := conn.Type
+	if driver != "mysql" && driver != "sqlite" {
+		return false
+	}
+	dsn, err := buildDSN(&conn)
+	if err != nil {
+		return false
+	}
+	return db.Ping(driver, dsn) == nil
 }
 
 // DeleteConnection deletes a connection by ID
 func (a *App) DeleteConnection(id string) error {
-	for i, conn := range mockConnections {
-		if conn.ID == id {
+	db.Close(id)
+	connMu.Lock()
+	defer connMu.Unlock()
+	for i, c := range mockConnections {
+		if c.ID == id {
 			mockConnections = append(mockConnections[:i], mockConnections[i+1:]...)
 			return nil
 		}
@@ -182,226 +273,235 @@ func (a *App) DeleteConnection(id string) error {
 
 // ExecuteQuery executes a SQL query
 func (a *App) ExecuteQuery(connectionID, sql string) string {
-	// Mock query results
-	result := QueryResult{
-		Columns: []string{"id", "name", "email", "role", "status", "created_at"},
-		Rows: []map[string]interface{}{
-			{
-				"id":         1,
-				"name":       "John Doe",
-				"email":      "john@example.com",
-				"role":       "Admin",
-				"status":    "Active",
-				"created_at": "2026-01-20 10:00:00",
-			},
-			{
-				"id":         2,
-				"name":       "Jane Smith",
-				"email":      "jane@example.com",
-				"role":       "Developer",
-				"status":    "Active",
-				"created_at": "2026-01-21 14:30:00",
-			},
-			{
-				"id":         3,
-				"name":       "Bob Wilson",
-				"email":      "bob@example.com",
-				"role":       "User",
-				"status":    "Idle",
-				"created_at": "2026-01-22 09:15:00",
-			},
-		},
-		RowCount:      1000,
-		ExecutionTime: 42,
-		AffectedRows:  3,
+	conn := getConnByID(connectionID)
+	if conn == nil {
+		return mustMarshalResult(nil, nil, 0, 0, fmt.Sprintf("connection not found: %s", connectionID))
 	}
-
-	data, err := json.Marshal(result)
+	g, err := getOrOpenDB(connectionID)
 	if err != nil {
-		return `{"columns":[],"rows":[],"rowCount":0,"error":"` + err.Error() + `"}`
+		return mustMarshalResult(nil, nil, 0, 0, err.Error())
 	}
+	start := time.Now()
+
+	if db.IsSelect(sql) {
+		cols, rows, err := db.RawSelect(g, sql)
+		elapsed := int(time.Since(start).Milliseconds())
+		if err != nil {
+			return mustMarshalResult(nil, nil, 0, elapsed, err.Error())
+		}
+		return mustMarshalResult(cols, rows, len(rows), elapsed, "")
+	}
+	affected, err := db.RawExec(g, sql)
+	elapsed := int(time.Since(start).Milliseconds())
+	if err != nil {
+		return mustMarshalResult(nil, nil, 0, elapsed, err.Error())
+	}
+	return mustMarshalResult(nil, nil, 0, elapsed, "", int(affected))
+}
+
+func mustMarshalResult(cols []string, rows []map[string]interface{}, rowCount, execMs int, errMsg string, affected ...int) string {
+	r := QueryResult{
+		Columns:       cols,
+		Rows:          rows,
+		RowCount:      rowCount,
+		ExecutionTime: execMs,
+		Error:         errMsg,
+	}
+	if len(affected) > 0 {
+		r.AffectedRows = affected[0]
+	}
+	data, _ := json.Marshal(r)
 	return string(data)
 }
 
-// FormatSQL formats a SQL query
+// FormatSQL formats a SQL query (no-op for now)
 func (a *App) FormatSQL(sql string) string {
-	// Mock SQL formatting - in real implementation, use a SQL formatter library
 	return sql
 }
 
 // GetTables returns all tables for a connection
 func (a *App) GetTables(connectionID string) string {
-	tables := []Table{
-		{Name: "users", Type: "table", RowCount: 1250},
-		{Name: "orders", Type: "table", RowCount: 3420},
-		{Name: "products", Type: "table", RowCount: 560},
-		{Name: "logs", Type: "table", RowCount: 8900},
-	}
-
-	data, err := json.Marshal(tables)
+	g, err := getOrOpenDB(connectionID)
 	if err != nil {
 		return "[]"
 	}
+	conn := getConnByID(connectionID)
+	if conn == nil {
+		return "[]"
+	}
+	names, err := db.TableNames(g, conn.Type)
+	if err != nil {
+		return "[]"
+	}
+	tables := make([]Table, 0, len(names))
+	for _, n := range names {
+		tables = append(tables, Table{Name: n, Type: "table"})
+	}
+	data, _ := json.Marshal(tables)
 	return string(data)
 }
 
 // GetTableData returns table data with pagination
 func (a *App) GetTableData(connectionID, tableName string, limit, offset int) string {
-	// Mock table data
-	rows := []map[string]interface{}{
-		{
-			"id":         1,
-			"name":       "John Doe",
-			"email":      "john@example.com",
-			"role":       "Admin",
-			"status":    "Active",
-			"created_at": "2026-01-20 10:00:00",
-		},
-		{
-			"id":         2,
-			"name":       "Jane Smith",
-			"email":      "jane@example.com",
-			"role":       "Developer",
-			"status":    "Active",
-			"created_at": "2026-01-21 14:30:00",
-		},
-		{
-			"id":         3,
-			"name":       "Bob Wilson",
-			"email":      "bob@example.com",
-			"role":       "User",
-			"status":    "Idle",
-			"created_at": "2026-01-22 09:15:00",
-		},
-		{
-			"id":         4,
-			"name":       "Alice Brown",
-			"email":      "alice@example.com",
-			"role":       "User",
-			"status":    "Active",
-			"created_at": "2026-01-23 11:20:00",
-		},
-	}
-
-	// Apply pagination
-	start := offset
-	end := offset + limit
-	if start > len(rows) {
-		start = len(rows)
-	}
-	if end > len(rows) {
-		end = len(rows)
-	}
-
-	result := TableData{
-		Columns:   []string{"id", "name", "email", "role", "status", "created_at"},
-		Rows:      rows[start:end],
-		TotalRows: 1000,
-		Page:      offset/limit + 1,
-		PageSize:  limit,
-	}
-
-	data, err := json.Marshal(result)
+	g, err := getOrOpenDB(connectionID)
 	if err != nil {
-		return `{"columns":[],"rows":[],"totalRows":0,"page":1,"pageSize":100}`
+		return `{"columns":[],"rows":[],"totalRows":0,"page":1,"pageSize":` + fmt.Sprint(limit) + `}`
 	}
+	conn := getConnByID(connectionID)
+	if conn == nil {
+		return `{"columns":[],"rows":[],"totalRows":0,"page":1,"pageSize":` + fmt.Sprint(limit) + `}`
+	}
+	cols, rows, total, err := db.TableData(g, conn.Type, tableName, limit, offset)
+	if err != nil {
+		return `{"columns":[],"rows":[],"totalRows":0,"page":1,"pageSize":` + fmt.Sprint(limit) + `}`
+	}
+	page := 1
+	if limit > 0 {
+		page = offset/limit + 1
+	}
+	result := TableData{Columns: cols, Rows: rows, TotalRows: total, Page: page, PageSize: limit}
+	data, _ := json.Marshal(result)
 	return string(data)
 }
 
 // UpdateTableData updates table data
 func (a *App) UpdateTableData(connectionID, tableName, updatesJSON string) error {
-	// Mock update - in real implementation, this would update the database
+	var updates []UpdateRecord
+	if err := json.Unmarshal([]byte(updatesJSON), &updates); err != nil {
+		return err
+	}
+	g, err := getOrOpenDB(connectionID)
+	if err != nil {
+		return err
+	}
+	conn := getConnByID(connectionID)
+	if conn == nil {
+		return fmt.Errorf("connection not found")
+	}
+	// Simple implementation: UPDATE table SET col=? WHERE col=? LIMIT 1 per update
+	tbl := quoteIdent(conn.Type, tableName)
+	for _, u := range updates {
+		col := quoteIdent(conn.Type, u.Column)
+		q := fmt.Sprintf("UPDATE %s SET %s = ? WHERE %s = ? LIMIT 1", tbl, col, col)
+		if res := g.Exec(q, u.NewValue, u.OldValue); res.Error != nil {
+			return res.Error
+		}
+	}
 	return nil
+}
+
+func quoteIdent(driver, name string) string {
+	if driver == "mysql" {
+		return "`" + strings.ReplaceAll(name, "`", "``") + "`"
+	}
+	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
 }
 
 // GetTableSchema returns table schema
 func (a *App) GetTableSchema(connectionID, tableName string) string {
-	schema := TableSchema{
-		Name: tableName,
-		Columns: []Column{
-			{
-				Name:         "id",
-				Type:         "INT",
-				Nullable:     false,
-				IsPrimaryKey: true,
-				IsUnique:     true,
-			},
-			{
-				Name:         "name",
-				Type:         "VARCHAR(255)",
-				Nullable:     false,
-				IsPrimaryKey: false,
-				IsUnique:     false,
-			},
-			{
-				Name:         "email",
-				Type:         "VARCHAR(255)",
-				Nullable:     false,
-				IsPrimaryKey: false,
-				IsUnique:     true,
-			},
-			{
-				Name:         "role",
-				Type:         "VARCHAR(50)",
-				Nullable:     true,
-				IsPrimaryKey: false,
-				IsUnique:     false,
-			},
-			{
-				Name:         "status",
-				Type:         "VARCHAR(20)",
-				Nullable:     false,
-				IsPrimaryKey: false,
-				IsUnique:     false,
-				DefaultValue: "Active",
-			},
-			{
-				Name:         "created_at",
-				Type:         "TIMESTAMP",
-				Nullable:     false,
-				IsPrimaryKey: false,
-				IsUnique:     false,
-				DefaultValue: "CURRENT_TIMESTAMP",
-			},
-		},
-		Indexes: []Index{
-			{
-				Name:     "PRIMARY",
-				Columns:  []string{"id"},
-				IsUnique: true,
-				Type:     "PRIMARY",
-			},
-			{
-				Name:     "idx_email",
-				Columns:  []string{"email"},
-				IsUnique: true,
-				Type:     "UNIQUE",
-			},
-		},
-		ForeignKeys: []ForeignKey{},
-	}
-
-	data, err := json.Marshal(schema)
+	g, err := getOrOpenDB(connectionID)
 	if err != nil {
 		return `{"name":"","columns":[],"indexes":[],"foreignKeys":[]}`
 	}
+	conn := getConnByID(connectionID)
+	if conn == nil {
+		return `{"name":"","columns":[],"indexes":[],"foreignKeys":[]}`
+	}
+	info, err := db.TableSchema(g, conn.Type, tableName)
+	if err != nil {
+		return `{"name":"","columns":[],"indexes":[],"foreignKeys":[]}`
+	}
+	schema := TableSchema{
+		Name:        info.Name,
+		Columns:     make([]Column, 0, len(info.Columns)),
+		Indexes:     nil,
+		ForeignKeys: nil,
+	}
+	for _, c := range info.Columns {
+		schema.Columns = append(schema.Columns, Column{
+			Name:         c.Name,
+			Type:         c.Type,
+			Nullable:     c.Nullable,
+			DefaultValue: c.DefaultValue,
+			IsPrimaryKey: c.IsPrimaryKey,
+			IsUnique:     c.IsUnique,
+		})
+	}
+	data, _ := json.Marshal(schema)
 	return string(data)
 }
 
 // ExportData exports data from a table
 func (a *App) ExportData(connectionID, tableName, format string) string {
-	// Mock export - return JSON string of exported data
-	result := map[string]interface{}{
+	g, err := getOrOpenDB(connectionID)
+	if err != nil {
+		return exportError(err.Error())
+	}
+	conn := getConnByID(connectionID)
+	if conn == nil {
+		return exportError("connection not found")
+	}
+	cols, rows, _, err := db.TableData(g, conn.Type, tableName, 1<<20, 0)
+	if err != nil {
+		return exportError(err.Error())
+	}
+	ext := format
+	if ext == "" {
+		ext = "json"
+	}
+	fname := tableName + "_export." + ext
+	outDir := filepath.Join("build", "export")
+	_ = os.MkdirAll(outDir, 0755)
+	path := filepath.Join(outDir, fname)
+
+	switch strings.ToLower(ext) {
+	case "csv":
+		f, err := os.Create(path)
+		if err != nil {
+			return exportError(err.Error())
+		}
+		defer f.Close()
+		w := csv.NewWriter(f)
+		_ = w.Write(cols)
+		for _, r := range rows {
+			rec := make([]string, len(cols))
+			for i, c := range cols {
+				v := r[c]
+				if v != nil {
+					rec[i] = fmt.Sprint(v)
+				}
+			}
+			_ = w.Write(rec)
+		}
+		w.Flush()
+		if w.Error() != nil {
+			return exportError(w.Error().Error())
+		}
+	case "json":
+		f, err := os.Create(path)
+		if err != nil {
+			return exportError(err.Error())
+		}
+		defer f.Close()
+		enc := json.NewEncoder(f)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(map[string]interface{}{"columns": cols, "rows": rows}); err != nil {
+			return exportError(err.Error())
+		}
+	default:
+		return exportError("unsupported format: " + format)
+	}
+	data, _ := json.Marshal(map[string]interface{}{
 		"success":  true,
 		"format":   format,
-		"filename": tableName + "_export." + format,
-		"data":     "Mock exported data",
-	}
+		"filename": fname,
+		"path":     path,
+	})
+	return string(data)
+}
 
-	data, err := json.Marshal(result)
-	if err != nil {
-		return `{"success":false,"error":"` + err.Error() + `"}`
-	}
+func exportError(msg string) string {
+	data, _ := json.Marshal(map[string]interface{}{"success": false, "error": msg})
 	return string(data)
 }
 

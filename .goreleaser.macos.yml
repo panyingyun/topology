@@ -3,14 +3,14 @@
 
 version: 2
 
-project_name: realm
+project_name: topology
 
 # 发布配置
 release:
   # GitHub发布配置
   github:
     owner: panyingyun  # 修改为你的GitHub用户名
-    name: realm     # 修改为你的仓库名
+    name: topology     # 修改为你的仓库名
   
   # 发布模式：替换或跳过已存在的发布
   mode: replace
@@ -41,7 +41,7 @@ builds:
   # 注意：此构建需要在 macOS 系统上执行，需要安装 Xcode
   - id: darwin
     main: .
-    binary: realm
+    binary: topology
     goos:
       - darwin
     goarch:
