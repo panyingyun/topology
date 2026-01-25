@@ -12,6 +12,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'query-result', result: QueryResult): void
+  (e: 'editor-position', line: number, column: number): void
 }>()
 
 const editorContainer = ref<HTMLElement | null>(null)
@@ -46,6 +47,7 @@ onMounted(async () => {
     editor.value.onDidChangeCursorPosition((e: any) => {
       editorLine.value = e.position.lineNumber
       editorColumn.value = e.position.column
+      emit('editor-position', editorLine.value, editorColumn.value)
     })
 
     // Ctrl+Enter to execute

@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { VxeGrid } from 'vxe-table'
 import type { VxeGridProps } from 'vxe-table'
+import { Download, ChevronDown, Filter } from 'lucide-vue-next'
 import type { QueryResult, UpdateRecord, ExportFormat } from '../types'
 
 const props = defineProps<{
@@ -14,6 +15,11 @@ const emit = defineEmits<{
   (e: 'export', format: ExportFormat): void
 }>()
 
+const showExportMenu = ref(false)
+const pendingChanges = ref(0)
+const gridRef = ref<any>()
+const exportMenuRef = ref<HTMLElement | null>(null)
+
 const gridOptions = ref<VxeGridProps>({
   border: true,
   height: '100%',
@@ -21,12 +27,10 @@ const gridOptions = ref<VxeGridProps>({
   rowConfig: { isCurrent: true, isHover: true },
   scrollY: { enabled: true, gt: 50 },
   editConfig: { trigger: 'dblclick', mode: 'cell' },
+  filterConfig: { remote: false },
   columns: [],
   data: [],
 })
-
-const pendingChanges = ref(0)
-const gridRef = ref<any>()
 
 watch(() => props.data, (newData) => {
   if (newData && newData.columns) {
@@ -35,6 +39,13 @@ watch(() => props.data, (newData) => {
       title: col,
       editRender: { name: 'input' },
       width: 150,
+      filters: [
+        { label: '包含', value: 'contains' },
+        { label: '等于', value: 'equals' },
+        { label: '不为空', value: 'notEmpty' },
+        { label: '为空', value: 'isEmpty' },
+      ],
+      filterRender: { name: 'input' },
     }))
     gridOptions.value.data = newData.rows
     pendingChanges.value = 0
@@ -77,7 +88,30 @@ const saveChanges = () => {
 
 const handleExport = (format: ExportFormat) => {
   emit('export', format)
+  showExportMenu.value = false
 }
+
+const exportFormats: Array<{ label: string; value: ExportFormat }> = [
+  { label: 'CSV', value: 'csv' },
+  { label: 'JSON', value: 'json' },
+  { label: 'SQL Insert', value: 'sql' },
+]
+
+// Close export menu when clicking outside
+const handleClickOutside = (e: MouseEvent) => {
+  const target = e.target as HTMLElement
+  if (exportMenuRef.value && !exportMenuRef.value.contains(target)) {
+    showExportMenu.value = false
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside)
+})
 </script>
 
 <template>
@@ -97,10 +131,31 @@ const handleExport = (format: ExportFormat) => {
         >
           Save Changes
         </button>
-        <div class="relative">
-          <button class="px-3 py-1 bg-[#3c3c3c] hover:bg-[#4c4c4c] text-gray-300 text-xs rounded transition-colors">
+        <div class="relative" ref="exportMenuRef">
+          <button
+            @click.stop="showExportMenu = !showExportMenu"
+            class="flex items-center gap-1 px-3 py-1 bg-[#3c3c3c] hover:bg-[#4c4c4c] text-gray-300 text-xs rounded transition-colors"
+          >
+            <Download :size="12" />
             Export
+            <ChevronDown :size="12" />
           </button>
+          <Transition name="fade">
+            <div
+              v-if="showExportMenu"
+              class="absolute right-0 top-full mt-1 bg-[#252526] border border-[#333] rounded shadow-lg py-1 min-w-[140px] z-50"
+              @click.stop
+            >
+              <button
+                v-for="format in exportFormats"
+                :key="format.value"
+                @click="handleExport(format.value)"
+                class="w-full px-4 py-2 text-left text-xs text-gray-300 hover:bg-[#37373d] transition-colors"
+              >
+                {{ format.label }}
+              </button>
+            </div>
+          </Transition>
         </div>
       </div>
     </div>
@@ -115,6 +170,20 @@ const handleExport = (format: ExportFormat) => {
     </div>
   </div>
 </template>
+
+
+<style scoped>
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+</style>
 
 <style>
 /* vxe-table 样式覆盖 */
@@ -138,5 +207,42 @@ const handleExport = (format: ExportFormat) => {
 
 .vxe-body--column {
   border-color: #333;
+}
+
+/* 编辑后的单元格黄色背景 */
+.vxe-body--column.col--update,
+.vxe-body--column.col--edit {
+  background-color: #5c4a00 !important;
+}
+
+.vxe-body--column.col--update:hover,
+.vxe-body--column.col--edit:hover {
+  background-color: #6d5500 !important;
+}
+
+/* vxe-table 修改后的行标记 */
+.vxe-body--row.row--update {
+  background-color: #2a2a1e !important;
+}
+
+.vxe-body--row.row--update:hover {
+  background-color: #3a3a2e !important;
+}
+
+/* 筛选器样式 */
+.vxe-filter--wrapper {
+  background-color: #252526;
+  border-color: #333;
+}
+
+.vxe-filter--panel {
+  background-color: #252526;
+  border-color: #333;
+}
+
+.vxe-filter--panel .vxe-input {
+  background-color: #3c3c3c;
+  border-color: #444;
+  color: #d4d4d4;
 }
 </style>

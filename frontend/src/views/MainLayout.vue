@@ -5,6 +5,7 @@ import Sidebar from '../components/Sidebar.vue'
 import TabBar from '../components/TabBar.vue'
 import StatusBar from '../components/StatusBar.vue'
 import QueryConsole from './QueryConsole.vue'
+import DataViewer from './DataViewer.vue'
 import ConnectionManager from './ConnectionManager.vue'
 import { connectionService } from '../services/connectionService'
 import type { TabItem, Connection, QueryResult } from '../types'
@@ -18,6 +19,8 @@ const tabs = ref<TabItem[]>([])
 const activeTabId = ref('')
 const currentConnection = ref<Connection | undefined>()
 const queryResult = ref<QueryResult | undefined>()
+const editorLine = ref(1)
+const editorColumn = ref(1)
 
 onMounted(async () => {
   await loadConnections()
@@ -133,12 +136,21 @@ const handleTabClose = (tabId: string) => {
   }
 }
 
+const handleTabReorder = (newTabs: TabItem[]) => {
+  tabs.value = newTabs
+}
+
 const handleQueryResult = (result: QueryResult) => {
   queryResult.value = result
   const activeTab = tabs.value.find(t => t.id === activeTabId.value)
   if (activeTab) {
     activeTab.queryResult = result
   }
+}
+
+const handleEditorPosition = (line: number, column: number) => {
+  editorLine.value = line
+  editorColumn.value = column
 }
 
 const activeTab = computed(() => {
@@ -169,6 +181,7 @@ const activeTab = computed(() => {
           :active-tab-id="activeTabId"
           @tab-click="handleTabClick"
           @tab-close="handleTabClose"
+          @tab-reorder="handleTabReorder"
         />
 
         <div class="flex-1 overflow-hidden">
@@ -177,10 +190,16 @@ const activeTab = computed(() => {
             :key="activeTab.id"
             :connection-id="activeTab.connectionId"
             @query-result="handleQueryResult"
+            @editor-position="handleEditorPosition"
           />
-          <div v-else-if="activeTab?.type === 'table'" class="h-full flex items-center justify-center text-gray-500">
-            Table view: {{ activeTab.database }}.{{ activeTab.tableName }} (to be implemented)
-          </div>
+          <DataViewer
+            v-else-if="activeTab?.type === 'table' && activeTab.connectionId && activeTab.database && activeTab.tableName"
+            :key="activeTab.id"
+            :connection-id="activeTab.connectionId"
+            :database="activeTab.database"
+            :table-name="activeTab.tableName"
+            @update="(updates) => console.log('Table updates:', updates)"
+          />
           <div v-else class="h-full flex flex-col items-center justify-center text-gray-500">
             <p class="mb-4">No tabs open</p>
             <p class="text-xs text-gray-600">Select a table from the sidebar or create a new connection</p>
@@ -192,6 +211,8 @@ const activeTab = computed(() => {
     <StatusBar
       :current-connection="currentConnection"
       :query-result="queryResult"
+      :editor-line="editorLine"
+      :editor-column="editorColumn"
     />
 
     <ConnectionManager
