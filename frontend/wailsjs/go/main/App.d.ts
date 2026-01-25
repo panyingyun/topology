@@ -9,9 +9,11 @@ export function CreateConnection(arg1:string):Promise<void>;
 
 export function DeleteConnection(arg1:string):Promise<void>;
 
-export function ExecuteQuery(arg1:string,arg2:string):Promise<string>;
+export function DeleteSnippet(arg1:string):Promise<void>;
 
-export function ExportData(arg1:string,arg2:string,arg3:string,arg4:string):Promise<string>;
+export function ExecuteQuery(arg1:string,arg2:string,arg3:string):Promise<string>;
+
+export function ExportData(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<string>;
 
 export function FormatSQL(arg1:string):Promise<string>;
 
@@ -19,21 +21,23 @@ export function GenerateCreateTableSQL(arg1:string,arg2:string):Promise<string>;
 
 export function GetConnections():Promise<string>;
 
-export function GetDatabases(arg1:string):Promise<string>;
+export function GetDatabases(arg1:string,arg2:string):Promise<string>;
 
 export function GetQueryHistory(arg1:string,arg2:string,arg3:number):Promise<string>;
 
 export function GetSchemaMetadata(arg1:string):Promise<string>;
 
-export function GetTableData(arg1:string,arg2:string,arg3:string,arg4:number,arg5:number):Promise<string>;
+export function GetSnippets():Promise<string>;
 
-export function GetTableSchema(arg1:string,arg2:string,arg3:string):Promise<string>;
+export function GetTableData(arg1:string,arg2:string,arg3:string,arg4:number,arg5:number,arg6:string):Promise<string>;
 
-export function GetTables(arg1:string,arg2:string):Promise<string>;
+export function GetTableSchema(arg1:string,arg2:string,arg3:string,arg4:string):Promise<string>;
+
+export function GetTables(arg1:string,arg2:string,arg3:string):Promise<string>;
 
 export function Greet(arg1:string):Promise<string>;
 
-export function ImportData(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string):Promise<string>;
+export function ImportData(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string):Promise<string>;
 
 export function ImportDataPreview(arg1:string,arg2:string):Promise<string>;
 
@@ -41,8 +45,12 @@ export function LoadSchemaMetadata(arg1:string):Promise<void>;
 
 export function ReconnectConnection(arg1:string):Promise<void>;
 
+export function ReleaseSession(arg1:string,arg2:string):Promise<void>;
+
+export function SaveSnippet(arg1:string,arg2:string):Promise<void>;
+
 export function TestConnection(arg1:string):Promise<boolean>;
 
 export function UpdateConnection(arg1:string):Promise<void>;
 
-export function UpdateTableData(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
+export function UpdateTableData(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<void>;

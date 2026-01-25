@@ -18,12 +18,16 @@ export function DeleteConnection(arg1) {
   return window['go']['main']['App']['DeleteConnection'](arg1);
 }
 
-export function ExecuteQuery(arg1, arg2) {
-  return window['go']['main']['App']['ExecuteQuery'](arg1, arg2);
+export function DeleteSnippet(arg1) {
+  return window['go']['main']['App']['DeleteSnippet'](arg1);
 }
 
-export function ExportData(arg1, arg2, arg3, arg4) {
-  return window['go']['main']['App']['ExportData'](arg1, arg2, arg3, arg4);
+export function ExecuteQuery(arg1, arg2, arg3) {
+  return window['go']['main']['App']['ExecuteQuery'](arg1, arg2, arg3);
+}
+
+export function ExportData(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['ExportData'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function FormatSQL(arg1) {
@@ -38,8 +42,8 @@ export function GetConnections() {
   return window['go']['main']['App']['GetConnections']();
 }
 
-export function GetDatabases(arg1) {
-  return window['go']['main']['App']['GetDatabases'](arg1);
+export function GetDatabases(arg1, arg2) {
+  return window['go']['main']['App']['GetDatabases'](arg1, arg2);
 }
 
 export function GetQueryHistory(arg1, arg2, arg3) {
@@ -50,24 +54,28 @@ export function GetSchemaMetadata(arg1) {
   return window['go']['main']['App']['GetSchemaMetadata'](arg1);
 }
 
-export function GetTableData(arg1, arg2, arg3, arg4, arg5) {
-  return window['go']['main']['App']['GetTableData'](arg1, arg2, arg3, arg4, arg5);
+export function GetSnippets() {
+  return window['go']['main']['App']['GetSnippets']();
 }
 
-export function GetTableSchema(arg1, arg2, arg3) {
-  return window['go']['main']['App']['GetTableSchema'](arg1, arg2, arg3);
+export function GetTableData(arg1, arg2, arg3, arg4, arg5, arg6) {
+  return window['go']['main']['App']['GetTableData'](arg1, arg2, arg3, arg4, arg5, arg6);
 }
 
-export function GetTables(arg1, arg2) {
-  return window['go']['main']['App']['GetTables'](arg1, arg2);
+export function GetTableSchema(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['GetTableSchema'](arg1, arg2, arg3, arg4);
+}
+
+export function GetTables(arg1, arg2, arg3) {
+  return window['go']['main']['App']['GetTables'](arg1, arg2, arg3);
 }
 
 export function Greet(arg1) {
   return window['go']['main']['App']['Greet'](arg1);
 }
 
-export function ImportData(arg1, arg2, arg3, arg4, arg5, arg6) {
-  return window['go']['main']['App']['ImportData'](arg1, arg2, arg3, arg4, arg5, arg6);
+export function ImportData(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
+  return window['go']['main']['App']['ImportData'](arg1, arg2, arg3, arg4, arg5, arg6, arg7);
 }
 
 export function ImportDataPreview(arg1, arg2) {
@@ -82,6 +90,14 @@ export function ReconnectConnection(arg1) {
   return window['go']['main']['App']['ReconnectConnection'](arg1);
 }
 
+export function ReleaseSession(arg1, arg2) {
+  return window['go']['main']['App']['ReleaseSession'](arg1, arg2);
+}
+
+export function SaveSnippet(arg1, arg2) {
+  return window['go']['main']['App']['SaveSnippet'](arg1, arg2);
+}
+
 export function TestConnection(arg1) {
   return window['go']['main']['App']['TestConnection'](arg1);
 }
@@ -90,6 +106,6 @@ export function UpdateConnection(arg1) {
   return window['go']['main']['App']['UpdateConnection'](arg1);
 }
 
-export function UpdateTableData(arg1, arg2, arg3, arg4) {
-  return window['go']['main']['App']['UpdateTableData'](arg1, arg2, arg3, arg4);
+export function UpdateTableData(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['UpdateTableData'](arg1, arg2, arg3, arg4, arg5);
 }

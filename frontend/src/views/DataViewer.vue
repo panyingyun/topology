@@ -10,6 +10,8 @@ import type { TableData, UpdateRecord, ExportFormat, QueryResult, ImportResult }
 const { t } = useI18n()
 
 const props = defineProps<{
+  /** Tab id for per-tab DB session isolation */
+  tabId?: string
   connectionId: string
   database: string
   tableName: string
@@ -96,7 +98,8 @@ const handleExport = async (format: ExportFormat) => {
       props.connectionId,
       props.database,
       props.tableName,
-      format
+      format,
+      props.tabId ?? ''
     )
     if (result.success) {
       console.log('Export successful:', result.filename)
@@ -216,6 +219,7 @@ watch(
       :connection-id="connectionId"
       :database="database"
       :table-name="tableName"
+      :session-id="tabId ?? ''"
       @close="showImporter = false"
       @success="handleImportSuccess"
     />

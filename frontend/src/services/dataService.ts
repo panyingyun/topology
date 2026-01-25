@@ -9,10 +9,13 @@ import {
   ExportData,
 } from '../../wailsjs/go/main/App'
 
+/** Optional sessionId for per-tab DB session isolation; pass '' for shared connection. */
+const defaultSession = ''
+
 export const dataService = {
-  async getDatabases(connectionId: string): Promise<string[]> {
+  async getDatabases(connectionId: string, sessionId: string = defaultSession): Promise<string[]> {
     try {
-      const result = await GetDatabases(connectionId)
+      const result = await GetDatabases(connectionId, sessionId)
       return JSON.parse(result)
     } catch (error) {
       console.error('Failed to get databases:', error)
@@ -20,9 +23,9 @@ export const dataService = {
     }
   },
 
-  async getTables(connectionId: string, database: string): Promise<Table[]> {
+  async getTables(connectionId: string, database: string, sessionId: string = defaultSession): Promise<Table[]> {
     try {
-      const result = await GetTables(connectionId, database)
+      const result = await GetTables(connectionId, database, sessionId)
       return JSON.parse(result)
     } catch (error) {
       console.error('Failed to get tables:', error)
@@ -35,10 +38,11 @@ export const dataService = {
     database: string,
     tableName: string,
     limit: number = 100,
-    offset: number = 0
+    offset: number = 0,
+    sessionId: string = defaultSession
   ): Promise<TableData> {
     try {
-      const result = await GetTableData(connectionId, database, tableName, limit, offset)
+      const result = await GetTableData(connectionId, database, tableName, limit, offset, sessionId)
       return JSON.parse(result)
     } catch (error) {
       console.error('Failed to get table data:', error)
@@ -56,20 +60,26 @@ export const dataService = {
     connectionId: string,
     database: string,
     tableName: string,
-    updates: UpdateRecord[]
+    updates: UpdateRecord[],
+    sessionId: string = defaultSession
   ): Promise<void> {
     try {
       const updatesJSON = JSON.stringify(updates)
-      await UpdateTableData(connectionId, database, tableName, updatesJSON)
+      await UpdateTableData(connectionId, database, tableName, updatesJSON, sessionId)
     } catch (error) {
       console.error('Failed to update table data:', error)
       throw error
     }
   },
 
-  async getTableSchema(connectionId: string, database: string, tableName: string): Promise<TableSchema> {
+  async getTableSchema(
+    connectionId: string,
+    database: string,
+    tableName: string,
+    sessionId: string = defaultSession
+  ): Promise<TableSchema> {
     try {
-      const result = await GetTableSchema(connectionId, database, tableName)
+      const result = await GetTableSchema(connectionId, database, tableName, sessionId)
       return JSON.parse(result)
     } catch (error) {
       console.error('Failed to get table schema:', error)
@@ -86,10 +96,11 @@ export const dataService = {
     connectionId: string,
     database: string,
     tableName: string,
-    format: string
+    format: string,
+    sessionId: string = defaultSession
   ): Promise<{ success: boolean; filename?: string; error?: string }> {
     try {
-      const result = await ExportData(connectionId, database, tableName, format)
+      const result = await ExportData(connectionId, database, tableName, format, sessionId)
       return JSON.parse(result)
     } catch (error) {
       console.error('Failed to export data:', error)

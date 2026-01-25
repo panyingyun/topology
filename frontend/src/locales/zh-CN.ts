@@ -107,6 +107,18 @@ export default {
       daysAgo: '{n} 天前',
     },
   },
+  snippets: {
+    title: 'SQL 片段',
+    search: '搜索别名...',
+    noSnippets: '暂无保存的片段',
+    alias: '别名',
+    saveCurrent: '保存当前为片段',
+    save: '保存片段',
+    delete: '删除',
+    insert: '插入',
+    aliasRequired: '请输入别名',
+    saved: '已保存',
+  },
   importer: {
     title: '导入数据到 {table}',
     selectFormat: '选择文件格式',

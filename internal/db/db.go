@@ -26,6 +26,14 @@ var (
 	OpenRetryDelay  = time.Second      // backoff base: 1s, 2s, 4s
 )
 
+// cacheKey returns the map key for connection cache. Empty sessionID means shared connection per connID.
+func cacheKey(connID, sessionID string) string {
+	if sessionID == "" {
+		return connID
+	}
+	return connID + "\x00" + sessionID
+}
+
 // BuildDSN builds DSN for mysql or sqlite. For sqlite, host is unused; database is the file path.
 func BuildDSN(driver, host string, port int, user, pass, database string) (string, error) {
 	switch driver {
@@ -52,16 +60,18 @@ func BuildDSN(driver, host string, port int, user, pass, database string) (strin
 	}
 }
 
-// Open opens a DB and caches it by connID. Uses retry with backoff on transient failure.
-func Open(connID, driver, dsn string) (*gorm.DB, error) {
+// Open opens a DB and caches it by connID and optional sessionID. Uses retry with backoff on transient failure.
+// When sessionID is non-empty, the connection is isolated per tab/session.
+func Open(connID, sessionID, driver, dsn string) (*gorm.DB, error) {
+	key := cacheKey(connID, sessionID)
 	mu.Lock()
 	defer mu.Unlock()
-	if cached, ok := connCache[connID]; ok {
+	if cached, ok := connCache[key]; ok {
 		sqlDB, _ := cached.DB()
 		if sqlDB != nil && sqlDB.Ping() == nil {
 			return cached, nil
 		}
-		delete(connCache, connID)
+		delete(connCache, key)
 	}
 
 	var lastErr error
@@ -71,7 +81,7 @@ func Open(connID, driver, dsn string) (*gorm.DB, error) {
 			time.Sleep(backoff)
 			backoff *= 2
 		}
-		db, err := openOnce(connID, driver, dsn)
+		db, err := openOnce(key, driver, dsn)
 		if err == nil {
 			return db, nil
 		}
@@ -84,8 +94,8 @@ func Open(connID, driver, dsn string) (*gorm.DB, error) {
 	return nil, lastErr
 }
 
-// openOnce opens a single connection and configures the pool; caller holds mu.
-func openOnce(connID, driver, dsn string) (*gorm.DB, error) {
+// openOnce opens a single connection and configures the pool; caller holds mu. key is the cache map key.
+func openOnce(key, driver, dsn string) (*gorm.DB, error) {
 	var dial gorm.Dialector
 	switch driver {
 	case "mysql":
@@ -110,27 +120,49 @@ func openOnce(connID, driver, dsn string) (*gorm.DB, error) {
 	sqlDB.SetConnMaxLifetime(ConnMaxLifetime)
 	sqlDB.SetConnMaxIdleTime(ConnMaxIdleTime)
 
-	connCache[connID] = db
+	connCache[key] = db
 	return db, nil
 }
 
-// Get returns cached DB for connID, or nil if not found.
-func Get(connID string) (*gorm.DB, bool) {
+// Get returns cached DB for connID and optional sessionID, or nil if not found.
+func Get(connID, sessionID string) (*gorm.DB, bool) {
+	key := cacheKey(connID, sessionID)
 	mu.RLock()
 	defer mu.RUnlock()
-	db, ok := connCache[connID]
+	db, ok := connCache[key]
 	return db, ok
 }
 
-// Close closes and removes cached DB for connID.
-func Close(connID string) {
+// Close closes and removes cached DB for the given connID and sessionID.
+func Close(connID, sessionID string) {
+	key := cacheKey(connID, sessionID)
 	mu.Lock()
 	defer mu.Unlock()
-	if db, ok := connCache[connID]; ok {
+	if db, ok := connCache[key]; ok {
 		if sqlDB, err := db.DB(); err == nil {
 			_ = sqlDB.Close()
 		}
-		delete(connCache, connID)
+		delete(connCache, key)
+	}
+}
+
+// CloseConnection closes all cached DBs for this connection (all sessions). Used when connection is deleted or updated.
+func CloseConnection(connID string) {
+	mu.Lock()
+	defer mu.Unlock()
+	var toDelete []string
+	for k := range connCache {
+		if k == connID || (len(k) > len(connID) && k[len(connID)] == '\x00' && k[:len(connID)] == connID) {
+			toDelete = append(toDelete, k)
+		}
+	}
+	for _, k := range toDelete {
+		if db, ok := connCache[k]; ok {
+			if sqlDB, err := db.DB(); err == nil {
+				_ = sqlDB.Close()
+			}
+			delete(connCache, k)
+		}
 	}
 }
 

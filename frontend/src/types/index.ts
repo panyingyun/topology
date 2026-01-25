@@ -128,6 +128,14 @@ export interface QueryHistory {
   rowCount?: number
 }
 
+// SQL snippet (saved fragment with alias)
+export interface Snippet {
+  id: string
+  alias: string
+  sql: string
+  createdAt: string
+}
+
 // Import types
 export type ImportFormat = 'csv' | 'json'
 

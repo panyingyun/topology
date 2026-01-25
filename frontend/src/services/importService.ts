@@ -29,7 +29,8 @@ export const importService = {
     tableName: string,
     filePath: string,
     format: ImportFormat,
-    columnMapping: Record<string, string>
+    columnMapping: Record<string, string>,
+    sessionId: string = ''
   ): Promise<ImportResult> {
     try {
       const mappingJSON = JSON.stringify(columnMapping)
@@ -39,7 +40,8 @@ export const importService = {
         tableName,
         filePath,
         format,
-        mappingJSON
+        mappingJSON,
+        sessionId
       )
       return JSON.parse(result)
     } catch (error) {

@@ -9,6 +9,7 @@ import QueryConsole from './QueryConsole.vue'
 import DataViewer from './DataViewer.vue'
 import ConnectionManager from './ConnectionManager.vue'
 import TableDesigner from '../components/TableDesigner.vue'
+import { ReleaseSession } from '../../wailsjs/go/main/App'
 import { connectionService } from '../services/connectionService'
 import { queryService } from '../services/queryService'
 import { dataService } from '../services/dataService'
@@ -195,6 +196,10 @@ const handleTabClick = (tabId: string) => {
 const handleTabClose = (tabId: string) => {
   const index = tabs.value.findIndex(t => t.id === tabId)
   if (index > -1) {
+    const tab = tabs.value[index]
+    if (tab.connectionId) {
+      ReleaseSession(tab.connectionId, tabId).catch(() => {})
+    }
     tabs.value.splice(index, 1)
     if (activeTabId.value === tabId) {
       activeTabId.value = tabs.value.length > 0 ? tabs.value[0].id : ''
@@ -241,7 +246,7 @@ const handleCreateTable = async (sql: string) => {
   const driver = (tableDesignerContext.value ? connections.value.find(c => c.id === tableDesignerContext.value!.connectionId) : currentConnection.value)?.type
   const sqlToRun = database && driver === 'mysql' ? `USE \`${database}\`;\n${sql}` : sql
   try {
-    await queryService.executeQuery(connId, sqlToRun)
+    await queryService.executeQuery(connId, '', sqlToRun)
     alert(t('common.success') + ': ' + 'Table created successfully!')
     showTableDesigner.value = false
     tableDesignerContext.value = null
@@ -291,6 +296,7 @@ const activeTab = computed(() => {
           <QueryConsole
             v-if="activeTab?.type === 'query'"
             :key="activeTab.id"
+            :tab-id="activeTab.id"
             :connection-id="activeTab.connectionId"
             :connection="currentConnection"
             :initial-sql="activeTab.initialSql"
@@ -306,6 +312,7 @@ const activeTab = computed(() => {
           <DataViewer
             v-else-if="activeTab?.type === 'table' && activeTab.connectionId && activeTab.database && activeTab.tableName"
             :key="activeTab.id"
+            :tab-id="activeTab.id"
             :connection-id="activeTab.connectionId"
             :database="activeTab.database"
             :table-name="activeTab.tableName"

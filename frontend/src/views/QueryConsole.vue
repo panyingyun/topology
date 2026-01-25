@@ -1,18 +1,22 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, shallowRef, watch } from 'vue'
-import { Play, Square, FileCode, Save, History, Sparkles } from 'lucide-vue-next'
+import { Play, Square, FileCode, Save, History, Sparkles, Bookmark } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import * as monaco from 'monaco-editor'
 import { queryService } from '../services/queryService'
+import { snippetService } from '../services/snippetService'
 import { useSchemaMetadata } from '../composables/useSchemaMetadata'
 import DataGrid from '../components/DataGrid.vue'
 import QueryHistory from '../components/QueryHistory.vue'
+import Snippets from '../components/Snippets.vue'
 import SQLAnalyzer from '../components/SQLAnalyzer.vue'
 import type { QueryResult, Connection } from '../types'
 
 const { t } = useI18n()
 
 const props = defineProps<{
+  /** Tab id for per-tab DB session isolation */
+  tabId?: string
   connectionId?: string
   connection?: Connection
   /** One-shot SQL to inject into editor (e.g. from table right-click "Query") */
@@ -43,6 +47,8 @@ const queryResult = ref<QueryResult | null>(null)
 const editorLine = ref(1)
 const editorColumn = ref(1)
 const showHistory = ref(false)
+const showSnippets = ref(false)
+const snippetRefreshKey = ref(0)
 const showAnalyzer = ref(false)
 
 const {
@@ -268,7 +274,7 @@ const runExecute = async () => {
 
   isRunning.value = true
   try {
-    const result = await queryService.executeQuery(connectionId, queryToExecute)
+    const result = await queryService.executeQuery(connectionId, props.tabId ?? '', queryToExecute)
     queryResult.value = result
     emit('query-result', result)
   } catch (error) {
@@ -311,6 +317,28 @@ const handleHistorySelect = (sql: string) => {
   if (editor.value) {
     editor.value.setValue(sql)
     sqlQuery.value = sql
+  }
+}
+
+const handleSnippetSelect = (sql: string) => {
+  if (editor.value) {
+    const model = editor.value.getModel()
+    const selection = editor.value.getSelection()
+    if (model && selection) {
+      editor.value.executeEdits('snippet', [{ range: selection, text: sql }])
+    }
+    editor.value.focus()
+  }
+  showSnippets.value = false
+}
+
+const handleSaveSnippet = async (alias: string) => {
+  try {
+    await snippetService.saveSnippet(alias, sqlQuery.value)
+    snippetRefreshKey.value += 1
+  } catch (error) {
+    console.error('Failed to save snippet:', error)
+    throw error
   }
 }
 </script>
@@ -385,6 +413,19 @@ const handleHistorySelect = (sql: string) => {
         </button>
 
         <button
+          @click="showSnippets = !showSnippets"
+          :class="[
+            'px-3 py-1 rounded text-xs transition-colors',
+            showSnippets
+              ? 'bg-[#1677ff] text-white'
+              : 'bg-[#3c3c3c] hover:bg-[#4c4c4c] text-gray-300'
+          ]"
+        >
+          <Bookmark :size="14" class="inline mr-1" />
+          {{ t('snippets.title') }}
+        </button>
+
+        <button
           @click="showAnalyzer = true"
           class="px-3 py-1 rounded text-xs bg-[#3c3c3c] hover:bg-[#4c4c4c] text-gray-300 transition-colors"
         >
@@ -439,6 +480,16 @@ const handleHistorySelect = (sql: string) => {
       :show="showHistory"
       @select="handleHistorySelect"
       @close="showHistory = false"
+    />
+
+    <!-- Snippets Panel -->
+    <Snippets
+      :show="showSnippets"
+      :current-sql="sqlQuery"
+      :refresh-trigger="snippetRefreshKey"
+      @select="handleSnippetSelect"
+      @save="handleSaveSnippet"
+      @close="showSnippets = false"
     />
 
     <!-- SQL Analyzer -->

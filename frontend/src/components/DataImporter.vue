@@ -12,6 +12,8 @@ const props = defineProps<{
   connectionId: string
   database: string
   tableName: string
+  /** Tab/session id for per-tab DB isolation */
+  sessionId?: string
 }>()
 
 const emit = defineEmits<{
@@ -85,7 +87,8 @@ const handleImport = async () => {
       props.tableName,
       filePath.value,
       importFormat.value,
-      columnMapping.value
+      columnMapping.value,
+      props.sessionId ?? ''
     )
     importResult.value = result
     if (result.success) {

@@ -107,6 +107,18 @@ export default {
       daysAgo: '{n} days ago',
     },
   },
+  snippets: {
+    title: 'SQL Snippets',
+    search: 'Search by alias...',
+    noSnippets: 'No snippets saved',
+    alias: 'Alias',
+    saveCurrent: 'Save current as snippet',
+    save: 'Save Snippet',
+    delete: 'Delete',
+    insert: 'Insert',
+    aliasRequired: 'Please enter an alias',
+    saved: 'Saved',
+  },
   importer: {
     title: 'Import Data to {table}',
     selectFormat: 'Select File Format',

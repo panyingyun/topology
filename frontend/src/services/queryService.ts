@@ -14,10 +14,11 @@ function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promi
 }
 
 export const queryService = {
-  async executeQuery(connectionId: string, sql: string): Promise<QueryResult> {
+  /** Execute SQL. sessionId isolates DB session per tab (e.g. tab id); pass '' when no tab context. */
+  async executeQuery(connectionId: string, sessionId: string, sql: string): Promise<QueryResult> {
     try {
       const result = await withTimeout(
-        ExecuteQuery(connectionId, sql),
+        ExecuteQuery(connectionId, sessionId, sql),
         QUERY_TIMEOUT_MS,
         'Query timeout (exceeded ' + QUERY_TIMEOUT_MS / 1000 + 's)'
       )

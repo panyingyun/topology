@@ -138,6 +138,14 @@ type QueryHistory struct {
 	RowCount     int    `json:"rowCount,omitempty"`
 }
 
+// Snippet holds a saved SQL fragment with an alias for quick insert.
+type Snippet struct {
+	ID        string `json:"id"`
+	Alias     string `json:"alias"`
+	SQL       string `json:"sql"`
+	CreatedAt string `json:"createdAt"`
+}
+
 // Schema metadata for SQL completion (tables + columns per connection).
 type SchemaTableMeta struct {
 	Name    string             `json:"name"`
@@ -157,24 +165,29 @@ type SchemaMetadata struct {
 }
 
 var (
-	connMu          sync.RWMutex
-	mockConnections []Connection
-	seedOnce        sync.Once
-	schemaMetaMu    sync.RWMutex
-	schemaMetaCache = make(map[string]SchemaMetadata)
-	connFileOnce    sync.Once
-	connFilePath    string
-	historyMu       sync.RWMutex
-	queryHistory    []QueryHistory
-	historyFileOnce sync.Once
-	historyFilePath string
-	maxHistorySize  = 100 // Keep last 100 queries
+	connMu           sync.RWMutex
+	mockConnections  []Connection
+	seedOnce         sync.Once
+	schemaMetaMu     sync.RWMutex
+	schemaMetaCache  = make(map[string]SchemaMetadata)
+	connFileOnce     sync.Once
+	connFilePath     string
+	historyMu        sync.RWMutex
+	queryHistory     []QueryHistory
+	historyFileOnce  sync.Once
+	historyFilePath  string
+	maxHistorySize   = 100 // Keep last 100 queries
+	snippetsMu       sync.RWMutex
+	snippets         []Snippet
+	snippetsFileOnce sync.Once
+	snippetsFilePath string
 )
 
 const (
-	connFileName    = "connections.json"
-	historyFileName = "query_history.json"
-	encKey          = "topology-connection-key-2026" // In production, use a proper key management system
+	connFileName     = "connections.json"
+	historyFileName  = "query_history.json"
+	snippetsFileName = "snippets.json"
+	encKey           = "topology-connection-key-2026" // In production, use a proper key management system
 )
 
 func getConnectionsFilePath() string {
@@ -203,6 +216,19 @@ func getHistoryFilePath() string {
 		historyFilePath = filepath.Join(appDir, historyFileName)
 	})
 	return historyFilePath
+}
+
+func getSnippetsFilePath() string {
+	snippetsFileOnce.Do(func() {
+		homeDir, err := os.UserConfigDir()
+		if err != nil {
+			homeDir = "."
+		}
+		appDir := filepath.Join(homeDir, "topology")
+		_ = os.MkdirAll(appDir, 0o755)
+		snippetsFilePath = filepath.Join(appDir, snippetsFileName)
+	})
+	return snippetsFilePath
 }
 
 func loadConnectionsFromFile() []Connection {
@@ -321,8 +347,9 @@ func buildDSN(c *Connection) (string, error) {
 	return db.BuildDSN(c.Type, c.Host, c.Port, c.Username, c.Password, c.Database)
 }
 
-// getOrOpenDB returns a working DB for the connection: uses cache if ping succeeds, otherwise reconnects.
-func getOrOpenDB(connID string) (*gorm.DB, error) {
+// getOrOpenDB returns a working DB for the connection (and optional session). Uses cache if ping succeeds, otherwise reconnects.
+// Empty sessionID uses shared connection per connID; non-empty isolates per tab/session.
+func getOrOpenDB(connID, sessionID string) (*gorm.DB, error) {
 	conn := getConnByID(connID)
 	if conn == nil {
 		return nil, fmt.Errorf("connection not found: %s", connID)
@@ -335,14 +362,14 @@ func getOrOpenDB(connID string) (*gorm.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	if g, ok := db.Get(connID); ok {
+	if g, ok := db.Get(connID, sessionID); ok {
 		sqlDB, err := g.DB()
 		if err == nil && sqlDB.Ping() == nil {
 			return g, nil
 		}
-		db.Close(connID)
+		db.Close(connID, sessionID)
 	}
-	return db.Open(connID, driver, dsn)
+	return db.Open(connID, sessionID, driver, dsn)
 }
 
 // GetConnections returns all database connections
@@ -401,7 +428,7 @@ func (a *App) UpdateConnection(connJSON string) error {
 	if conn.ID == "" {
 		return fmt.Errorf("connection ID required")
 	}
-	db.Close(conn.ID)
+	db.CloseConnection(conn.ID)
 	schemaMetaMu.Lock()
 	delete(schemaMetaCache, conn.ID)
 	schemaMetaMu.Unlock()
@@ -423,7 +450,7 @@ func (a *App) UpdateConnection(connJSON string) error {
 
 // ReconnectConnection closes cached DB for the connection so it reconnects on next use.
 func (a *App) ReconnectConnection(id string) error {
-	db.Close(id)
+	db.CloseConnection(id)
 	schemaMetaMu.Lock()
 	delete(schemaMetaCache, id)
 	schemaMetaMu.Unlock()
@@ -432,7 +459,7 @@ func (a *App) ReconnectConnection(id string) error {
 
 // DeleteConnection deletes a connection by ID
 func (a *App) DeleteConnection(id string) error {
-	db.Close(id)
+	db.CloseConnection(id)
 	schemaMetaMu.Lock()
 	delete(schemaMetaCache, id)
 	schemaMetaMu.Unlock()
@@ -448,13 +475,13 @@ func (a *App) DeleteConnection(id string) error {
 	return fmt.Errorf("connection not found")
 }
 
-// ExecuteQuery executes a SQL query
-func (a *App) ExecuteQuery(connectionID, sql string) string {
+// ExecuteQuery executes a SQL query. sessionID optionally isolates this tab's DB session (e.g. tab id).
+func (a *App) ExecuteQuery(connectionID, sessionID, sql string) string {
 	conn := getConnByID(connectionID)
 	if conn == nil {
 		return mustMarshalResult(nil, nil, 0, 0, fmt.Sprintf("connection not found: %s", connectionID))
 	}
-	g, err := getOrOpenDB(connectionID)
+	g, err := getOrOpenDB(connectionID, sessionID)
 	if err != nil {
 		return mustMarshalResult(nil, nil, 0, 0, err.Error())
 	}
@@ -493,6 +520,14 @@ func (a *App) ExecuteQuery(connectionID, sql string) string {
 	return result
 }
 
+// ReleaseSession closes the DB session for the given connection and tab/session. Call when a tab is closed so transactions do not leak.
+func (a *App) ReleaseSession(connectionID, sessionID string) {
+	if sessionID == "" {
+		return
+	}
+	db.Close(connectionID, sessionID)
+}
+
 func mustMarshalResult(cols []string, rows []map[string]interface{}, rowCount, execMs int, errMsg string, affected ...int) string {
 	r := QueryResult{
 		Columns:       cols,
@@ -521,7 +556,7 @@ func (a *App) LoadSchemaMetadata(connectionID string) {
 
 func (a *App) loadSchemaMetadataWorker(connectionID string) {
 	meta := SchemaMetadata{ConnectionID: connectionID}
-	g, err := getOrOpenDB(connectionID)
+	g, err := getOrOpenDB(connectionID, "")
 	if err != nil {
 		schemaMetaMu.Lock()
 		schemaMetaCache[connectionID] = meta
@@ -550,7 +585,7 @@ func (a *App) loadSchemaMetadataWorker(connectionID string) {
 		}
 		for _, tblName := range tableNames {
 			tblMeta := SchemaTableMeta{Name: tblName}
-			schemaJSON := a.GetTableSchema(connectionID, dbName, tblName)
+			schemaJSON := a.GetTableSchema(connectionID, dbName, tblName, "")
 			var ts TableSchema
 			if json.Unmarshal([]byte(schemaJSON), &ts) == nil {
 				for _, c := range ts.Columns {
@@ -579,9 +614,9 @@ func (a *App) GetSchemaMetadata(connectionID string) string {
 	return string(data)
 }
 
-// GetDatabases returns database names for a connection (MySQL: SHOW DATABASES; SQLite: ["main"]).
-func (a *App) GetDatabases(connectionID string) string {
-	g, err := getOrOpenDB(connectionID)
+// GetDatabases returns database names for a connection (MySQL: SHOW DATABASES; SQLite: ["main"]). sessionID optional for tab isolation.
+func (a *App) GetDatabases(connectionID, sessionID string) string {
+	g, err := getOrOpenDB(connectionID, sessionID)
 	if err != nil {
 		return "[]"
 	}
@@ -597,9 +632,9 @@ func (a *App) GetDatabases(connectionID string) string {
 	return string(data)
 }
 
-// GetTables returns all tables for a connection and database. For SQLite, database is ignored.
-func (a *App) GetTables(connectionID, database string) string {
-	g, err := getOrOpenDB(connectionID)
+// GetTables returns all tables for a connection and database. For SQLite, database is ignored. sessionID optional for tab isolation.
+func (a *App) GetTables(connectionID, database, sessionID string) string {
+	g, err := getOrOpenDB(connectionID, sessionID)
 	if err != nil {
 		return "[]"
 	}
@@ -619,9 +654,9 @@ func (a *App) GetTables(connectionID, database string) string {
 	return string(data)
 }
 
-// GetTableData returns table data with pagination. database is optional (MySQL: qualify db.table).
-func (a *App) GetTableData(connectionID, database, tableName string, limit, offset int) string {
-	g, err := getOrOpenDB(connectionID)
+// GetTableData returns table data with pagination. database is optional (MySQL: qualify db.table). sessionID optional for tab isolation.
+func (a *App) GetTableData(connectionID, database, tableName string, limit, offset int, sessionID string) string {
+	g, err := getOrOpenDB(connectionID, sessionID)
 	if err != nil {
 		return `{"columns":[],"rows":[],"totalRows":0,"page":1,"pageSize":` + fmt.Sprint(limit) + `}`
 	}
@@ -643,8 +678,8 @@ func (a *App) GetTableData(connectionID, database, tableName string, limit, offs
 }
 
 // UpdateTableData updates table data in a single transaction. database is optional (MySQL: qualify db.table).
-// On any failure, the whole transaction is rolled back.
-func (a *App) UpdateTableData(connectionID, database, tableName, updatesJSON string) error {
+// On any failure, the whole transaction is rolled back. sessionID optional for tab isolation.
+func (a *App) UpdateTableData(connectionID, database, tableName, updatesJSON, sessionID string) error {
 	var updates []UpdateRecord
 	if err := json.Unmarshal([]byte(updatesJSON), &updates); err != nil {
 		return err
@@ -652,7 +687,7 @@ func (a *App) UpdateTableData(connectionID, database, tableName, updatesJSON str
 	if len(updates) == 0 {
 		return nil
 	}
-	g, err := getOrOpenDB(connectionID)
+	g, err := getOrOpenDB(connectionID, sessionID)
 	if err != nil {
 		return err
 	}
@@ -832,6 +867,82 @@ func (a *App) ClearQueryHistory() error {
 	return os.Remove(filePath)
 }
 
+func loadSnippets() {
+	filePath := getSnippetsFilePath()
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		snippets = make([]Snippet, 0)
+		return
+	}
+	if err := json.Unmarshal(data, &snippets); err != nil {
+		snippets = make([]Snippet, 0)
+	}
+}
+
+func saveSnippetsToFile() {
+	data, err := json.MarshalIndent(snippets, "", "  ")
+	if err != nil {
+		return
+	}
+	_ = os.WriteFile(getSnippetsFilePath(), data, 0o600)
+}
+
+// GetSnippets returns all saved SQL snippets (alias + sql) as JSON array.
+func (a *App) GetSnippets() string {
+	snippetsMu.RLock()
+	defer snippetsMu.RUnlock()
+	if snippets == nil {
+		loadSnippets()
+	}
+	data, err := json.Marshal(snippets)
+	if err != nil {
+		return "[]"
+	}
+	return string(data)
+}
+
+// SaveSnippet adds or updates a snippet by alias. If alias exists, the snippet is updated.
+func (a *App) SaveSnippet(alias, sql string) error {
+	alias = strings.TrimSpace(alias)
+	if alias == "" {
+		return fmt.Errorf("alias is required")
+	}
+	snippetsMu.Lock()
+	defer snippetsMu.Unlock()
+	if snippets == nil {
+		loadSnippets()
+	}
+	id := fmt.Sprintf("%d", time.Now().UnixNano())
+	for i := range snippets {
+		if snippets[i].Alias == alias {
+			snippets[i].SQL = sql
+			snippets[i].CreatedAt = time.Now().Format(time.RFC3339)
+			saveSnippetsToFile()
+			return nil
+		}
+	}
+	snippets = append(snippets, Snippet{ID: id, Alias: alias, SQL: sql, CreatedAt: time.Now().Format(time.RFC3339)})
+	saveSnippetsToFile()
+	return nil
+}
+
+// DeleteSnippet removes a snippet by id.
+func (a *App) DeleteSnippet(id string) error {
+	snippetsMu.Lock()
+	defer snippetsMu.Unlock()
+	if snippets == nil {
+		loadSnippets()
+	}
+	for i, s := range snippets {
+		if s.ID == id {
+			snippets = append(snippets[:i], snippets[i+1:]...)
+			saveSnippetsToFile()
+			return nil
+		}
+	}
+	return fmt.Errorf("snippet not found: %s", id)
+}
+
 // ImportDataPreview parses and returns preview of import data (first 10 rows)
 func (a *App) ImportDataPreview(filePath, format string) string {
 	data, err := os.ReadFile(filePath)
@@ -920,9 +1031,9 @@ func parseCSV(data []byte) ([]string, [][]string, error) {
 	return columns, rows, nil
 }
 
-// ImportData imports data into a table
-func (a *App) ImportData(connectionID, database, tableName, filePath, format string, columnMappingJSON string) string {
-	g, err := getOrOpenDB(connectionID)
+// ImportData imports data into a table. sessionID optional for tab isolation.
+func (a *App) ImportData(connectionID, database, tableName, filePath, format string, columnMappingJSON, sessionID string) string {
+	g, err := getOrOpenDB(connectionID, sessionID)
 	if err != nil {
 		return importError(err.Error())
 	}
@@ -1280,9 +1391,9 @@ func (a *App) AnalyzeSQL(sql, driver string) string {
 	return string(data)
 }
 
-// GetTableSchema returns table schema. database is optional (MySQL: scope by TABLE_SCHEMA).
-func (a *App) GetTableSchema(connectionID, database, tableName string) string {
-	g, err := getOrOpenDB(connectionID)
+// GetTableSchema returns table schema. database is optional (MySQL: scope by TABLE_SCHEMA). sessionID optional for tab isolation.
+func (a *App) GetTableSchema(connectionID, database, tableName, sessionID string) string {
+	g, err := getOrOpenDB(connectionID, sessionID)
 	if err != nil {
 		return `{"name":"","columns":[],"indexes":[],"foreignKeys":[]}`
 	}
@@ -1314,9 +1425,9 @@ func (a *App) GetTableSchema(connectionID, database, tableName string) string {
 	return string(data)
 }
 
-// ExportData exports data from a table. database is optional (MySQL: qualify db.table).
-func (a *App) ExportData(connectionID, database, tableName, format string) string {
-	g, err := getOrOpenDB(connectionID)
+// ExportData exports data from a table. database is optional (MySQL: qualify db.table). sessionID optional for tab isolation.
+func (a *App) ExportData(connectionID, database, tableName, format, sessionID string) string {
+	g, err := getOrOpenDB(connectionID, sessionID)
 	if err != nil {
 		return exportError(err.Error())
 	}
