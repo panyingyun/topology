@@ -48,6 +48,18 @@ export default {
       connecting: 'Connecting',
       error: 'Error',
     },
+    sshTunnel: {
+      title: 'SSH Tunnel',
+      enable: 'Enable SSH Tunnel',
+      host: 'SSH Host',
+      port: 'SSH Port',
+      username: 'SSH Username',
+      password: 'SSH Password',
+      privateKey: 'Private Key (PEM)',
+      privateKeyPlaceholder: 'Paste PEM key content, or leave empty to use password',
+      passwordPlaceholder: 'SSH password or key passphrase',
+      mysqlOnly: 'SSH tunnel is only supported for MySQL currently',
+    },
   },
   sidebar: {
     newConnection: 'NEW CONNECTION',

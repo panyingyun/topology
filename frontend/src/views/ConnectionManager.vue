@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, watch, computed } from 'vue'
-import { Database, CheckCircle, XCircle, Loader } from 'lucide-vue-next'
+import { Database, CheckCircle, XCircle, Loader, Lock, ChevronDown, ChevronRight } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { connectionService } from '../services/connectionService'
 import type { Connection, DatabaseType } from '../types'
@@ -31,7 +31,24 @@ const form = reactive({
   password: '',
   database: '',
   useSSL: false,
+  sshTunnel: {
+    enabled: false,
+    host: '',
+    port: 22,
+    username: '',
+    password: '',
+    privateKey: '',
+  } as {
+    enabled: boolean
+    host: string
+    port: number
+    username: string
+    password: string
+    privateKey: string
+  },
 })
+
+const showSshSection = ref(true)
 
 const isEditMode = computed(() => props.mode === 'edit' && props.editConnection)
 
@@ -47,6 +64,15 @@ watch([() => props.show, () => props.editConnection], () => {
       form.password = conn.password || ''
       form.database = conn.database || ''
       form.useSSL = conn.useSSL || false
+      const st = conn.sshTunnel
+      form.sshTunnel = {
+        enabled: st?.enabled ?? false,
+        host: st?.host ?? '',
+        port: st?.port ?? 22,
+        username: st?.username ?? '',
+        password: st?.password ?? '',
+        privateKey: st?.privateKey ?? '',
+      }
     } else {
       activeDbType.value = 'mysql'
       form.name = ''
@@ -56,6 +82,7 @@ watch([() => props.show, () => props.editConnection], () => {
       form.password = ''
       form.database = ''
       form.useSSL = false
+      form.sshTunnel = { enabled: false, host: '', port: 22, username: '', password: '', privateKey: '' }
     }
     testStatus.value = 'idle'
     errorMessage.value = ''
@@ -73,15 +100,34 @@ const handleTypeChange = (type: DatabaseType) => {
   }
 }
 
+const buildConnectionPayload = () => ({
+  name: form.name,
+  type: activeDbType.value,
+  host: form.host,
+  port: form.port,
+  username: form.username,
+  password: form.password,
+  database: form.database || undefined,
+  useSSL: form.useSSL,
+  sshTunnel:
+    form.sshTunnel.enabled &&
+    (activeDbType.value === 'mysql' || activeDbType.value === 'postgresql')
+      ? {
+          enabled: true,
+          host: form.sshTunnel.host || undefined,
+          port: form.sshTunnel.port || 22,
+          username: form.sshTunnel.username || undefined,
+          password: form.sshTunnel.password || undefined,
+          privateKey: form.sshTunnel.privateKey || undefined,
+        }
+      : undefined,
+})
+
 const testConnection = async () => {
   testStatus.value = 'loading'
   errorMessage.value = ''
-  
   try {
-    const result = await connectionService.testConnection({
-      ...form,
-      type: activeDbType.value,
-    } as any)
+    const result = await connectionService.testConnection(buildConnectionPayload() as any)
     
     if (result) {
       testStatus.value = 'success'
@@ -100,16 +146,7 @@ const testConnection = async () => {
 
 const handleConnect = async () => {
   try {
-    const connection = await connectionService.createConnection({
-      name: form.name,
-      type: activeDbType.value,
-      host: form.host,
-      port: form.port,
-      username: form.username,
-      password: form.password,
-      database: form.database || undefined,
-      useSSL: form.useSSL,
-    })
+    const connection = await connectionService.createConnection(buildConnectionPayload() as any)
     emit('connect', connection)
     emit('close')
   } catch (error) {
@@ -120,16 +157,18 @@ const handleConnect = async () => {
 const handleUpdate = async () => {
   if (!isEditMode.value || !props.editConnection) return
   try {
+    const payload = buildConnectionPayload()
     const updated: Connection = {
       ...props.editConnection,
-      name: form.name,
-      type: activeDbType.value,
-      host: form.host,
-      port: form.port,
-      username: form.username,
-      password: form.password,
-      database: form.database || undefined,
-      useSSL: form.useSSL,
+      name: payload.name,
+      type: payload.type,
+      host: payload.host,
+      port: payload.port,
+      username: payload.username,
+      password: payload.password,
+      database: payload.database,
+      useSSL: payload.useSSL,
+      sshTunnel: payload.sshTunnel,
     }
     await connectionService.updateConnection(updated)
     emit('update', updated)
@@ -259,6 +298,82 @@ const dbTypes: Array<{ type: DatabaseType; label: string; icon: string; color: s
                 class="w-4 h-4 rounded border-[#444] bg-[#3c3c3c] text-[#1677ff] focus:ring-[#1677ff]"
               />
               <label for="useSSL" class="text-xs text-gray-400">{{ t('connection.useSSL') }}</label>
+            </div>
+
+            <!-- SSH Tunnel (MySQL only in backend) -->
+            <div v-if="activeDbType === 'mysql'" class="mt-6 pt-4 border-t border-[#333]">
+              <button
+                type="button"
+                class="flex items-center gap-2 w-full text-left mb-3"
+                @click="showSshSection = !showSshSection"
+              >
+                <Lock :size="16" class="text-[#1677ff] flex-shrink-0" />
+                <span class="text-sm font-semibold text-gray-200">{{ t('connection.sshTunnel.title') }}</span>
+                <ChevronDown v-if="showSshSection" :size="16" class="text-gray-400 ml-auto" />
+                <ChevronRight v-else :size="16" class="text-gray-400 ml-auto" />
+              </button>
+              <div v-show="showSshSection" class="space-y-4 pl-6 border-l-2 border-[#333] ml-1">
+                <div class="flex items-center gap-2">
+                  <input
+                    v-model="form.sshTunnel.enabled"
+                    type="checkbox"
+                    id="sshEnabled"
+                    class="w-4 h-4 rounded border-[#444] bg-[#3c3c3c] text-[#1677ff] focus:ring-[#1677ff]"
+                  />
+                  <label for="sshEnabled" class="text-xs text-gray-400">{{ t('connection.sshTunnel.enable') }}</label>
+                </div>
+                <template v-if="form.sshTunnel.enabled">
+                  <div class="grid grid-cols-2 gap-4">
+                    <div>
+                      <label class="block text-xs font-semibold text-gray-400 mb-2">{{ t('connection.sshTunnel.host') }}</label>
+                      <input
+                        v-model="form.sshTunnel.host"
+                        type="text"
+                        placeholder="jump.example.com"
+                        class="w-full bg-[#3c3c3c] border border-[#444] rounded px-3 py-2 text-sm text-gray-200 focus:border-[#1677ff] focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-semibold text-gray-400 mb-2">{{ t('connection.sshTunnel.port') }}</label>
+                      <input
+                        v-model.number="form.sshTunnel.port"
+                        type="number"
+                        min="1"
+                        max="65535"
+                        class="w-full bg-[#3c3c3c] border border-[#444] rounded px-3 py-2 text-sm text-gray-200 focus:border-[#1677ff] focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-semibold text-gray-400 mb-2">{{ t('connection.sshTunnel.username') }}</label>
+                    <input
+                      v-model="form.sshTunnel.username"
+                      type="text"
+                      placeholder="ssh_user"
+                      class="w-full bg-[#3c3c3c] border border-[#444] rounded px-3 py-2 text-sm text-gray-200 focus:border-[#1677ff] focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-semibold text-gray-400 mb-2">{{ t('connection.sshTunnel.password') }} ({{ t('common.optional') }})</label>
+                    <input
+                      v-model="form.sshTunnel.password"
+                      type="password"
+                      :placeholder="t('connection.sshTunnel.passwordPlaceholder')"
+                      class="w-full bg-[#3c3c3c] border border-[#444] rounded px-3 py-2 text-sm text-gray-200 focus:border-[#1677ff] focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-semibold text-gray-400 mb-2">{{ t('connection.sshTunnel.privateKey') }} ({{ t('common.optional') }})</label>
+                    <textarea
+                      v-model="form.sshTunnel.privateKey"
+                      :placeholder="t('connection.sshTunnel.privateKeyPlaceholder')"
+                      rows="4"
+                      class="w-full bg-[#3c3c3c] border border-[#444] rounded px-3 py-2 text-sm text-gray-200 focus:border-[#1677ff] focus:outline-none font-mono resize-y"
+                    />
+                    <p class="text-xs text-gray-500 mt-1">{{ t('connection.sshTunnel.mysqlOnly') }}</p>
+                  </div>
+                </template>
+              </div>
             </div>
           </div>
         </div>

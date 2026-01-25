@@ -48,6 +48,18 @@ export default {
       connecting: '连接中',
       error: '错误',
     },
+    sshTunnel: {
+      title: 'SSH 隧道',
+      enable: '启用 SSH 隧道',
+      host: 'SSH 主机',
+      port: 'SSH 端口',
+      username: 'SSH 用户名',
+      password: 'SSH 密码',
+      privateKey: '私钥 (PEM)',
+      privateKeyPlaceholder: '粘贴 PEM 私钥内容，或留空使用密码',
+      passwordPlaceholder: 'SSH 密码或私钥短语',
+      mysqlOnly: '当前仅 MySQL 支持通过 SSH 隧道连接',
+    },
   },
   sidebar: {
     newConnection: '新建连接',
