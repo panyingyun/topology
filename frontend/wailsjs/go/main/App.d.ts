@@ -35,8 +35,6 @@ export function GetTableSchema(arg1:string,arg2:string,arg3:string,arg4:string):
 
 export function GetTables(arg1:string,arg2:string,arg3:string):Promise<string>;
 
-export function Greet(arg1:string):Promise<string>;
-
 export function ImportData(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string):Promise<string>;
 
 export function ImportDataPreview(arg1:string,arg2:string):Promise<string>;

@@ -165,22 +165,22 @@ type SchemaMetadata struct {
 }
 
 var (
-	connMu           sync.RWMutex
-	mockConnections  []Connection
-	seedOnce         sync.Once
-	schemaMetaMu     sync.RWMutex
-	schemaMetaCache  = make(map[string]SchemaMetadata)
-	connFileOnce     sync.Once
-	connFilePath     string
-	historyMu        sync.RWMutex
-	queryHistory     []QueryHistory
-	historyFileOnce  sync.Once
-	historyFilePath  string
-	maxHistorySize   = 100 // Keep last 100 queries
-	snippetsMu       sync.RWMutex
-	snippets         []Snippet
-	snippetsFileOnce sync.Once
-	snippetsFilePath string
+	connMu              sync.RWMutex
+	connections         []Connection
+	connectionsLoadOnce sync.Once
+	schemaMetaMu        sync.RWMutex
+	schemaMetaCache     = make(map[string]SchemaMetadata)
+	connFileOnce        sync.Once
+	connFilePath        string
+	historyMu           sync.RWMutex
+	queryHistory        []QueryHistory
+	historyFileOnce     sync.Once
+	historyFilePath     string
+	maxHistorySize      = 100 // Keep last 100 queries
+	snippetsMu          sync.RWMutex
+	snippets            []Snippet
+	snippetsFileOnce    sync.Once
+	snippetsFilePath    string
 )
 
 const (
@@ -231,15 +231,17 @@ func getSnippetsFilePath() string {
 	return snippetsFilePath
 }
 
-func loadConnectionsFromFile() []Connection {
+// loadConnectionsFromFile returns (connections, fileExisted). When fileExisted is true, use the result
+// (even if empty); when false, use empty list so that explicit "no connections" is respected.
+func loadConnectionsFromFile() ([]Connection, bool) {
 	filePath := getConnectionsFilePath()
 	data, err := os.ReadFile(filePath)
 	if err != nil {
-		return nil
+		return nil, false
 	}
 	var connections []Connection
 	if err := json.Unmarshal(data, &connections); err != nil {
-		return nil
+		return nil, false
 	}
 	// Decrypt passwords
 	for i := range connections {
@@ -249,7 +251,7 @@ func loadConnectionsFromFile() []Connection {
 			}
 		}
 	}
-	return connections
+	return connections, true
 }
 
 func saveConnectionsToFile(connections []Connection) error {
@@ -271,72 +273,26 @@ func saveConnectionsToFile(connections []Connection) error {
 	return os.WriteFile(filePath, data, 0o600)
 }
 
-func seedTestConnections() {
-	seedOnce.Do(func() {
+// ensureConnectionsLoaded loads connections from file once; if file is missing or invalid, keeps list empty.
+func ensureConnectionsLoaded() {
+	connectionsLoadOnce.Do(func() {
 		connMu.Lock()
 		defer connMu.Unlock()
-
-		// Try to load from file first
-		saved := loadConnectionsFromFile()
-		if len(saved) > 0 {
-			mockConnections = saved
-			return
-		}
-
-		// Otherwise, use default test connections
-		mockConnections = make([]Connection, 0, 2)
-
-		// MySQL from testdb/mysql.url
-		if cfg, err := db.LoadMySQLTestConfig("testdb/mysql.url"); err == nil {
-			mockConnections = append(mockConnections, Connection{
-				ID:        "1",
-				Name:      "Test MySQL",
-				Type:      "mysql",
-				Host:      strings.TrimSpace(cfg.Host),
-				Port:      cfg.Port,
-				Username:  cfg.Username,
-				Password:  cfg.Password,
-				Database:  "mysql",
-				Status:    "disconnected",
-				CreatedAt: time.Now().Format(time.RFC3339),
-			})
+		saved, fileExisted := loadConnectionsFromFile()
+		if fileExisted {
+			connections = saved
 		} else {
-			mockConnections = append(mockConnections, Connection{
-				ID:        "1",
-				Name:      "Test MySQL (default)",
-				Type:      "mysql",
-				Host:      "127.0.0.1",
-				Port:      3306,
-				Username:  "root",
-				Password:  "",
-				Database:  "mysql",
-				Status:    "disconnected",
-				CreatedAt: time.Now().Format(time.RFC3339),
-			})
+			connections = make([]Connection, 0)
 		}
-
-		// SQLite from testdb/realm.db
-		mockConnections = append(mockConnections, Connection{
-			ID:        "2",
-			Name:      "Test SQLite",
-			Type:      "sqlite",
-			Host:      "",
-			Port:      0,
-			Username:  "",
-			Password:  "",
-			Database:  db.SQLiteTestPath(),
-			Status:    "disconnected",
-			CreatedAt: time.Now().Format(time.RFC3339),
-		})
 	})
 }
 
 func getConnByID(id string) *Connection {
 	connMu.RLock()
 	defer connMu.RUnlock()
-	for i := range mockConnections {
-		if mockConnections[i].ID == id {
-			c := mockConnections[i]
+	for i := range connections {
+		if connections[i].ID == id {
+			c := connections[i]
 			return &c
 		}
 	}
@@ -374,10 +330,10 @@ func getOrOpenDB(connID, sessionID string) (*gorm.DB, error) {
 
 // GetConnections returns all database connections
 func (a *App) GetConnections() string {
-	seedTestConnections()
+	ensureConnectionsLoaded()
 	connMu.RLock()
-	list := make([]Connection, len(mockConnections))
-	copy(list, mockConnections)
+	list := make([]Connection, len(connections))
+	copy(list, connections)
 	connMu.RUnlock()
 	data, err := json.Marshal(list)
 	if err != nil {
@@ -388,6 +344,7 @@ func (a *App) GetConnections() string {
 
 // CreateConnection creates a new database connection
 func (a *App) CreateConnection(connJSON string) error {
+	ensureConnectionsLoaded()
 	var conn Connection
 	if err := json.Unmarshal([]byte(connJSON), &conn); err != nil {
 		return err
@@ -396,10 +353,9 @@ func (a *App) CreateConnection(connJSON string) error {
 	conn.Status = "disconnected"
 	conn.CreatedAt = time.Now().Format(time.RFC3339)
 	connMu.Lock()
-	mockConnections = append(mockConnections, conn)
+	connections = append(connections, conn)
 	connMu.Unlock()
-	// Save to file
-	return saveConnectionsToFile(mockConnections)
+	return saveConnectionsToFile(connections)
 }
 
 // TestConnection tests a database connection
@@ -421,6 +377,7 @@ func (a *App) TestConnection(connJSON string) bool {
 
 // UpdateConnection updates an existing connection by ID. ID must exist.
 func (a *App) UpdateConnection(connJSON string) error {
+	ensureConnectionsLoaded()
 	var conn Connection
 	if err := json.Unmarshal([]byte(connJSON), &conn); err != nil {
 		return err
@@ -434,15 +391,14 @@ func (a *App) UpdateConnection(connJSON string) error {
 	schemaMetaMu.Unlock()
 	connMu.Lock()
 	defer connMu.Unlock()
-	for i, c := range mockConnections {
+	for i, c := range connections {
 		if c.ID == conn.ID {
 			conn.CreatedAt = c.CreatedAt
 			if conn.Status == "" {
 				conn.Status = c.Status
 			}
-			mockConnections[i] = conn
-			// Save to file
-			return saveConnectionsToFile(mockConnections)
+			connections[i] = conn
+			return saveConnectionsToFile(connections)
 		}
 	}
 	return fmt.Errorf("connection not found")
@@ -459,17 +415,17 @@ func (a *App) ReconnectConnection(id string) error {
 
 // DeleteConnection deletes a connection by ID
 func (a *App) DeleteConnection(id string) error {
+	ensureConnectionsLoaded()
 	db.CloseConnection(id)
 	schemaMetaMu.Lock()
 	delete(schemaMetaCache, id)
 	schemaMetaMu.Unlock()
 	connMu.Lock()
 	defer connMu.Unlock()
-	for i, c := range mockConnections {
+	for i, c := range connections {
 		if c.ID == id {
-			mockConnections = append(mockConnections[:i], mockConnections[i+1:]...)
-			// Save to file
-			return saveConnectionsToFile(mockConnections)
+			connections = append(connections[:i], connections[i+1:]...)
+			return saveConnectionsToFile(connections)
 		}
 	}
 	return fmt.Errorf("connection not found")
@@ -1522,9 +1478,4 @@ func (a *App) ExportData(connectionID, database, tableName, format, sessionID st
 func exportError(msg string) string {
 	data, _ := json.Marshal(map[string]interface{}{"success": false, "error": msg})
 	return string(data)
-}
-
-// Greet returns a greeting for the given name (kept for compatibility)
-func (a *App) Greet(name string) string {
-	return fmt.Sprintf("Hello %s, It's show time!", name)
 }
