@@ -9,10 +9,12 @@ import (
 	"encoding/base64"
 	"encoding/csv"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -64,6 +66,36 @@ type SSHTunnel struct {
 	Username   string `json:"username,omitempty"`
 	Password   string `json:"password,omitempty"`
 	PrivateKey string `json:"privateKey,omitempty"`
+}
+
+// Navicat NCX XML structures (connections.ncx)
+type navicatConnectionsRoot struct {
+	XMLName     xml.Name           `xml:"Connections"`
+	Connections []navicatConnEntry `xml:"Connection"`
+}
+
+type navicatConnEntry struct {
+	ConnectionName   string `xml:"ConnectionName,attr"`
+	ConnType         string `xml:"ConnType,attr"`
+	Host             string `xml:"Host,attr"`
+	Port             string `xml:"Port,attr"`
+	Database         string `xml:"Database,attr"`
+	DatabaseFileName string `xml:"DatabaseFileName,attr"`
+	UserName         string `xml:"UserName,attr"`
+	SSL              string `xml:"SSL,attr"`
+	SSH              string `xml:"SSH,attr"`
+	SSH_Host         string `xml:"SSH_Host,attr"`
+	SSH_Port         string `xml:"SSH_Port,attr"`
+	SSH_UserName     string `xml:"SSH_UserName,attr"`
+	SSH_AuthenMethod string `xml:"SSH_AuthenMethod,attr"`
+	SSH_PrivateKey   string `xml:"SSH_PrivateKey,attr"`
+}
+
+// ImportNavicatResult is the JSON returned by ImportNavicatConnections.
+type ImportNavicatResult struct {
+	Imported int      `json:"imported"`
+	Skipped  int      `json:"skipped"`
+	Errors   []string `json:"errors,omitempty"`
 }
 
 type Table struct {
@@ -436,6 +468,113 @@ func (a *App) CreateConnection(connJSON string) error {
 	connections = append(connections, conn)
 	connMu.Unlock()
 	return saveConnectionsToFile(connections)
+}
+
+// ImportNavicatConnectionsFromDialog opens a file dialog for .ncx, then imports and creates connections.
+// Returns same JSON as ImportNavicatConnections; if user cancels the dialog, returns imported=0 and no error.
+func (a *App) ImportNavicatConnectionsFromDialog() string {
+	path, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: "选择 Navicat 连接文件",
+		Filters: []runtime.FileFilter{
+			{DisplayName: "Navicat Connections (*.ncx)", Pattern: "*.ncx"},
+			{DisplayName: "All Files", Pattern: "*"},
+		},
+	})
+	if err != nil || path == "" {
+		out, _ := json.Marshal(ImportNavicatResult{})
+		return string(out)
+	}
+	return a.ImportNavicatConnections(path)
+}
+
+// ImportNavicatConnections reads a Navicat .ncx file and creates connections for MySQL and SQLite.
+// Password is not stored in NCX; imported connections have empty password (user can edit later).
+// Returns JSON ImportNavicatResult: imported count, skipped count, and any errors.
+func (a *App) ImportNavicatConnections(filePath string) string {
+	var result ImportNavicatResult
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		result.Errors = append(result.Errors, "read file: "+err.Error())
+		out, _ := json.Marshal(result)
+		return string(out)
+	}
+	var root navicatConnectionsRoot
+	if err := xml.Unmarshal(data, &root); err != nil {
+		result.Errors = append(result.Errors, "parse XML: "+err.Error())
+		out, _ := json.Marshal(result)
+		return string(out)
+	}
+	ensureConnectionsLoaded()
+	for _, n := range root.Connections {
+		connType := strings.ToUpper(strings.TrimSpace(n.ConnType))
+		var driver string
+		switch connType {
+		case "MYSQL":
+			driver = "mysql"
+		case "SQLITE":
+			driver = "sqlite"
+		default:
+			result.Skipped++
+			continue
+		}
+		name := strings.TrimSpace(n.ConnectionName)
+		if name == "" {
+			name = n.Host + ":" + n.Port
+		}
+		port := 0
+		if driver == "mysql" {
+			if n.Port != "" {
+				port, _ = strconv.Atoi(n.Port)
+			}
+			if port <= 0 {
+				port = 3306
+			}
+		}
+		conn := Connection{
+			Name:     name,
+			Type:     driver,
+			Host:     strings.TrimSpace(n.Host),
+			Port:     port,
+			Username: strings.TrimSpace(n.UserName),
+			Password: "",
+			Database: strings.TrimSpace(n.Database),
+			UseSSL:   strings.ToLower(n.SSL) == "true",
+			Status:   "disconnected",
+		}
+		if driver == "sqlite" {
+			if n.DatabaseFileName != "" {
+				conn.Database = strings.TrimSpace(n.DatabaseFileName)
+			}
+			conn.Host = ""
+			conn.Port = 0
+		}
+		if strings.ToLower(n.SSH) == "true" && n.SSH_Host != "" && driver == "mysql" {
+			sshPort := 22
+			if n.SSH_Port != "" {
+				if p, _ := strconv.Atoi(n.SSH_Port); p > 0 {
+					sshPort = p
+				}
+			}
+			conn.SSHTunnel = &SSHTunnel{
+				Enabled:  true,
+				Host:     strings.TrimSpace(n.SSH_Host),
+				Port:     sshPort,
+				Username: strings.TrimSpace(n.SSH_UserName),
+				Password: "",
+			}
+			if strings.ToUpper(n.SSH_AuthenMethod) == "PUBLICKEY" && n.SSH_PrivateKey != "" {
+				conn.SSHTunnel.PrivateKey = strings.TrimSpace(n.SSH_PrivateKey)
+			}
+		}
+		connJSON, _ := json.Marshal(conn)
+		if err := a.CreateConnection(string(connJSON)); err != nil {
+			result.Errors = append(result.Errors, name+": "+err.Error())
+			continue
+		}
+		result.Imported++
+	}
+	out, _ := json.Marshal(result)
+	return string(out)
 }
 
 // TestConnection tests a database connection. When SSH tunnel is enabled, starts a temporary tunnel then closes it.

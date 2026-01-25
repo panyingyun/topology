@@ -66,8 +66,14 @@ export default {
   },
   sidebar: {
     newConnection: 'NEW CONNECTION',
+    importNavicat: 'Import Navicat',
     newTable: 'NEW TABLE',
     filter: 'Filter...',
+  },
+  navicatImport: {
+    result: 'Imported {imported} connection(s), skipped {skipped}',
+    cancelled: 'Cancelled',
+    error: 'Import failed',
   },
   query: {
     title: 'SQL Query',

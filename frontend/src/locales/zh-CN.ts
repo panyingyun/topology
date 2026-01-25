@@ -66,8 +66,14 @@ export default {
   },
   sidebar: {
     newConnection: '新建连接',
+    importNavicat: '导入 Navicat',
     newTable: '新建表',
     filter: '筛选...',
+  },
+  navicatImport: {
+    result: '已导入 {imported} 个连接，跳过 {skipped} 个',
+    cancelled: '已取消',
+    error: '导入失败',
   },
   query: {
     title: 'SQL 查询',

@@ -41,6 +41,10 @@ export function ImportData(arg1:string,arg2:string,arg3:string,arg4:string,arg5:
 
 export function ImportDataPreview(arg1:string,arg2:string):Promise<string>;
 
+export function ImportNavicatConnections(arg1:string):Promise<string>;
+
+export function ImportNavicatConnectionsFromDialog():Promise<string>;
+
 export function LoadSchemaMetadata(arg1:string):Promise<void>;
 
 export function ReconnectConnection(arg1:string):Promise<void>;

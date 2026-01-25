@@ -267,6 +267,24 @@ const handleCloseLiveMonitor = () => {
   monitorConnection.value = null
 }
 
+const handleImportNavicat = async () => {
+  try {
+    const result = await connectionService.importNavicatFromDialog()
+    await loadConnections()
+    if (result.imported > 0) {
+      const msg = result.errors?.length
+        ? t('navicatImport.result', { imported: result.imported, skipped: result.skipped }) + '\n' + result.errors.slice(0, 3).join('\n')
+        : t('navicatImport.result', { imported: result.imported, skipped: result.skipped })
+      alert(msg)
+    } else if (result.errors?.length) {
+      alert(t('navicatImport.error') + ': ' + result.errors[0])
+    }
+  } catch (error) {
+    console.error('Import Navicat failed:', error)
+    alert(t('navicatImport.error') + ': ' + (error instanceof Error ? error.message : 'Unknown error'))
+  }
+}
+
 const handleNewTable = (connectionId: string, database: string) => {
   tableDesignerContext.value = { connectionId, database }
   showTableDesigner.value = true
@@ -317,6 +335,7 @@ const activeTab = computed(() => {
         @table-import="handleTableImport"
         @table-export="handleTableExport"
         @open-monitor="handleOpenMonitor"
+        @import-navicat="handleImportNavicat"
       />
 
       <div class="flex-1 flex flex-col overflow-hidden">

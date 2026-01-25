@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { Search, Plus } from 'lucide-vue-next'
+import { Search, Plus, FileDown } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import ConnectionTree from './ConnectionTree.vue'
 import type { Connection } from '../types'
@@ -24,6 +24,7 @@ const emit = defineEmits<{
   (e: 'table-import', connectionId: string, database: string, tableName: string): void
   (e: 'table-export', connectionId: string, database: string, tableName: string): void
   (e: 'open-monitor', connection: import('../types').Connection): void
+  (e: 'import-navicat'): void
 }>()
 
 const searchQuery = ref('')
@@ -62,6 +63,13 @@ const startResize = (e: MouseEvent) => {
       >
         <Plus :size="14" />
         {{ t('sidebar.newConnection') }}
+      </button>
+      <button
+        @click="emit('import-navicat')"
+        class="w-full border theme-border text-xs py-2 rounded-md font-medium transition-all active:scale-[0.98] flex items-center justify-center gap-2 theme-text hover:bg-[#37373d]"
+      >
+        <FileDown :size="14" />
+        {{ t('sidebar.importNavicat') }}
       </button>
       <div class="relative">
         <Search :size="14" class="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />

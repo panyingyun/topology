@@ -82,6 +82,14 @@ export function ImportDataPreview(arg1, arg2) {
   return window['go']['main']['App']['ImportDataPreview'](arg1, arg2);
 }
 
+export function ImportNavicatConnections(arg1) {
+  return window['go']['main']['App']['ImportNavicatConnections'](arg1);
+}
+
+export function ImportNavicatConnectionsFromDialog() {
+  return window['go']['main']['App']['ImportNavicatConnectionsFromDialog']();
+}
+
 export function LoadSchemaMetadata(arg1) {
   return window['go']['main']['App']['LoadSchemaMetadata'](arg1);
 }

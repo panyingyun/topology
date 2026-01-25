@@ -7,7 +7,14 @@ import {
   DeleteConnection,
   UpdateConnection,
   ReconnectConnection,
+  ImportNavicatConnectionsFromDialog,
 } from '../../wailsjs/go/main/App'
+
+export interface ImportNavicatResult {
+  imported: number
+  skipped: number
+  errors?: string[]
+}
 
 export const connectionService = {
   async getConnections(): Promise<Connection[]> {
@@ -52,5 +59,15 @@ export const connectionService = {
 
   async deleteConnection(id: string): Promise<void> {
     await DeleteConnection(id)
+  },
+
+  /** Opens file dialog for .ncx, imports Navicat connections (MySQL/SQLite) and creates them. */
+  async importNavicatFromDialog(): Promise<ImportNavicatResult> {
+    const raw = await ImportNavicatConnectionsFromDialog()
+    try {
+      return JSON.parse(raw || '{}') as ImportNavicatResult
+    } catch {
+      return { imported: 0, skipped: 0, errors: [] }
+    }
   },
 }
