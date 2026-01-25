@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { ref, reactive, watch, computed } from 'vue'
 import { Database, CheckCircle, XCircle, Loader } from 'lucide-vue-next'
+import { useI18n } from 'vue-i18n'
 import { connectionService } from '../services/connectionService'
 import type { Connection, DatabaseType } from '../types'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   show: boolean
@@ -154,7 +157,7 @@ const dbTypes: Array<{ type: DatabaseType; label: string; icon: string; color: s
       <div class="bg-[#252526] rounded-lg border border-[#333] w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         <div class="px-6 py-4 border-b border-[#333] flex items-center justify-between">
           <h2 class="text-lg font-semibold text-gray-200">
-            {{ isEditMode ? '编辑连接' : 'New Connection' }}
+            {{ isEditMode ? t('connection.editConnection') : t('connection.newConnection') }}
           </h2>
           <button
             @click="emit('close')"
@@ -168,7 +171,7 @@ const dbTypes: Array<{ type: DatabaseType; label: string; icon: string; color: s
           <!-- Database Type Selection -->
           <div class="mb-6">
             <label class="block text-xs font-semibold text-gray-400 mb-3 uppercase tracking-wider">
-              Database Type
+              {{ t('connection.databaseType') }}
             </label>
             <div class="grid grid-cols-3 gap-4">
               <div
@@ -191,7 +194,7 @@ const dbTypes: Array<{ type: DatabaseType; label: string; icon: string; color: s
           <!-- Connection Form -->
           <div class="space-y-4">
             <div>
-              <label class="block text-xs font-semibold text-gray-400 mb-2">Connection Name</label>
+              <label class="block text-xs font-semibold text-gray-400 mb-2">{{ t('connection.connectionName') }}</label>
               <input
                 v-model="form.name"
                 type="text"
@@ -202,7 +205,7 @@ const dbTypes: Array<{ type: DatabaseType; label: string; icon: string; color: s
 
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="block text-xs font-semibold text-gray-400 mb-2">Host</label>
+                <label class="block text-xs font-semibold text-gray-400 mb-2">{{ t('connection.host') }}</label>
                 <input
                   v-model="form.host"
                   type="text"
@@ -211,7 +214,7 @@ const dbTypes: Array<{ type: DatabaseType; label: string; icon: string; color: s
                 />
               </div>
               <div>
-                <label class="block text-xs font-semibold text-gray-400 mb-2">Port</label>
+                <label class="block text-xs font-semibold text-gray-400 mb-2">{{ t('connection.port') }}</label>
                 <input
                   v-model.number="form.port"
                   type="number"
@@ -222,7 +225,7 @@ const dbTypes: Array<{ type: DatabaseType; label: string; icon: string; color: s
 
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="block text-xs font-semibold text-gray-400 mb-2">Username</label>
+                <label class="block text-xs font-semibold text-gray-400 mb-2">{{ t('connection.username') }}</label>
                 <input
                   v-model="form.username"
                   type="text"
@@ -230,7 +233,7 @@ const dbTypes: Array<{ type: DatabaseType; label: string; icon: string; color: s
                 />
               </div>
               <div>
-                <label class="block text-xs font-semibold text-gray-400 mb-2">Password</label>
+                <label class="block text-xs font-semibold text-gray-400 mb-2">{{ t('connection.password') }}</label>
                 <input
                   v-model="form.password"
                   type="password"
@@ -240,7 +243,7 @@ const dbTypes: Array<{ type: DatabaseType; label: string; icon: string; color: s
             </div>
 
             <div>
-              <label class="block text-xs font-semibold text-gray-400 mb-2">Database (optional)</label>
+              <label class="block text-xs font-semibold text-gray-400 mb-2">{{ t('connection.database') }} ({{ t('common.optional') }})</label>
               <input
                 v-model="form.database"
                 type="text"
@@ -255,7 +258,7 @@ const dbTypes: Array<{ type: DatabaseType; label: string; icon: string; color: s
                 id="useSSL"
                 class="w-4 h-4 rounded border-[#444] bg-[#3c3c3c] text-[#1677ff] focus:ring-[#1677ff]"
               />
-              <label for="useSSL" class="text-xs text-gray-400">Use SSL/TLS</label>
+              <label for="useSSL" class="text-xs text-gray-400">{{ t('connection.useSSL') }}</label>
             </div>
           </div>
         </div>
@@ -276,7 +279,7 @@ const dbTypes: Array<{ type: DatabaseType; label: string; icon: string; color: s
               <CheckCircle v-else-if="testStatus === 'success'" :size="14" class="text-green-500" />
               <XCircle v-else-if="testStatus === 'error'" :size="14" class="text-red-500" />
               <Database v-else :size="14" />
-              {{ testStatus === 'loading' ? 'Testing...' : testStatus === 'success' ? 'Success' : testStatus === 'error' ? 'Failed' : 'Test Connection' }}
+              {{ testStatus === 'loading' ? t('common.loading') : testStatus === 'success' ? t('common.success') : testStatus === 'error' ? t('common.error') : t('connection.testConnection') }}
             </button>
             <span v-if="errorMessage" class="text-xs text-red-400">{{ errorMessage }}</span>
           </div>
@@ -286,21 +289,21 @@ const dbTypes: Array<{ type: DatabaseType; label: string; icon: string; color: s
               @click="emit('close')"
               class="px-4 py-2 rounded text-xs font-semibold bg-[#3c3c3c] hover:bg-[#4c4c4c] text-gray-300 transition-colors"
             >
-              Cancel
+              {{ t('common.cancel') }}
             </button>
             <button
               v-if="!isEditMode"
               @click="handleConnect"
               class="px-6 py-2 rounded text-xs font-semibold bg-[#1677ff] hover:bg-[#4096ff] text-white transition-colors"
             >
-              Connect
+              {{ t('connection.connect') }}
             </button>
             <button
               v-else
               @click="handleUpdate"
               class="px-6 py-2 rounded text-xs font-semibold bg-[#1677ff] hover:bg-[#4096ff] text-white transition-colors"
             >
-              更新
+              {{ t('connection.update') }}
             </button>
           </div>
         </div>

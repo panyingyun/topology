@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, shallowRef } from 'vue'
 import { Play, Square, FileCode, Save, History, Sparkles } from 'lucide-vue-next'
-import loader from '@monaco-editor/loader'
+import { useI18n } from 'vue-i18n'
+import * as monaco from 'monaco-editor'
 import { queryService } from '../services/queryService'
 import DataGrid from '../components/DataGrid.vue'
 import QueryHistory from '../components/QueryHistory.vue'
 import SQLAnalyzer from '../components/SQLAnalyzer.vue'
 import type { QueryResult, Connection } from '../types'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   connectionId?: string
@@ -29,8 +32,6 @@ const showHistory = ref(false)
 const showAnalyzer = ref(false)
 
 onMounted(async () => {
-  const monaco = await loader.init()
-  
   if (editorContainer.value) {
     editor.value = monaco.editor.create(editorContainer.value, {
       value: sqlQuery.value,
@@ -138,7 +139,7 @@ const handleHistorySelect = (sql: string) => {
         >
           <Play v-if="!isRunning" :size="14" />
           <Square v-else :size="14" class="animate-pulse" />
-          {{ isRunning ? 'RUNNING' : 'EXECUTE' }}
+          {{ isRunning ? t('query.running') : t('query.execute') }}
         </button>
 
         <button
@@ -147,7 +148,7 @@ const handleHistorySelect = (sql: string) => {
           class="flex items-center gap-2 px-3 py-1 rounded text-xs font-bold bg-red-600 hover:bg-red-500 transition-all"
         >
           <Square :size="14" />
-          STOP
+          {{ t('query.stop') }}
         </button>
 
         <button
@@ -155,7 +156,7 @@ const handleHistorySelect = (sql: string) => {
           class="px-3 py-1 rounded text-xs bg-[#3c3c3c] hover:bg-[#4c4c4c] text-gray-300 transition-colors"
         >
           <FileCode :size="14" class="inline mr-1" />
-          Format SQL
+          {{ t('query.formatSQL') }}
         </button>
 
         <button
@@ -163,7 +164,7 @@ const handleHistorySelect = (sql: string) => {
           class="px-3 py-1 rounded text-xs bg-[#3c3c3c] hover:bg-[#4c4c4c] text-gray-300 transition-colors"
         >
           <Save :size="14" class="inline mr-1" />
-          Save
+          {{ t('query.save') }}
         </button>
 
         <button
@@ -176,7 +177,7 @@ const handleHistorySelect = (sql: string) => {
           ]"
         >
           <History :size="14" class="inline mr-1" />
-          历史
+          {{ t('query.history') }}
         </button>
 
         <button
@@ -184,7 +185,7 @@ const handleHistorySelect = (sql: string) => {
           class="px-3 py-1 rounded text-xs bg-[#3c3c3c] hover:bg-[#4c4c4c] text-gray-300 transition-colors"
         >
           <Sparkles :size="14" class="inline mr-1" />
-          分析 SQL
+          {{ t('query.analyzeSQL') }}
         </button>
       </div>
 
@@ -217,7 +218,7 @@ const handleHistorySelect = (sql: string) => {
           </div>
         </div>
         <div v-else class="h-full flex items-center justify-center text-gray-500 text-sm">
-          No results yet. Execute a query to see results.
+          {{ t('query.noResults') }}. {{ t('query.executeQuery') }}
         </div>
       </div>
     </div>

@@ -1,5 +1,5 @@
 import { ref, onMounted, onUnmounted, shallowRef, type Ref } from 'vue'
-import loader from '@monaco-editor/loader'
+import * as monaco from 'monaco-editor'
 
 export function useMonaco(container: Ref<HTMLElement | null>) {
   const editor = shallowRef<any>(null)
@@ -9,7 +9,6 @@ export function useMonaco(container: Ref<HTMLElement | null>) {
   const column = ref(1)
 
   onMounted(async () => {
-    const monaco = await loader.init()
     
     if (container.value) {
       editor.value = monaco.editor.create(container.value, {

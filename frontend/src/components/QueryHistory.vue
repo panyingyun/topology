@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { History, Search, X, Clock, CheckCircle, XCircle, Trash2 } from 'lucide-vue-next'
+import { useI18n } from 'vue-i18n'
+import { getLocale } from '../locales'
 import { historyService } from '../services/historyService'
 import type { QueryHistory } from '../types'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   connectionId?: string
@@ -39,7 +43,7 @@ const handleSelect = (item: QueryHistory) => {
 }
 
 const handleClear = async () => {
-  if (confirm('确定要清除所有查询历史吗？')) {
+  if (confirm(t('history.clearConfirm'))) {
     try {
       await historyService.clearQueryHistory()
       await loadHistory()
@@ -57,11 +61,12 @@ const formatTime = (timeStr: string) => {
   const hours = Math.floor(diff / 3600000)
   const days = Math.floor(diff / 86400000)
 
-  if (minutes < 1) return '刚刚'
-  if (minutes < 60) return `${minutes} 分钟前`
-  if (hours < 24) return `${hours} 小时前`
-  if (days < 7) return `${days} 天前`
-  return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  if (minutes < 1) return t('history.timeAgo.justNow')
+  if (minutes < 60) return t('history.timeAgo.minutesAgo', { n: minutes })
+  if (hours < 24) return t('history.timeAgo.hoursAgo', { n: hours })
+  if (days < 7) return t('history.timeAgo.daysAgo', { n: days })
+  const locale = getLocale()
+  return date.toLocaleDateString(locale === 'zh-CN' ? 'zh-CN' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
 const filteredHistory = computed(() => {
@@ -97,13 +102,13 @@ onMounted(() => {
       <div class="h-12 flex items-center justify-between px-4 border-b border-[#333] bg-[#2d2d30]">
         <div class="flex items-center gap-2">
           <History :size="16" class="text-[#1677ff]" />
-          <span class="text-sm font-semibold text-gray-200">查询历史</span>
+          <span class="text-sm font-semibold text-gray-200">{{ t('history.title') }}</span>
         </div>
         <div class="flex items-center gap-2">
           <button
             @click="handleClear"
             class="p-1.5 hover:bg-[#37373d] rounded transition-colors"
-            title="清除历史"
+            :title="t('history.clear')"
           >
             <Trash2 :size="14" class="text-gray-400" />
           </button>
@@ -123,7 +128,7 @@ onMounted(() => {
           <input
             v-model="searchTerm"
             type="text"
-            placeholder="搜索查询历史..."
+            :placeholder="t('history.search')"
             class="w-full bg-[#3c3c3c] text-xs pl-8 pr-3 py-2 rounded border border-transparent focus:border-[#1677ff] outline-none transition-all text-gray-200"
           />
         </div>
@@ -136,7 +141,7 @@ onMounted(() => {
         </div>
         <div v-else-if="filteredHistory.length === 0" class="flex flex-col items-center justify-center h-32 text-gray-500">
           <History :size="32" class="mb-2 opacity-50" />
-          <p class="text-xs">暂无查询历史</p>
+          <p class="text-xs">{{ t('history.noHistory') }}</p>
         </div>
         <div v-else class="divide-y divide-[#333]">
           <button

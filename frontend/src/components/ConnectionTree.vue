@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { ChevronRight, ChevronDown, Database, Table as TableIcon, Circle, FolderOpen } from 'lucide-vue-next'
+import { useI18n } from 'vue-i18n'
 import { dataService } from '../services/dataService'
 import type { Connection, Table } from '../types'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   searchQuery: string
@@ -227,20 +230,20 @@ onUnmounted(() => {
             @click="handleEditConnection"
             class="w-full px-4 py-2 text-left text-xs text-gray-300 hover:bg-[#37373d] transition-colors"
           >
-            编辑连接
+            {{ t('connection.edit') }}
           </button>
           <button
             @click="handleRefreshConnection"
             class="w-full px-4 py-2 text-left text-xs text-gray-300 hover:bg-[#37373d] transition-colors"
           >
-            更新连接
+            {{ t('connection.refresh') }}
           </button>
           <div class="h-px bg-[#333] my-1"></div>
           <button
             @click="handleDeleteConnection"
             class="w-full px-4 py-2 text-left text-xs text-red-400 hover:bg-[#37373d] transition-colors"
           >
-            删除连接
+            {{ t('connection.delete') }}
           </button>
         </div>
       </Transition>

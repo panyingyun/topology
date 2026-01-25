@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { Database } from 'lucide-vue-next'
 import { WindowMinimise, Quit } from '../../wailsjs/runtime/runtime'
+import { useI18n } from 'vue-i18n'
+import LanguageSwitcher from './LanguageSwitcher.vue'
+
+const { t } = useI18n()
 
 const handleMinimize = () => {
   WindowMinimise()
@@ -20,10 +24,11 @@ const handleClose = () => {
       <div class="w-5 h-5 bg-[#1677ff] rounded flex items-center justify-center">
         <Database :size="12" class="text-white" />
       </div>
-      <span class="tracking-tight text-gray-300">Topology</span>
+      <span class="tracking-tight text-gray-300">{{ t('common.appName') }}</span>
     </div>
 
-    <div class="flex no-drag" style="--wails-draggable: no-drag">
+    <div class="flex items-center gap-2 no-drag" style="--wails-draggable: no-drag">
+      <LanguageSwitcher />
       <button
         @click="handleMinimize"
         class="hover:bg-[#37373d] w-10 h-10 transition-colors text-xs flex items-center justify-center"

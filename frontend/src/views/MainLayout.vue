@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import TitleBar from '../components/TitleBar.vue'
 import Sidebar from '../components/Sidebar.vue'
 import TabBar from '../components/TabBar.vue'
@@ -11,6 +12,8 @@ import TableDesigner from '../components/TableDesigner.vue'
 import { connectionService } from '../services/connectionService'
 import { queryService } from '../services/queryService'
 import type { TabItem, Connection, QueryResult } from '../types'
+
+const { t } = useI18n()
 
 const sidebarWidth = ref(260)
 const showConnectionManager = ref(false)
@@ -158,18 +161,18 @@ const handleEditorPosition = (line: number, column: number) => {
 
 const handleCreateTable = async (sql: string) => {
   if (!currentConnection.value) {
-    alert('请先选择连接')
+    alert(t('common.error') + ': ' + 'Please select a connection first')
     return
   }
   try {
     await queryService.executeQuery(currentConnection.value.id, sql)
-    alert('表创建成功！')
+    alert(t('common.success') + ': ' + 'Table created successfully!')
     showTableDesigner.value = false
     // Refresh connections to show new table
     await loadConnections()
   } catch (error) {
     console.error('Failed to create table:', error)
-    alert('创建表失败: ' + (error instanceof Error ? error.message : 'Unknown error'))
+    alert(t('common.error') + ': ' + (error instanceof Error ? error.message : 'Unknown error'))
   }
 }
 
@@ -223,8 +226,8 @@ const activeTab = computed(() => {
             @update="(updates) => console.log('Table updates:', updates)"
           />
           <div v-else class="h-full flex flex-col items-center justify-center text-gray-500">
-            <p class="mb-4">No tabs open</p>
-            <p class="text-xs text-gray-600">Select a table from the sidebar or create a new connection</p>
+            <p class="mb-4">{{ $t('tabs.noTabs') }}</p>
+            <p class="text-xs text-gray-600">{{ $t('tabs.selectTable') }}</p>
           </div>
         </div>
       </div>

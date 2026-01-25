@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Plus, Trash2, X, Database, Key, Link, FileCode } from 'lucide-vue-next'
 import { schemaService } from '../services/schemaService'
 import type { TableSchema, Column, Index, ForeignKey, DatabaseType } from '../types'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   show: boolean
@@ -81,11 +84,11 @@ const removeForeignKey = (index: number) => {
 
 const generateSQL = async () => {
   if (!tableName.value.trim()) {
-    alert('请输入表名')
+    alert(t('designer.enterTableName'))
     return
   }
   if (columns.value.length === 0) {
-    alert('至少需要添加一个列')
+    alert(t('designer.addAtLeastOneColumn'))
     return
   }
 
@@ -105,7 +108,7 @@ const generateSQL = async () => {
     showSQL.value = true
   } catch (error) {
     console.error('Failed to generate SQL:', error)
-    alert('生成 SQL 失败: ' + (error instanceof Error ? error.message : 'Unknown error'))
+    alert(t('designer.generateFailed') + ': ' + (error instanceof Error ? error.message : 'Unknown error'))
   }
 }
 
@@ -145,7 +148,7 @@ const handleClose = () => {
         <div class="px-6 py-4 border-b border-[#333] flex items-center justify-between">
           <h2 class="text-lg font-semibold text-gray-200 flex items-center gap-2">
             <Database :size="20" class="text-[#1677ff]" />
-            表结构设计器
+            {{ t('designer.title') }}
           </h2>
           <button
             @click="handleClose"
@@ -159,7 +162,7 @@ const handleClose = () => {
         <div class="flex-1 overflow-y-auto custom-scrollbar p-6">
           <!-- Table Name -->
           <div class="mb-6">
-            <label class="block text-xs font-semibold text-gray-400 mb-2">表名</label>
+            <label class="block text-xs font-semibold text-gray-400 mb-2">{{ t('designer.tableName') }}</label>
             <input
               v-model="tableName"
               type="text"
@@ -171,13 +174,13 @@ const handleClose = () => {
           <!-- Columns -->
           <div class="mb-6">
             <div class="flex items-center justify-between mb-3">
-              <h3 class="text-sm font-semibold text-gray-300">列定义</h3>
+              <h3 class="text-sm font-semibold text-gray-300">{{ t('designer.columns') }}</h3>
               <button
                 @click="addColumn"
                 class="flex items-center gap-1 px-3 py-1 bg-[#1677ff] hover:bg-[#4096ff] text-white text-xs rounded transition-colors"
               >
                 <Plus :size="12" />
-                添加列
+                {{ t('designer.addColumn') }}
               </button>
             </div>
             <div class="space-y-2">
@@ -186,46 +189,46 @@ const handleClose = () => {
                 :key="idx"
                 class="grid grid-cols-12 gap-2 p-3 bg-[#1e1e1e] rounded border border-[#333]"
               >
-                <input
-                  v-model="col.name"
-                  type="text"
-                  placeholder="列名"
-                  class="col-span-3 bg-[#3c3c3c] border border-[#444] rounded px-2 py-1.5 text-xs text-gray-200 focus:border-[#1677ff] focus:outline-none"
-                />
-                <select
-                  v-model="col.type"
-                  class="col-span-3 bg-[#3c3c3c] border border-[#444] rounded px-2 py-1.5 text-xs text-gray-200 focus:border-[#1677ff] focus:outline-none"
-                >
-                  <option v-for="type in commonTypes" :key="type" :value="type">
-                    {{ type }}
-                  </option>
-                </select>
-                <label class="col-span-2 flex items-center gap-1 text-xs text-gray-400">
                   <input
-                    v-model="col.nullable"
-                    type="checkbox"
-                    class="w-4 h-4 rounded border-[#444] bg-[#3c3c3c] text-[#1677ff]"
+                    v-model="col.name"
+                    type="text"
+                    :placeholder="t('designer.columnName')"
+                    class="col-span-3 bg-[#3c3c3c] border border-[#444] rounded px-2 py-1.5 text-xs text-gray-200 focus:border-[#1677ff] focus:outline-none"
                   />
-                  NULL
-                </label>
-                <label class="col-span-2 flex items-center gap-1 text-xs text-gray-400">
-                  <input
-                    v-model="col.isPrimaryKey"
-                    type="checkbox"
-                    class="w-4 h-4 rounded border-[#444] bg-[#3c3c3c] text-[#1677ff]"
-                  />
-                  <Key :size="12" />
-                  PK
-                </label>
-                <label class="col-span-1 flex items-center gap-1 text-xs text-gray-400">
-                  <input
-                    v-model="col.isUnique"
-                    type="checkbox"
-                    :disabled="col.isPrimaryKey"
-                    class="w-4 h-4 rounded border-[#444] bg-[#3c3c3c] text-[#1677ff]"
-                  />
-                  UNIQUE
-                </label>
+                  <select
+                    v-model="col.type"
+                    class="col-span-3 bg-[#3c3c3c] border border-[#444] rounded px-2 py-1.5 text-xs text-gray-200 focus:border-[#1677ff] focus:outline-none"
+                  >
+                    <option v-for="type in commonTypes" :key="type" :value="type">
+                      {{ type }}
+                    </option>
+                  </select>
+                  <label class="col-span-2 flex items-center gap-1 text-xs text-gray-400">
+                    <input
+                      v-model="col.nullable"
+                      type="checkbox"
+                      class="w-4 h-4 rounded border-[#444] bg-[#3c3c3c] text-[#1677ff]"
+                    />
+                    {{ t('designer.nullable') }}
+                  </label>
+                  <label class="col-span-2 flex items-center gap-1 text-xs text-gray-400">
+                    <input
+                      v-model="col.isPrimaryKey"
+                      type="checkbox"
+                      class="w-4 h-4 rounded border-[#444] bg-[#3c3c3c] text-[#1677ff]"
+                    />
+                    <Key :size="12" />
+                    {{ t('designer.primaryKey') }}
+                  </label>
+                  <label class="col-span-1 flex items-center gap-1 text-xs text-gray-400">
+                    <input
+                      v-model="col.isUnique"
+                      type="checkbox"
+                      :disabled="col.isPrimaryKey"
+                      class="w-4 h-4 rounded border-[#444] bg-[#3c3c3c] text-[#1677ff]"
+                    />
+                    {{ t('designer.unique') }}
+                  </label>
                 <button
                   @click="removeColumn(idx)"
                   class="col-span-1 flex items-center justify-center text-red-400 hover:text-red-300"
@@ -239,17 +242,17 @@ const handleClose = () => {
           <!-- Indexes -->
           <div class="mb-6">
             <div class="flex items-center justify-between mb-3">
-              <h3 class="text-sm font-semibold text-gray-300">索引</h3>
+              <h3 class="text-sm font-semibold text-gray-300">{{ t('designer.indexes') }}</h3>
               <button
                 @click="addIndex"
                 class="flex items-center gap-1 px-3 py-1 bg-[#3c3c3c] hover:bg-[#4c4c4c] text-gray-300 text-xs rounded transition-colors"
               >
                 <Plus :size="12" />
-                添加索引
+                {{ t('designer.addIndex') }}
               </button>
             </div>
             <div v-if="indexes.length === 0" class="text-xs text-gray-500 text-center py-4">
-              暂无索引
+              {{ t('designer.noIndexes') }}
             </div>
             <div v-else class="space-y-2">
               <div
@@ -261,7 +264,7 @@ const handleClose = () => {
                   <input
                     v-model="idx.name"
                     type="text"
-                    placeholder="索引名"
+                    :placeholder="t('designer.indexName')"
                     class="flex-1 bg-[#3c3c3c] border border-[#444] rounded px-2 py-1.5 text-xs text-gray-200 focus:border-[#1677ff] focus:outline-none"
                   />
                   <label class="flex items-center gap-1 text-xs text-gray-400">
@@ -270,7 +273,7 @@ const handleClose = () => {
                       type="checkbox"
                       class="w-4 h-4 rounded border-[#444] bg-[#3c3c3c] text-[#1677ff]"
                     />
-                    UNIQUE
+                    {{ t('designer.unique') }}
                   </label>
                   <button
                     @click="removeIndex(idxIndex)"
@@ -282,7 +285,7 @@ const handleClose = () => {
                 <input
                   v-model="idx.columns"
                   type="text"
-                  placeholder="列名（逗号分隔）"
+                  :placeholder="t('designer.indexColumns')"
                   class="w-full bg-[#3c3c3c] border border-[#444] rounded px-2 py-1.5 text-xs text-gray-200 focus:border-[#1677ff] focus:outline-none"
                   @input="(e: any) => idx.columns = e.target.value.split(',').map((s: string) => s.trim())"
                 />
@@ -293,17 +296,17 @@ const handleClose = () => {
           <!-- Foreign Keys -->
           <div class="mb-6">
             <div class="flex items-center justify-between mb-3">
-              <h3 class="text-sm font-semibold text-gray-300">外键</h3>
+              <h3 class="text-sm font-semibold text-gray-300">{{ t('designer.foreignKeys') }}</h3>
               <button
                 @click="addForeignKey"
                 class="flex items-center gap-1 px-3 py-1 bg-[#3c3c3c] hover:bg-[#4c4c4c] text-gray-300 text-xs rounded transition-colors"
               >
                 <Plus :size="12" />
-                添加外键
+                {{ t('designer.addForeignKey') }}
               </button>
             </div>
             <div v-if="foreignKeys.length === 0" class="text-xs text-gray-500 text-center py-4">
-              暂无外键
+              {{ t('designer.noForeignKeys') }}
             </div>
             <div v-else class="space-y-2">
               <div
@@ -315,13 +318,13 @@ const handleClose = () => {
                   <input
                     v-model="fk.name"
                     type="text"
-                    placeholder="外键名"
+                    :placeholder="t('designer.fkName')"
                     class="bg-[#3c3c3c] border border-[#444] rounded px-2 py-1.5 text-xs text-gray-200 focus:border-[#1677ff] focus:outline-none"
                   />
                   <input
                     v-model="fk.referencedTable"
                     type="text"
-                    placeholder="引用表名"
+                    :placeholder="t('designer.referencedTable')"
                     class="bg-[#3c3c3c] border border-[#444] rounded px-2 py-1.5 text-xs text-gray-200 focus:border-[#1677ff] focus:outline-none"
                   />
                 </div>
@@ -329,14 +332,14 @@ const handleClose = () => {
                   <input
                     v-model="fk.columns"
                     type="text"
-                    placeholder="列名（逗号分隔）"
+                    :placeholder="t('designer.fkColumns')"
                     class="bg-[#3c3c3c] border border-[#444] rounded px-2 py-1.5 text-xs text-gray-200 focus:border-[#1677ff] focus:outline-none"
                     @input="(e: any) => fk.columns = e.target.value.split(',').map((s: string) => s.trim())"
                   />
                   <input
                     v-model="fk.referencedColumns"
                     type="text"
-                    placeholder="引用列名（逗号分隔）"
+                    :placeholder="t('designer.refColumns')"
                     class="bg-[#3c3c3c] border border-[#444] rounded px-2 py-1.5 text-xs text-gray-200 focus:border-[#1677ff] focus:outline-none"
                     @input="(e: any) => fk.referencedColumns = e.target.value.split(',').map((s: string) => s.trim())"
                   />
@@ -377,7 +380,7 @@ const handleClose = () => {
               <div class="flex items-center justify-between mb-2">
                 <h3 class="text-sm font-semibold text-gray-300 flex items-center gap-2">
                   <FileCode :size="16" />
-                  生成的 SQL
+                  {{ t('designer.generatedSQL') }}
                 </h3>
                 <button
                   @click="showSQL = false"
@@ -397,21 +400,21 @@ const handleClose = () => {
             @click="handleClose"
             class="px-4 py-2 rounded text-xs font-semibold bg-[#3c3c3c] hover:bg-[#4c4c4c] text-gray-300 transition-colors"
           >
-            取消
+            {{ t('common.cancel') }}
           </button>
           <div class="flex items-center gap-3">
             <button
               @click="generateSQL"
               class="px-4 py-2 rounded text-xs font-semibold bg-[#3c3c3c] hover:bg-[#4c4c4c] text-gray-300 transition-colors"
             >
-              生成 SQL
+              {{ t('designer.generateSQL') }}
             </button>
             <button
               v-if="generatedSQL"
               @click="handleCreate"
               class="px-6 py-2 rounded text-xs font-semibold bg-[#1677ff] hover:bg-[#4096ff] text-white transition-colors"
             >
-              创建表
+              {{ t('designer.createTable') }}
             </button>
           </div>
         </div>

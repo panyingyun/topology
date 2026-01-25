@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { Upload } from 'lucide-vue-next'
+import { useI18n } from 'vue-i18n'
 import DataGrid from '../components/DataGrid.vue'
 import DataImporter from '../components/DataImporter.vue'
 import { dataService } from '../services/dataService'
 import type { TableData, UpdateRecord, ExportFormat, QueryResult, ImportResult } from '../types'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   connectionId: string
@@ -74,7 +77,7 @@ const handleExport = async (format: ExportFormat) => {
     )
     if (result.success) {
       console.log('Export successful:', result.filename)
-      // TODO: Show notification
+      // Note: In production, show a notification to user
     } else {
       console.error('Export failed:', result.error)
     }
@@ -114,8 +117,8 @@ watch(
     <div class="h-12 flex items-center justify-between px-4 bg-[#252526] border-b border-[#333]">
       <div class="flex items-center gap-4 text-xs text-gray-400">
         <span class="font-semibold text-gray-300">{{ tableName }}</span>
-        <span>Total: {{ tableData.totalRows.toLocaleString() }} rows</span>
-        <span>Page: {{ currentPage }} / {{ Math.ceil(tableData.totalRows / pageSize) || 1 }}</span>
+        <span>{{ t('table.totalRows') }}: {{ tableData.totalRows.toLocaleString() }}</span>
+        <span>{{ t('table.page') }}: {{ currentPage }} / {{ Math.ceil(tableData.totalRows / pageSize) || 1 }}</span>
       </div>
 
       <div class="flex items-center gap-2">
@@ -124,28 +127,28 @@ watch(
           class="flex items-center gap-1.5 px-3 py-1 bg-[#1677ff] hover:bg-[#4096ff] text-white text-xs rounded transition-colors font-semibold"
         >
           <Upload :size="12" />
-          导入数据
+          {{ t('table.importData') }}
         </button>
         <button
           v-if="currentPage * pageSize < tableData.totalRows"
           @click="handleLoadMore"
           class="px-3 py-1 bg-[#3c3c3c] hover:bg-[#4c4c4c] text-gray-300 text-xs rounded transition-colors"
         >
-          Load More
+          {{ t('table.loadMore') }}
         </button>
         <button
           v-if="currentPage > 1"
           @click="handlePageChange(currentPage - 1)"
           class="px-3 py-1 bg-[#3c3c3c] hover:bg-[#4c4c4c] text-gray-300 text-xs rounded transition-colors"
         >
-          Previous
+          {{ t('table.previous') }}
         </button>
         <button
           v-if="currentPage * pageSize < tableData.totalRows"
           @click="handlePageChange(currentPage + 1)"
           class="px-3 py-1 bg-[#3c3c3c] hover:bg-[#4c4c4c] text-gray-300 text-xs rounded transition-colors"
         >
-          Next
+          {{ t('table.next') }}
         </button>
       </div>
     </div>
@@ -161,11 +164,11 @@ watch(
       <div v-else-if="isLoading" class="h-full flex items-center justify-center text-gray-500">
         <div class="text-center">
           <div class="w-8 h-8 border-2 border-[#1677ff] border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-          <p class="text-xs">Loading data...</p>
+          <p class="text-xs">{{ t('table.loading') }}</p>
         </div>
       </div>
       <div v-else class="h-full flex items-center justify-center text-gray-500">
-        <p class="text-sm">No data available</p>
+        <p class="text-sm">{{ t('table.noData') }}</p>
       </div>
     </div>
 

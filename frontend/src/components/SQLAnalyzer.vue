@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Sparkles, AlertTriangle, Lightbulb, TrendingUp, X } from 'lucide-vue-next'
 import { schemaService } from '../services/schemaService'
 import type { SQLAnalysis, DatabaseType } from '../types'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   show: boolean
@@ -19,7 +22,7 @@ const isLoading = ref(false)
 
 const analyze = async () => {
   if (!props.sql.trim()) {
-    alert('请输入 SQL 语句')
+    alert(t('analyzer.enterSQL'))
     return
   }
   isLoading.value = true
@@ -27,7 +30,7 @@ const analyze = async () => {
     analysis.value = await schemaService.analyzeSQL(props.sql, props.driver || 'mysql')
   } catch (error) {
     console.error('Failed to analyze SQL:', error)
-    alert('分析失败: ' + (error instanceof Error ? error.message : 'Unknown error'))
+    alert(t('analyzer.analyzeFailed') + ': ' + (error instanceof Error ? error.message : 'Unknown error'))
   } finally {
     isLoading.value = false
   }
@@ -60,7 +63,7 @@ watch(() => props.show, (newVal) => {
         <div class="px-6 py-4 border-b border-[#333] flex items-center justify-between">
           <h2 class="text-lg font-semibold text-gray-200 flex items-center gap-2">
             <Sparkles :size="20" class="text-[#1677ff]" />
-            SQL 分析
+            {{ t('analyzer.title') }}
           </h2>
           <button
             @click="emit('close')"
@@ -75,7 +78,7 @@ watch(() => props.show, (newVal) => {
           <div v-if="isLoading" class="flex items-center justify-center h-64">
             <div class="text-center">
               <div class="w-8 h-8 border-2 border-[#1677ff] border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-              <p class="text-sm text-gray-400">正在分析 SQL...</p>
+              <p class="text-sm text-gray-400">{{ t('analyzer.analyzing') }}</p>
             </div>
           </div>
 
@@ -84,7 +87,7 @@ watch(() => props.show, (newVal) => {
             <div class="p-4 bg-[#1e1e1e] rounded border border-[#333]">
               <div class="flex items-center gap-2 mb-2">
                 <TrendingUp :size="16" class="text-[#1677ff]" />
-                <span class="text-sm font-semibold text-gray-300">查询类型</span>
+                <span class="text-sm font-semibold text-gray-300">{{ t('analyzer.queryType') }}</span>
               </div>
               <span class="text-xs text-gray-400 uppercase">{{ analysis.queryType }}</span>
             </div>
@@ -93,11 +96,11 @@ watch(() => props.show, (newVal) => {
             <div class="p-4 bg-[#1e1e1e] rounded border border-[#333]">
               <div class="flex items-center gap-2 mb-3">
                 <TrendingUp :size="16" class="text-[#1677ff]" />
-                <span class="text-sm font-semibold text-gray-300">性能评估</span>
+                <span class="text-sm font-semibold text-gray-300">{{ t('analyzer.performance') }}</span>
               </div>
               <div class="space-y-2">
                 <div class="flex items-center justify-between">
-                  <span class="text-xs text-gray-400">复杂度</span>
+                  <span class="text-xs text-gray-400">{{ t('analyzer.complexity') }}</span>
                   <span :class="['text-xs font-semibold uppercase', complexityColor]">
                     {{ analysis.performance?.estimatedComplexity || 'unknown' }}
                   </span>
@@ -112,7 +115,7 @@ watch(() => props.show, (newVal) => {
             <div v-if="analysis.warnings && analysis.warnings.length > 0" class="p-4 bg-red-500/10 rounded border border-red-500/50">
               <div class="flex items-center gap-2 mb-3">
                 <AlertTriangle :size="16" class="text-red-400" />
-                <span class="text-sm font-semibold text-red-400">警告</span>
+                <span class="text-sm font-semibold text-red-400">{{ t('analyzer.warnings') }}</span>
               </div>
               <ul class="space-y-1">
                 <li
@@ -130,7 +133,7 @@ watch(() => props.show, (newVal) => {
             <div v-if="analysis.suggestions && analysis.suggestions.length > 0" class="p-4 bg-yellow-500/10 rounded border border-yellow-500/50">
               <div class="flex items-center gap-2 mb-3">
                 <Lightbulb :size="16" class="text-yellow-400" />
-                <span class="text-sm font-semibold text-yellow-400">优化建议</span>
+                <span class="text-sm font-semibold text-yellow-400">{{ t('analyzer.suggestions') }}</span>
               </div>
               <ul class="space-y-1">
                 <li
@@ -145,7 +148,7 @@ watch(() => props.show, (newVal) => {
             </div>
 
             <div v-if="analysis.warnings?.length === 0 && analysis.suggestions?.length === 0" class="p-4 bg-green-500/10 rounded border border-green-500/50 text-center">
-              <p class="text-xs text-green-400">未发现明显问题</p>
+              <p class="text-xs text-green-400">{{ t('analyzer.noIssues') }}</p>
             </div>
           </div>
         </div>
@@ -156,7 +159,7 @@ watch(() => props.show, (newVal) => {
             @click="emit('close')"
             class="px-6 py-2 rounded text-xs font-semibold bg-[#1677ff] hover:bg-[#4096ff] text-white transition-colors"
           >
-            关闭
+            {{ t('common.close') }}
           </button>
         </div>
       </div>

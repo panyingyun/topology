@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Upload, X, CheckCircle, AlertCircle, FileText, Database } from 'lucide-vue-next'
 import { importService } from '../services/importService'
 import type { ImportPreview, ImportFormat, ImportResult } from '../types'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   show: boolean
@@ -52,7 +55,7 @@ const loadPreview = async () => {
     // For now, we'll use a placeholder path
     preview.value = await importService.previewImport(filePath.value, importFormat.value)
     if (preview.value.error) {
-      alert('预览失败: ' + preview.value.error)
+      alert(t('importer.previewFailed') + ': ' + preview.value.error)
       step.value = 'select'
     } else {
       // Initialize column mapping (file column -> table column)
@@ -64,7 +67,7 @@ const loadPreview = async () => {
     }
   } catch (error) {
     console.error('Failed to load preview:', error)
-    alert('预览失败: ' + (error instanceof Error ? error.message : 'Unknown error'))
+    alert(t('importer.previewFailed') + ': ' + (error instanceof Error ? error.message : 'Unknown error'))
     step.value = 'select'
   } finally {
     isPreviewing.value = false
@@ -89,12 +92,12 @@ const handleImport = async () => {
       step.value = 'result'
       emit('success', result)
     } else {
-      alert('导入失败: ' + (result.error || 'Unknown error'))
+      alert(t('importer.importFailed') + ': ' + (result.error || 'Unknown error'))
       step.value = 'mapping'
     }
   } catch (error) {
     console.error('Failed to import:', error)
-    alert('导入失败: ' + (error instanceof Error ? error.message : 'Unknown error'))
+    alert(t('importer.importFailed') + ': ' + (error instanceof Error ? error.message : 'Unknown error'))
     step.value = 'mapping'
   } finally {
     isImporting.value = false
@@ -130,7 +133,7 @@ const availableTableColumns = computed(() => {
         <div class="px-6 py-4 border-b border-[#333] flex items-center justify-between">
           <h2 class="text-lg font-semibold text-gray-200 flex items-center gap-2">
             <Database :size="20" class="text-[#1677ff]" />
-            导入数据到 {{ tableName }}
+            {{ t('importer.title', { table: tableName }) }}
           </h2>
           <button
             @click="handleClose"
@@ -145,7 +148,7 @@ const availableTableColumns = computed(() => {
           <!-- Step 1: File Selection -->
           <div v-if="step === 'select'" class="space-y-4">
             <div>
-              <label class="block text-xs font-semibold text-gray-400 mb-2">选择文件格式</label>
+              <label class="block text-xs font-semibold text-gray-400 mb-2">{{ t('importer.selectFormat') }}</label>
               <div class="flex gap-4">
                 <label class="flex items-center gap-2 cursor-pointer">
                   <input
@@ -169,7 +172,7 @@ const availableTableColumns = computed(() => {
             </div>
 
             <div>
-              <label class="block text-xs font-semibold text-gray-400 mb-2">选择文件</label>
+              <label class="block text-xs font-semibold text-gray-400 mb-2">{{ t('importer.selectFile') }}</label>
               <div class="border-2 border-dashed border-[#444] rounded-lg p-8 text-center hover:border-[#1677ff] transition-colors">
                 <input
                   type="file"
@@ -183,8 +186,8 @@ const availableTableColumns = computed(() => {
                   class="cursor-pointer flex flex-col items-center gap-2"
                 >
                   <Upload :size="32" class="text-gray-400" />
-                  <span class="text-sm text-gray-300">点击选择文件或拖拽文件到此处</span>
-                  <span class="text-xs text-gray-500">支持 {{ importFormat.toUpperCase() }} 格式</span>
+                  <span class="text-sm text-gray-300">{{ t('importer.dragDrop') }}</span>
+                  <span class="text-xs text-gray-500">{{ t('importer.supportedFormat', { format: importFormat.toUpperCase() }) }}</span>
                 </label>
               </div>
             </div>
@@ -194,14 +197,14 @@ const availableTableColumns = computed(() => {
           <div v-if="step === 'preview' && isPreviewing" class="flex items-center justify-center h-64">
             <div class="text-center">
               <div class="w-8 h-8 border-2 border-[#1677ff] border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-              <p class="text-sm text-gray-400">正在预览数据...</p>
+              <p class="text-sm text-gray-400">{{ t('common.loading') }}</p>
             </div>
           </div>
 
           <!-- Step 3: Column Mapping -->
           <div v-if="step === 'mapping' && preview" class="space-y-4">
             <div>
-              <h3 class="text-sm font-semibold text-gray-300 mb-2">数据预览（前 10 行）</h3>
+              <h3 class="text-sm font-semibold text-gray-300 mb-2">{{ t('importer.preview') }}</h3>
               <div class="bg-[#1e1e1e] rounded border border-[#333] overflow-x-auto">
                 <table class="w-full text-xs">
                   <thead class="bg-[#2d2d30] sticky top-0">
@@ -235,7 +238,7 @@ const availableTableColumns = computed(() => {
             </div>
 
             <div>
-              <h3 class="text-sm font-semibold text-gray-300 mb-2">列映射</h3>
+              <h3 class="text-sm font-semibold text-gray-300 mb-2">{{ t('importer.columnMapping') }}</h3>
               <div class="space-y-2">
                 <div
                   v-for="fileCol in preview.columns"
@@ -259,13 +262,13 @@ const availableTableColumns = computed(() => {
                 @click="step = 'select'"
                 class="px-4 py-2 rounded text-xs font-semibold bg-[#3c3c3c] hover:bg-[#4c4c4c] text-gray-300 transition-colors"
               >
-                返回
+                {{ t('importer.back') }}
               </button>
               <button
                 @click="handleImport"
                 class="px-6 py-2 rounded text-xs font-semibold bg-[#1677ff] hover:bg-[#4096ff] text-white transition-colors"
               >
-                开始导入
+                {{ t('importer.startImport') }}
               </button>
             </div>
           </div>
@@ -274,7 +277,7 @@ const availableTableColumns = computed(() => {
           <div v-if="step === 'importing'" class="flex items-center justify-center h-64">
             <div class="text-center">
               <div class="w-8 h-8 border-2 border-[#1677ff] border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-              <p class="text-sm text-gray-400">正在导入数据...</p>
+              <p class="text-sm text-gray-400">{{ t('importer.importing') }}</p>
             </div>
           </div>
 
@@ -300,11 +303,11 @@ const availableTableColumns = computed(() => {
                     importResult.success ? 'text-green-400' : 'text-red-400'
                   ]"
                 >
-                  {{ importResult.success ? '导入成功' : '导入失败' }}
+                  {{ importResult.success ? t('importer.importSuccess') : t('importer.importFailed') }}
                 </span>
               </div>
               <div v-if="importResult.success" class="text-xs text-gray-300 space-y-1">
-                <p>成功导入: {{ importResult.inserted }} / {{ importResult.totalRows }} 行</p>
+                <p>{{ t('importer.imported', { inserted: importResult.inserted, total: importResult.totalRows }) }}</p>
               </div>
               <div v-else class="text-xs text-red-400">
                 <p>{{ importResult.error }}</p>
@@ -316,7 +319,7 @@ const availableTableColumns = computed(() => {
                 @click="handleClose"
                 class="px-6 py-2 rounded text-xs font-semibold bg-[#1677ff] hover:bg-[#4096ff] text-white transition-colors"
               >
-                完成
+                {{ t('importer.complete') }}
               </button>
             </div>
           </div>

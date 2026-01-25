@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { VxeGrid } from 'vxe-table'
 import type { VxeGridProps } from 'vxe-table'
 import { Download, ChevronDown, Filter } from 'lucide-vue-next'
 import type { QueryResult, UpdateRecord, ExportFormat } from '../types'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   data: QueryResult
@@ -91,11 +94,11 @@ const handleExport = (format: ExportFormat) => {
   showExportMenu.value = false
 }
 
-const exportFormats: Array<{ label: string; value: ExportFormat }> = [
-  { label: 'CSV', value: 'csv' },
-  { label: 'JSON', value: 'json' },
-  { label: 'SQL Insert', value: 'sql' },
-]
+const exportFormats = computed(() => [
+  { label: t('dataGrid.csv'), value: 'csv' as ExportFormat },
+  { label: t('dataGrid.json'), value: 'json' as ExportFormat },
+  { label: t('dataGrid.sql'), value: 'sql' as ExportFormat },
+])
 
 // Close export menu when clicking outside
 const handleClickOutside = (e: MouseEvent) => {
@@ -118,9 +121,9 @@ onUnmounted(() => {
   <div class="flex flex-col h-full bg-[#1e1e1e]">
     <div class="h-10 flex items-center justify-between px-4 bg-[#252526] border-b border-[#333]">
       <div class="flex items-center gap-4 text-xs text-gray-400">
-        <span>Rows: {{ data.rowCount.toLocaleString() }}</span>
+        <span>{{ t('dataGrid.rows') }}: {{ data.rowCount.toLocaleString() }}</span>
         <span v-if="pendingChanges > 0" class="text-yellow-400">
-          {{ pendingChanges }} pending changes
+          {{ pendingChanges }} {{ t('dataGrid.pendingChanges') }}
         </span>
       </div>
       <div class="flex items-center gap-2">
@@ -129,7 +132,7 @@ onUnmounted(() => {
           @click="saveChanges"
           class="px-3 py-1 bg-green-600 hover:bg-green-500 text-white text-xs rounded transition-colors"
         >
-          Save Changes
+          {{ t('dataGrid.saveChanges') }}
         </button>
         <div class="relative" ref="exportMenuRef">
           <button
@@ -137,7 +140,7 @@ onUnmounted(() => {
             class="flex items-center gap-1 px-3 py-1 bg-[#3c3c3c] hover:bg-[#4c4c4c] text-gray-300 text-xs rounded transition-colors"
           >
             <Download :size="12" />
-            Export
+            {{ t('dataGrid.export') }}
             <ChevronDown :size="12" />
           </button>
           <Transition name="fade">

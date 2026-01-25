@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { Search, Plus, Database } from 'lucide-vue-next'
+import { useI18n } from 'vue-i18n'
 import ConnectionTree from './ConnectionTree.vue'
 import type { Connection } from '../types'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   width: number
@@ -54,21 +57,21 @@ const startResize = (e: MouseEvent) => {
         class="w-full bg-[#1677ff] hover:bg-[#4096ff] text-white text-xs py-2 rounded-md font-bold transition-all active:scale-[0.98] flex items-center justify-center gap-2"
       >
         <Plus :size="14" />
-        NEW CONNECTION
+        {{ t('sidebar.newConnection') }}
       </button>
       <button
         @click="emit('new-table')"
         class="w-full bg-[#3c3c3c] hover:bg-[#4c4c4c] text-gray-300 text-xs py-2 rounded-md font-bold transition-all active:scale-[0.98] flex items-center justify-center gap-2"
       >
         <Database :size="14" />
-        NEW TABLE
+        {{ t('sidebar.newTable') }}
       </button>
       <div class="relative">
         <Search :size="14" class="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
         <input
           v-model="searchQuery"
           type="text"
-          placeholder="Filter..."
+          :placeholder="t('sidebar.filter')"
           class="w-full bg-[#3c3c3c] text-xs pl-8 pr-3 py-1.5 rounded border border-transparent focus:border-[#1677ff] outline-none transition-all text-gray-200"
         />
       </div>
