@@ -12,44 +12,45 @@ A cross-platform database management tool built with Wails framework, providing 
 ### Implemented ✅
 
 - **Connection Management**
-  - Support for MySQL, PostgreSQL, and SQLite database connections
-  - Create, test, and delete database connections
-  - Real-time connection status display
-  - Hierarchical connection tree (Connection -> Database -> Table)
+  - Support for MySQL and SQLite (PostgreSQL UI ready, backend in progress)
+  - Create, test, and delete connections (with confirmation before delete)
+  - **Import Navicat connections**: sidebar "Import Navicat" to select .ncx file; parses and creates MySQL/SQLite connections (passwords empty, edit later)
+  - Real-time connection status; connection tree (Connection → Database → Table)
+  - Connection context menu: Edit, Refresh, Open Monitor, Delete
 
 - **SQL Query Editor**
-  - Monaco Editor integration for professional code editing experience
-  - SQL syntax highlighting and auto-completion
-  - Ctrl+Enter quick query execution
-  - SQL formatting functionality
-  - Real-time query result display
+  - Monaco Editor, SQL highlighting and auto-completion
+  - Ctrl+Enter execute; SQL formatting
+  - Real-time results; query history (search, quick select)
+  - **Execution plan** (MySQL): toolbar "Execution Plan" for EXPLAIN visualization (full scan/index usage, suggestions)
+  - 2‑minute timeout and error display
 
 - **Data Viewing & Editing**
-  - High-performance data grid (based on vxe-table)
-  - Virtual scrolling for large datasets
-  - Double-click cell editing
-  - Change tracking and batch saving
-  - Data export functionality
+  - High-performance data grid (vxe-table), virtual scrolling
+  - Cell edit, change tracking, batch save
+  - Header filters; export (CSV, JSON, SQL Insert); import (CSV/JSON with preview and column mapping)
+  - Table data viewer with paged load
+
+- **Live Monitor** (MySQL)
+  - Connection right-click "Open Monitor" for real-time dashboard
+  - Refreshes every 5s: threads connected, process list (SHOW FULL PROCESSLIST)
+  - Slow query highlighting (≥ 5s)
 
 - **Multi-Tab Management**
-  - Support for multiple query tabs
-  - Support for table data view tabs
-  - Tab switching and closing
+  - Multiple query and table-data tabs; tab reorder; switch/close
 
 - **User Interface**
-  - Modern dark theme
-  - Draggable resizable sidebar
-  - Custom title bar (supports window dragging)
-  - Status bar displaying connection info and query statistics
+  - Light/dark theme (persisted)
+  - Resizable sidebar; custom title bar; window controls
+  - Status bar: connection, query stats, editor line/column
+  - i18n: Chinese and English
 
 ### Planned 🚧
 
-- Table structure designer
-- Data import functionality
-- AI SQL optimization
-- Query history
-- Connection persistence storage
-- Enhanced keyboard shortcuts system
+- PostgreSQL backend support
+- More keyboard shortcuts
+- Table structure visual editor (edit existing tables)
+- Data backup/restore
 
 ## 🛠️ Tech Stack
 
@@ -67,7 +68,7 @@ A cross-platform database management tool built with Wails framework, providing 
 ### Backend
 - **Language**: Go 1.23.1
 - **Framework**: [Wails v2](https://wails.io/)
-- **Architecture**: Frontend-backend separation, backend provides interfaces returning mock data
+- **Architecture**: Frontend-backend separation; backend provides real APIs (connections, query, table data, import/export, execution plan, live monitor)
 
 ## 📁 Project Structure
 
@@ -199,7 +200,7 @@ npm run build
 
 ## 🎨 UI Design
 
-- **Theme**: Dark theme
+- **Theme**: Light and dark (persisted)
 - **Primary Color**: `#1677ff` (Tech Blue)
 - **Fonts**: 
   - Code: JetBrains Mono, Fira Code
@@ -209,20 +210,13 @@ npm run build
 
 ### Completed ✅
 
-- [x] Project initialization and dependency installation
-- [x] Type definitions and interface design
-- [x] All core component implementations
-- [x] All page view implementations
-- [x] Service layer and composable functions
-- [x] Frontend-backend integration
-- [x] Build verification
-
-### In Progress 🚧
-
-- [ ] Complete table data view implementation
-- [ ] Enhanced data import/export functionality
-- [ ] Table structure designer
-- [ ] AI SQL optimization feature
+- [x] Connection persistence, query history, data import/export (CSV, JSON, SQL Insert)
+- [x] Table structure designer, SQL analysis
+- [x] Execution plan visualization (MySQL), live monitor (MySQL)
+- [x] Import Navicat connections (.ncx)
+- [x] Delete connection confirmation
+- [x] i18n (zh-CN, en-US), light/dark theme
+- [x] Build and GoReleaser release (macOS, Ubuntu 22.04/24.04, Windows)
 
 For detailed development plan, please see [docs/development-plan.md](docs/development-plan.md)
 
@@ -242,4 +236,4 @@ Issues and Pull Requests are welcome!
 
 ---
 
-**Last Updated**: 2026-01-24
+**Last Updated**: 2026-01-25

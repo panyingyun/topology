@@ -13,9 +13,11 @@
 
 - **连接管理**
   - 支持 MySQL、SQLite 数据库连接（PostgreSQL 前端 UI 已支持，后端实现中）
-  - 创建、测试、删除数据库连接
+  - 创建、测试、删除数据库连接（删除前确认提示）
+  - **导入 Navicat 连接**：侧栏「导入 Navicat」可选择 .ncx 文件，自动解析并创建 MySQL/SQLite 连接（密码需后续编辑填写）
   - 连接状态实时显示
   - 连接树形结构展示（连接 -> 数据库 -> 表）
+  - 连接右键：编辑、刷新、打开监控、删除
 
 - **SQL 查询编辑器**
   - Monaco Editor 集成，提供专业的代码编辑体验
@@ -29,6 +31,7 @@
   - SQL 区域与结果区域比例可拖拽调节，默认 SQL 1/3、结果 2/3
   - 切换标签后返回查询窗口时，自动恢复该标签的 SQL 与查询结果
   - 查询执行超时（2 分钟）与错误提示，避免一直「运行中」
+  - **执行计划**（MySQL）：工具栏「执行计划」按钮，可视化 EXPLAIN 结果（全表扫描/索引使用、优化建议）
 
 - **数据查看与编辑**
   - 高性能数据网格（基于 vxe-table）
@@ -46,6 +49,11 @@
   - 支持表数据查看标签页
   - 标签页切换和关闭
   - 标签页拖拽排序
+
+- **实时监控**（MySQL）
+  - 连接右键「打开监控」打开实时监控弹窗
+  - 每 5 秒刷新：活跃连接数、进程列表（SHOW FULL PROCESSLIST）
+  - 慢查询高亮（执行时间 ≥ 5 秒）
 
 - **用户界面**
   - 亮色 / 暗色主题切换（标题栏主题按钮，偏好持久化）
@@ -78,7 +86,7 @@
 ### 后端
 - **语言**: Go 1.23.1
 - **框架**: [Wails v2](https://wails.io/)
-- **架构**: 前后端分离，后端提供接口返回 mock 数据
+- **架构**: 前后端分离，后端提供真实数据接口（连接、查询、表数据、导入导出、执行计划、实时监控等）
 
 ## 📁 项目结构
 
@@ -94,7 +102,9 @@ topology/
 │   │   │   ├── ConnectionTree.vue # 连接树
 │   │   │   ├── TabBar.vue        # 标签页
 │   │   │   ├── StatusBar.vue     # 状态栏
-│   │   │   └── DataGrid.vue      # 数据网格
+│   │   │   ├── DataGrid.vue      # 数据网格
+│   │   │   ├── ExecutionPlanViewer.vue # 执行计划可视化
+│   │   │   └── LiveMonitor.vue   # 实时监控弹窗
 │   │   ├── views/            # 页面视图
 │   │   │   ├── MainLayout.vue    # 主布局
 │   │   │   ├── ConnectionManager.vue # 连接管理器
@@ -103,10 +113,12 @@ topology/
 │   │   ├── services/         # 服务层
 │   │   │   ├── connectionService.ts
 │   │   │   ├── queryService.ts
-│   │   │   └── dataService.ts
+│   │   │   ├── dataService.ts
+│   │   │   └── monitorService.ts # 实时监控
 │   │   ├── composables/      # 组合式函数
 │   │   │   ├── useMonaco.ts
-│   │   │   └── useTheme.ts   # 亮/暗主题切换与持久化
+│   │   │   ├── useTheme.ts   # 亮/暗主题切换与持久化
+│   │   │   └── useSchemaMetadata.ts
 │   │   ├── types/            # TypeScript 类型定义
 │   │   │   └── index.ts
 │   │   ├── App.vue           # 根组件
@@ -171,6 +183,26 @@ wails build -clean
 
 构建产物位于 `build/bin/` 目录。
 
+### 发布构建（GoReleaser）
+
+多平台分别使用对应配置文件发布，校验和文件名含平台信息（如 `topology_1.3.0_Ubuntu22.04_checksums.txt`）：
+
+```bash
+# 检查配置
+goreleaser check -f .goreleaser.macos.yml
+goreleaser check -f .goreleaser.ubuntu22.04.yml
+goreleaser check -f .goreleaser.ubuntu24.04.yml
+goreleaser check -f .goreleaser.windows.yml
+
+# 发布（需先设置 GITHUB_TOKEN 并打 tag）
+goreleaser release -f .goreleaser.macos.yml --clean
+goreleaser release -f .goreleaser.ubuntu22.04.yml --clean
+goreleaser release -f .goreleaser.ubuntu24.04.yml --clean
+goreleaser release -f .goreleaser.windows.yml --clean
+```
+
+详见 [release.md](release.md)。
+
 ### 前端单独构建
 
 如果需要单独构建前端：
@@ -184,11 +216,11 @@ npm run build
 
 ### 创建数据库连接
 
-1. 点击侧边栏的 "NEW CONNECTION" 按钮
+1. 点击侧边栏的「新建连接」按钮；或点击「导入 Navicat」选择 .ncx 文件批量导入（仅 MySQL/SQLite，密码需后续编辑）
 2. 选择数据库类型（MySQL 或 SQLite，PostgreSQL 支持开发中）
 3. 填写连接信息（主机、端口、用户名、密码等）
-4. 点击 "Test Connection" 测试连接
-5. 点击 "Connect" 创建连接
+4. 点击「测试连接」测试连接
+5. 点击「连接」创建连接
 
 ### 执行 SQL 查询
 
@@ -267,6 +299,10 @@ npm run build
 - [x] 查询执行超时与错误提示（避免一直运行中）
 - [x] 亮色/暗色主题切换与持久化
 - [x] 标题栏最大化/还原按钮
+- [x] 执行计划可视化（MySQL EXPLAIN，流程图展示、全表扫描/索引标注）
+- [x] 实时监控（MySQL：活跃连接数、进程列表、慢查询高亮，Wails 事件推送）
+- [x] 导入 Navicat 连接文件（.ncx，自动创建 MySQL/SQLite 连接）
+- [x] 删除连接前确认（是/否）
 
 ### 已完成功能详情 ✅
 
@@ -336,6 +372,15 @@ npm run build
 - [Vue 3 文档](https://vuejs.org/)
 - [Tailwind CSS 文档](https://tailwindcss.com/docs)
 
+## 支持作者
+
+如果你觉得 gg 软件对你有帮助，欢迎请作者喝一杯咖啡 ☕
+
+<div style="display: flex; gap: 10px;">
+  <img src="docs/alipay.jpg" alt="支付宝" width="200"  height="373"/>
+  <img src="docs/wcpay.png" alt="微信支付" width="200" height="373"/>
+</div>
+
 ---
 
 **最后更新**: 2026-01-25
@@ -376,9 +421,18 @@ Topology 现已支持多语言界面：
 - ✅ 数据导入/导出
 - ✅ 表结构设计器
 - ✅ SQL 分析功能
+- ✅ 执行计划、实时监控、Navicat 导入
 - ✅ 状态栏和提示信息
 
 ## 📋 最近更新
+
+### 2026-01-26（执行计划、实时监控、Navicat 导入）
+
+- ✅ **执行计划**：MySQL 下可查看 SELECT 的 EXPLAIN 结果，流程图展示节点类型、全表扫描/索引使用、优化建议
+- ✅ **实时监控**：连接右键「打开监控」，弹窗展示活跃连接数与进程列表，每 5 秒刷新，慢查询高亮
+- ✅ **导入 Navicat 连接**：侧栏「导入 Navicat」选择 .ncx 文件，解析并自动创建 MySQL/SQLite 连接（密码为空需后续编辑）
+- ✅ **删除连接**：删除前弹出确认「是否确认删除连接「xxx」？」选是/否
+- ✅ **发布**：GoReleaser 校验和文件名含平台（如 `topology_1.3.0_Ubuntu22.04_checksums.txt`），详见 release.md
 
 ### 2026-01-25（界面与查询体验）
 
@@ -421,7 +475,7 @@ Topology 现已支持多语言界面：
   - 主键、唯一约束、NULL 约束配置
   - 外键级联操作配置（RESTRICT/CASCADE/SET NULL）
   - 自动生成 CREATE TABLE 和 CREATE INDEX 语句
-- ✅ 完成 SQL 分析功能
+- ✅ 完成 SQL 分析功能执行计划、实时监控、Navicat
   - SQL 查询类型自动识别
   - 性能复杂度评估（low/medium/high）
   - 常见问题检测和警告（如缺少 WHERE、SELECT * 等）
@@ -432,3 +486,6 @@ Topology 现已支持多语言界面：
   - 自动检测浏览器语言
   - 语言偏好保存到本地存储
   - 所有界面文本已国际化
+
+
+
