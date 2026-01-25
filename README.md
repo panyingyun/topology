@@ -374,7 +374,7 @@ npm run build
 
 ## 支持作者
 
-如果你觉得 gg 软件对你有帮助，欢迎请作者喝一杯咖啡 ☕
+如果你觉得 Topology 软件对你有帮助，欢迎请作者喝一杯咖啡 ☕
 
 <div style="display: flex; gap: 10px;">
   <img src="docs/alipay.jpg" alt="支付宝" width="200"  height="373"/>
