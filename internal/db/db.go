@@ -12,9 +12,18 @@ import (
 	"gorm.io/gorm"
 )
 
+// PoolConfig holds connection pool settings (defaults used when opening).
 var (
 	connCache = make(map[string]*gorm.DB)
 	mu        sync.RWMutex
+
+	// Default pool settings: balanced for desktop app with multiple connections.
+	MaxIdleConns    = 5
+	MaxOpenConns    = 20
+	ConnMaxLifetime = 30 * time.Minute // close connections older than 30m
+	ConnMaxIdleTime = 5 * time.Minute  // close idle connections after 5m (helps with server-side idle timeout)
+	OpenRetries     = 4                // total attempts (1 initial + 3 retries)
+	OpenRetryDelay  = time.Second      // backoff base: 1s, 2s, 4s
 )
 
 // BuildDSN builds DSN for mysql or sqlite. For sqlite, host is unused; database is the file path.
@@ -43,7 +52,7 @@ func BuildDSN(driver, host string, port int, user, pass, database string) (strin
 	}
 }
 
-// Open opens a DB and caches it by connID.
+// Open opens a DB and caches it by connID. Uses retry with backoff on transient failure.
 func Open(connID, driver, dsn string) (*gorm.DB, error) {
 	mu.Lock()
 	defer mu.Unlock()
@@ -55,6 +64,28 @@ func Open(connID, driver, dsn string) (*gorm.DB, error) {
 		delete(connCache, connID)
 	}
 
+	var lastErr error
+	backoff := OpenRetryDelay
+	for attempt := 0; attempt < OpenRetries; attempt++ {
+		if attempt > 0 {
+			time.Sleep(backoff)
+			backoff *= 2
+		}
+		db, err := openOnce(connID, driver, dsn)
+		if err == nil {
+			return db, nil
+		}
+		lastErr = err
+		// SQLite file errors usually don't benefit from retry
+		if driver == "sqlite" {
+			return nil, err
+		}
+	}
+	return nil, lastErr
+}
+
+// openOnce opens a single connection and configures the pool; caller holds mu.
+func openOnce(connID, driver, dsn string) (*gorm.DB, error) {
 	var dial gorm.Dialector
 	switch driver {
 	case "mysql":
@@ -74,9 +105,10 @@ func Open(connID, driver, dsn string) (*gorm.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	sqlDB.SetMaxIdleConns(2)
-	sqlDB.SetMaxOpenConns(10)
-	sqlDB.SetConnMaxLifetime(time.Hour)
+	sqlDB.SetMaxIdleConns(MaxIdleConns)
+	sqlDB.SetMaxOpenConns(MaxOpenConns)
+	sqlDB.SetConnMaxLifetime(ConnMaxLifetime)
+	sqlDB.SetConnMaxIdleTime(ConnMaxIdleTime)
 
 	connCache[connID] = db
 	return db, nil

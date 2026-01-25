@@ -298,6 +298,7 @@ func buildDSN(c *Connection) (string, error) {
 	return db.BuildDSN(c.Type, c.Host, c.Port, c.Username, c.Password, c.Database)
 }
 
+// getOrOpenDB returns a working DB for the connection: uses cache if ping succeeds, otherwise reconnects.
 func getOrOpenDB(connID string) (*gorm.DB, error) {
 	conn := getConnByID(connID)
 	if conn == nil {
@@ -312,7 +313,11 @@ func getOrOpenDB(connID string) (*gorm.DB, error) {
 		return nil, err
 	}
 	if g, ok := db.Get(connID); ok {
-		return g, nil
+		sqlDB, err := g.DB()
+		if err == nil && sqlDB.Ping() == nil {
+			return g, nil
+		}
+		db.Close(connID)
 	}
 	return db.Open(connID, driver, dsn)
 }
