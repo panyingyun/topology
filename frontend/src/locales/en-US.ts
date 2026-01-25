@@ -67,6 +67,7 @@ export default {
     next: 'Next',
     importData: 'Import Data',
     noData: 'No data available',
+    noDataInTable: 'No data in current table',
     loading: 'Loading data...',
   },
   dataGrid: {

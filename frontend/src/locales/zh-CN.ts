@@ -67,6 +67,7 @@ export default {
     next: '下一页',
     importData: '导入数据',
     noData: '暂无数据',
+    noDataInTable: '当前表中无数据',
     loading: '正在加载数据...',
   },
   dataGrid: {

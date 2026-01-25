@@ -126,13 +126,13 @@ type UpdateRecord struct {
 }
 
 type QueryHistory struct {
-	ID          string `json:"id"`
+	ID           string `json:"id"`
 	ConnectionID string `json:"connectionId"`
-	SQL         string `json:"sql"`
-	ExecutedAt  string `json:"executedAt"`
-	Success     bool   `json:"success"`
-	Duration    int    `json:"duration,omitempty"` // milliseconds
-	RowCount    int    `json:"rowCount,omitempty"`
+	SQL          string `json:"sql"`
+	ExecutedAt   string `json:"executedAt"`
+	Success      bool   `json:"success"`
+	Duration     int    `json:"duration,omitempty"` // milliseconds
+	RowCount     int    `json:"rowCount,omitempty"`
 }
 
 var (
@@ -141,8 +141,8 @@ var (
 	seedOnce        sync.Once
 	connFileOnce    sync.Once
 	connFilePath    string
-	historyMu      sync.RWMutex
-	queryHistory   []QueryHistory
+	historyMu       sync.RWMutex
+	queryHistory    []QueryHistory
 	historyFileOnce sync.Once
 	historyFilePath string
 	maxHistorySize  = 100 // Keep last 100 queries
@@ -226,7 +226,7 @@ func seedTestConnections() {
 	seedOnce.Do(func() {
 		connMu.Lock()
 		defer connMu.Unlock()
-		
+
 		// Try to load from file first
 		saved := loadConnectionsFromFile()
 		if len(saved) > 0 {
@@ -653,13 +653,13 @@ func saveQueryHistory(connectionID, sql string, success bool, duration, rowCount
 
 	// Add new history entry
 	history := QueryHistory{
-		ID:          fmt.Sprintf("%d", time.Now().UnixNano()),
+		ID:           fmt.Sprintf("%d", time.Now().UnixNano()),
 		ConnectionID: connectionID,
-		SQL:         sql,
-		ExecutedAt:  time.Now().Format(time.RFC3339),
-		Success:     success,
-		Duration:    duration,
-		RowCount:    rowCount,
+		SQL:          sql,
+		ExecutedAt:   time.Now().Format(time.RFC3339),
+		Success:      success,
+		Duration:     duration,
+		RowCount:     rowCount,
 	}
 	queryHistory = append([]QueryHistory{history}, queryHistory...)
 
@@ -753,7 +753,7 @@ func (a *App) ImportDataPreview(filePath, format string) string {
 		}
 	case "json":
 		var jsonData struct {
-			Columns []string                   `json:"columns"`
+			Columns []string                 `json:"columns"`
 			Rows    []map[string]interface{} `json:"rows"`
 		}
 		if err := json.Unmarshal(data, &jsonData); err != nil {
@@ -858,7 +858,7 @@ func (a *App) ImportData(connectionID, database, tableName, filePath, format str
 		}
 	case "json":
 		var jsonData struct {
-			Columns []string                   `json:"columns"`
+			Columns []string                 `json:"columns"`
 			Rows    []map[string]interface{} `json:"rows"`
 		}
 		if err := json.Unmarshal(data, &jsonData); err != nil {
@@ -951,7 +951,7 @@ func (a *App) ImportData(connectionID, database, tableName, filePath, format str
 
 		sql := fmt.Sprintf("INSERT INTO %s (%s) VALUES %s",
 			tbl, strings.Join(quotedCols, ", "), strings.Join(values, ", "))
-		
+
 		if err := g.Exec(sql).Error; err != nil {
 			return importError(fmt.Sprintf("failed to insert batch: %v", err))
 		}
@@ -1114,10 +1114,10 @@ func (a *App) GenerateCreateTableSQL(schemaJSON, driver string) string {
 func (a *App) AnalyzeSQL(sql, driver string) string {
 	sqlLower := strings.ToLower(strings.TrimSpace(sql))
 	analysis := map[string]interface{}{
-		"queryType":    "unknown",
-		"suggestions":  []string{},
-		"warnings":     []string{},
-		"performance":  map[string]interface{}{},
+		"queryType":   "unknown",
+		"suggestions": []string{},
+		"warnings":    []string{},
+		"performance": map[string]interface{}{},
 	}
 
 	// Detect query type

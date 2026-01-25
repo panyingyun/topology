@@ -2,3 +2,4 @@ build/bin
 node_modules
 frontend/dist
 topology
+build/export/realm_export.sql

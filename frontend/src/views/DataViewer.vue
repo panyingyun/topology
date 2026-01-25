@@ -168,7 +168,7 @@ watch(
         </div>
       </div>
       <div v-else class="h-full flex items-center justify-center text-gray-500">
-        <p class="text-sm">{{ t('table.noData') }}</p>
+        <p class="text-sm">{{ t('table.noDataInTable') }}</p>
       </div>
     </div>
 
