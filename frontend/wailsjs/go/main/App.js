@@ -14,8 +14,8 @@ export function ExecuteQuery(arg1, arg2) {
   return window['go']['main']['App']['ExecuteQuery'](arg1, arg2);
 }
 
-export function ExportData(arg1, arg2, arg3) {
-  return window['go']['main']['App']['ExportData'](arg1, arg2, arg3);
+export function ExportData(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['ExportData'](arg1, arg2, arg3, arg4);
 }
 
 export function FormatSQL(arg1) {
@@ -26,16 +26,20 @@ export function GetConnections() {
   return window['go']['main']['App']['GetConnections']();
 }
 
-export function GetTableData(arg1, arg2, arg3, arg4) {
-  return window['go']['main']['App']['GetTableData'](arg1, arg2, arg3, arg4);
+export function GetDatabases(arg1) {
+  return window['go']['main']['App']['GetDatabases'](arg1);
 }
 
-export function GetTableSchema(arg1, arg2) {
-  return window['go']['main']['App']['GetTableSchema'](arg1, arg2);
+export function GetTableData(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['GetTableData'](arg1, arg2, arg3, arg4, arg5);
 }
 
-export function GetTables(arg1) {
-  return window['go']['main']['App']['GetTables'](arg1);
+export function GetTableSchema(arg1, arg2, arg3) {
+  return window['go']['main']['App']['GetTableSchema'](arg1, arg2, arg3);
+}
+
+export function GetTables(arg1, arg2) {
+  return window['go']['main']['App']['GetTables'](arg1, arg2);
 }
 
 export function Greet(arg1) {
@@ -46,6 +50,6 @@ export function TestConnection(arg1) {
   return window['go']['main']['App']['TestConnection'](arg1);
 }
 
-export function UpdateTableData(arg1, arg2, arg3) {
-  return window['go']['main']['App']['UpdateTableData'](arg1, arg2, arg3);
+export function UpdateTableData(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['UpdateTableData'](arg1, arg2, arg3, arg4);
 }

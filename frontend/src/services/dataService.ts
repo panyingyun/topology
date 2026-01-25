@@ -1,11 +1,28 @@
 import type { Table, TableData, TableSchema, UpdateRecord } from '../types'
 
-import { GetTables, GetTableData, UpdateTableData, GetTableSchema, ExportData } from '../../wailsjs/go/main/App'
+import {
+  GetDatabases,
+  GetTables,
+  GetTableData,
+  UpdateTableData,
+  GetTableSchema,
+  ExportData,
+} from '../../wailsjs/go/main/App'
 
 export const dataService = {
-  async getTables(connectionId: string): Promise<Table[]> {
+  async getDatabases(connectionId: string): Promise<string[]> {
     try {
-      const result = await GetTables(connectionId)
+      const result = await GetDatabases(connectionId)
+      return JSON.parse(result)
+    } catch (error) {
+      console.error('Failed to get databases:', error)
+      return []
+    }
+  },
+
+  async getTables(connectionId: string, database: string): Promise<Table[]> {
+    try {
+      const result = await GetTables(connectionId, database)
       return JSON.parse(result)
     } catch (error) {
       console.error('Failed to get tables:', error)
@@ -15,12 +32,13 @@ export const dataService = {
 
   async getTableData(
     connectionId: string,
+    database: string,
     tableName: string,
     limit: number = 100,
     offset: number = 0
   ): Promise<TableData> {
     try {
-      const result = await GetTableData(connectionId, tableName, limit, offset)
+      const result = await GetTableData(connectionId, database, tableName, limit, offset)
       return JSON.parse(result)
     } catch (error) {
       console.error('Failed to get table data:', error)
@@ -36,21 +54,22 @@ export const dataService = {
 
   async updateTableData(
     connectionId: string,
+    database: string,
     tableName: string,
     updates: UpdateRecord[]
   ): Promise<void> {
     try {
       const updatesJSON = JSON.stringify(updates)
-      await UpdateTableData(connectionId, tableName, updatesJSON)
+      await UpdateTableData(connectionId, database, tableName, updatesJSON)
     } catch (error) {
       console.error('Failed to update table data:', error)
       throw error
     }
   },
 
-  async getTableSchema(connectionId: string, tableName: string): Promise<TableSchema> {
+  async getTableSchema(connectionId: string, database: string, tableName: string): Promise<TableSchema> {
     try {
-      const result = await GetTableSchema(connectionId, tableName)
+      const result = await GetTableSchema(connectionId, database, tableName)
       return JSON.parse(result)
     } catch (error) {
       console.error('Failed to get table schema:', error)
@@ -63,9 +82,14 @@ export const dataService = {
     }
   },
 
-  async exportData(connectionId: string, tableName: string, format: string): Promise<{ success: boolean; filename?: string; error?: string }> {
+  async exportData(
+    connectionId: string,
+    database: string,
+    tableName: string,
+    format: string
+  ): Promise<{ success: boolean; filename?: string; error?: string }> {
     try {
-      const result = await ExportData(connectionId, tableName, format)
+      const result = await ExportData(connectionId, database, tableName, format)
       return JSON.parse(result)
     } catch (error) {
       console.error('Failed to export data:', error)

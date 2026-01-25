@@ -120,7 +120,7 @@ type UpdateRecord struct {
 }
 
 var (
-	connMu         sync.RWMutex
+	connMu          sync.RWMutex
 	mockConnections []Connection
 	seedOnce        sync.Once
 )
@@ -319,8 +319,8 @@ func (a *App) FormatSQL(sql string) string {
 	return sql
 }
 
-// GetTables returns all tables for a connection
-func (a *App) GetTables(connectionID string) string {
+// GetDatabases returns database names for a connection (MySQL: SHOW DATABASES; SQLite: ["main"]).
+func (a *App) GetDatabases(connectionID string) string {
 	g, err := getOrOpenDB(connectionID)
 	if err != nil {
 		return "[]"
@@ -329,7 +329,25 @@ func (a *App) GetTables(connectionID string) string {
 	if conn == nil {
 		return "[]"
 	}
-	names, err := db.TableNames(g, conn.Type)
+	names, err := db.DatabaseNames(g, conn.Type)
+	if err != nil {
+		return "[]"
+	}
+	data, _ := json.Marshal(names)
+	return string(data)
+}
+
+// GetTables returns all tables for a connection and database. For SQLite, database is ignored.
+func (a *App) GetTables(connectionID, database string) string {
+	g, err := getOrOpenDB(connectionID)
+	if err != nil {
+		return "[]"
+	}
+	conn := getConnByID(connectionID)
+	if conn == nil {
+		return "[]"
+	}
+	names, err := db.TableNames(g, conn.Type, database)
 	if err != nil {
 		return "[]"
 	}
@@ -341,8 +359,8 @@ func (a *App) GetTables(connectionID string) string {
 	return string(data)
 }
 
-// GetTableData returns table data with pagination
-func (a *App) GetTableData(connectionID, tableName string, limit, offset int) string {
+// GetTableData returns table data with pagination. database is optional (MySQL: qualify db.table).
+func (a *App) GetTableData(connectionID, database, tableName string, limit, offset int) string {
 	g, err := getOrOpenDB(connectionID)
 	if err != nil {
 		return `{"columns":[],"rows":[],"totalRows":0,"page":1,"pageSize":` + fmt.Sprint(limit) + `}`
@@ -351,7 +369,7 @@ func (a *App) GetTableData(connectionID, tableName string, limit, offset int) st
 	if conn == nil {
 		return `{"columns":[],"rows":[],"totalRows":0,"page":1,"pageSize":` + fmt.Sprint(limit) + `}`
 	}
-	cols, rows, total, err := db.TableData(g, conn.Type, tableName, limit, offset)
+	cols, rows, total, err := db.TableData(g, conn.Type, database, tableName, limit, offset)
 	if err != nil {
 		return `{"columns":[],"rows":[],"totalRows":0,"page":1,"pageSize":` + fmt.Sprint(limit) + `}`
 	}
@@ -364,8 +382,8 @@ func (a *App) GetTableData(connectionID, tableName string, limit, offset int) st
 	return string(data)
 }
 
-// UpdateTableData updates table data
-func (a *App) UpdateTableData(connectionID, tableName, updatesJSON string) error {
+// UpdateTableData updates table data. database is optional (MySQL: qualify db.table).
+func (a *App) UpdateTableData(connectionID, database, tableName, updatesJSON string) error {
 	var updates []UpdateRecord
 	if err := json.Unmarshal([]byte(updatesJSON), &updates); err != nil {
 		return err
@@ -378,8 +396,7 @@ func (a *App) UpdateTableData(connectionID, tableName, updatesJSON string) error
 	if conn == nil {
 		return fmt.Errorf("connection not found")
 	}
-	// Simple implementation: UPDATE table SET col=? WHERE col=? LIMIT 1 per update
-	tbl := quoteIdent(conn.Type, tableName)
+	tbl := db.QualTable(conn.Type, database, tableName)
 	for _, u := range updates {
 		col := quoteIdent(conn.Type, u.Column)
 		q := fmt.Sprintf("UPDATE %s SET %s = ? WHERE %s = ? LIMIT 1", tbl, col, col)
@@ -397,8 +414,8 @@ func quoteIdent(driver, name string) string {
 	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
 }
 
-// GetTableSchema returns table schema
-func (a *App) GetTableSchema(connectionID, tableName string) string {
+// GetTableSchema returns table schema. database is optional (MySQL: scope by TABLE_SCHEMA).
+func (a *App) GetTableSchema(connectionID, database, tableName string) string {
 	g, err := getOrOpenDB(connectionID)
 	if err != nil {
 		return `{"name":"","columns":[],"indexes":[],"foreignKeys":[]}`
@@ -407,7 +424,7 @@ func (a *App) GetTableSchema(connectionID, tableName string) string {
 	if conn == nil {
 		return `{"name":"","columns":[],"indexes":[],"foreignKeys":[]}`
 	}
-	info, err := db.TableSchema(g, conn.Type, tableName)
+	info, err := db.TableSchema(g, conn.Type, database, tableName)
 	if err != nil {
 		return `{"name":"","columns":[],"indexes":[],"foreignKeys":[]}`
 	}
@@ -431,8 +448,8 @@ func (a *App) GetTableSchema(connectionID, tableName string) string {
 	return string(data)
 }
 
-// ExportData exports data from a table
-func (a *App) ExportData(connectionID, tableName, format string) string {
+// ExportData exports data from a table. database is optional (MySQL: qualify db.table).
+func (a *App) ExportData(connectionID, database, tableName, format string) string {
 	g, err := getOrOpenDB(connectionID)
 	if err != nil {
 		return exportError(err.Error())
@@ -441,7 +458,7 @@ func (a *App) ExportData(connectionID, tableName, format string) string {
 	if conn == nil {
 		return exportError("connection not found")
 	}
-	cols, rows, _, err := db.TableData(g, conn.Type, tableName, 1<<20, 0)
+	cols, rows, _, err := db.TableData(g, conn.Type, database, tableName, 1<<20, 0)
 	if err != nil {
 		return exportError(err.Error())
 	}
@@ -451,7 +468,7 @@ func (a *App) ExportData(connectionID, tableName, format string) string {
 	}
 	fname := tableName + "_export." + ext
 	outDir := filepath.Join("build", "export")
-	_ = os.MkdirAll(outDir, 0755)
+	_ = os.MkdirAll(outDir, 0o755)
 	path := filepath.Join(outDir, fname)
 
 	switch strings.ToLower(ext) {

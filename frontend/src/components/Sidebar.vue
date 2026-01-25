@@ -10,7 +10,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update:width', width: number): void
   (e: 'new-connection'): void
-  (e: 'table-selected', connectionId: string, tableName: string): void
+  (e: 'table-selected', connectionId: string, database: string, tableName: string): void
 }>()
 
 const searchQuery = ref('')
@@ -64,7 +64,7 @@ const startResize = (e: MouseEvent) => {
     <div class="flex-1 overflow-y-auto custom-scrollbar px-2">
       <ConnectionTree
         :search-query="searchQuery"
-        @table-selected="(connId, tableName) => emit('table-selected', connId, tableName)"
+        @table-selected="(connId, db, tableName) => emit('table-selected', connId, db, tableName)"
       />
     </div>
 

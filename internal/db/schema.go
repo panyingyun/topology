@@ -23,12 +23,12 @@ type TableSchemaInfo struct {
 	Columns []SchemaColumn `json:"columns"`
 }
 
-// TableSchema returns schema (columns) for the given table.
-func TableSchema(db *gorm.DB, driver, table string) (*TableSchemaInfo, error) {
+// TableSchema returns schema (columns) for the given table. database is optional (MySQL: scope by TABLE_SCHEMA).
+func TableSchema(db *gorm.DB, driver, database, table string) (*TableSchemaInfo, error) {
 	info := &TableSchemaInfo{Name: table}
 	switch driver {
 	case "mysql":
-		return mysqlTableSchema(db, table, info)
+		return mysqlTableSchema(db, database, table, info)
 	case "sqlite":
 		return sqliteTableSchema(db, table, info)
 	default:
@@ -36,8 +36,8 @@ func TableSchema(db *gorm.DB, driver, table string) (*TableSchemaInfo, error) {
 	}
 }
 
-func mysqlTableSchema(db *gorm.DB, table string, info *TableSchemaInfo) (*TableSchemaInfo, error) {
-	q := "SELECT COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT, COLUMN_KEY, EXTRA FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION"
+func mysqlTableSchema(db *gorm.DB, database, table string, info *TableSchemaInfo) (*TableSchemaInfo, error) {
+	q := "SELECT COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT, COLUMN_KEY, EXTRA FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION"
 	var raw []struct {
 		COLUMN_NAME    string
 		COLUMN_TYPE    string
@@ -46,8 +46,16 @@ func mysqlTableSchema(db *gorm.DB, table string, info *TableSchemaInfo) (*TableS
 		COLUMN_KEY     string
 		EXTRA          string
 	}
-	if err := db.Raw(q, table).Scan(&raw).Error; err != nil {
-		return nil, err
+	if database != "" {
+		if err := db.Raw(q, database, table).Scan(&raw).Error; err != nil {
+			return nil, err
+		}
+	} else {
+		// use DATABASE() for current connection DB
+		q2 := "SELECT COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT, COLUMN_KEY, EXTRA FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION"
+		if err := db.Raw(q2, table).Scan(&raw).Error; err != nil {
+			return nil, err
+		}
 	}
 	for _, r := range raw {
 		def := ""

@@ -106,6 +106,7 @@ export interface TabItem {
   type: TabType;
   title: string;
   connectionId?: string;
+  database?: string;
   tableName?: string;
   sql?: string;
   queryResult?: QueryResult;

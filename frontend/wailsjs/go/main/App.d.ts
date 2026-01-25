@@ -7,20 +7,22 @@ export function DeleteConnection(arg1:string):Promise<void>;
 
 export function ExecuteQuery(arg1:string,arg2:string):Promise<string>;
 
-export function ExportData(arg1:string,arg2:string,arg3:string):Promise<string>;
+export function ExportData(arg1:string,arg2:string,arg3:string,arg4:string):Promise<string>;
 
 export function FormatSQL(arg1:string):Promise<string>;
 
 export function GetConnections():Promise<string>;
 
-export function GetTableData(arg1:string,arg2:string,arg3:number,arg4:number):Promise<string>;
+export function GetDatabases(arg1:string):Promise<string>;
 
-export function GetTableSchema(arg1:string,arg2:string):Promise<string>;
+export function GetTableData(arg1:string,arg2:string,arg3:string,arg4:number,arg5:number):Promise<string>;
 
-export function GetTables(arg1:string):Promise<string>;
+export function GetTableSchema(arg1:string,arg2:string,arg3:string):Promise<string>;
+
+export function GetTables(arg1:string,arg2:string):Promise<string>;
 
 export function Greet(arg1:string):Promise<string>;
 
 export function TestConnection(arg1:string):Promise<boolean>;
 
-export function UpdateTableData(arg1:string,arg2:string,arg3:string):Promise<void>;
+export function UpdateTableData(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;

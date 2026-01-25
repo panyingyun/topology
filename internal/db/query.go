@@ -92,12 +92,43 @@ func IsSelect(q string) bool {
 		strings.HasPrefix(upper, "EXPLAIN") || strings.HasPrefix(upper, "PRAGMA")
 }
 
-// TableNames returns table names for the given driver.
-func TableNames(db *gorm.DB, driver string) ([]string, error) {
+// DatabaseNames returns database names for the given driver. MySQL: SHOW DATABASES; SQLite: ["main"].
+func DatabaseNames(db *gorm.DB, driver string) ([]string, error) {
+	switch driver {
+	case "mysql":
+		cols, rows, err := RawSelect(db, "SHOW DATABASES")
+		if err != nil {
+			return nil, err
+		}
+		col := "Database"
+		if len(cols) > 0 {
+			col = cols[0]
+		}
+		var names []string
+		for _, r := range rows {
+			if v, ok := r[col]; ok && v != nil {
+				names = append(names, fmt.Sprint(v))
+			}
+		}
+		return names, nil
+	case "sqlite":
+		return []string{"main"}, nil
+	default:
+		return nil, fmt.Errorf("unsupported driver: %s", driver)
+	}
+}
+
+// TableNames returns table names for the given driver and database. For SQLite, database is ignored.
+func TableNames(db *gorm.DB, driver, database string) ([]string, error) {
 	var q string
 	switch driver {
 	case "mysql":
-		q = "SHOW TABLES"
+		if database != "" {
+			// SHOW TABLES FROM `db`
+			q = "SHOW TABLES FROM " + quoteIdent(driver, database)
+		} else {
+			q = "SHOW TABLES"
+		}
 	case "sqlite":
 		q = "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
 	default:
@@ -108,7 +139,10 @@ func TableNames(db *gorm.DB, driver string) ([]string, error) {
 		return nil, err
 	}
 	var names []string
-	col := "Tables_in_" // MySQL SHOW TABLES
+	col := "Tables_in_"
+	if database != "" {
+		col = "Tables_in_" + database
+	}
 	if len(cols) > 0 {
 		col = cols[0]
 	}
@@ -120,23 +154,36 @@ func TableNames(db *gorm.DB, driver string) ([]string, error) {
 	return names, nil
 }
 
-// TableRowCount returns total row count for a table.
-func TableRowCount(db *gorm.DB, driver, table string) (int, error) {
-	table = quoteIdent(driver, table)
-	q := "SELECT COUNT(*) FROM " + table
+// qualTable returns qualified table for queries: MySQL "`db`.`table`" when database set, else "`table`"; SQLite "table".
+func qualTable(driver, database, table string) string {
+	tbl := quoteIdent(driver, table)
+	if driver == "mysql" && database != "" {
+		return quoteIdent(driver, database) + "." + tbl
+	}
+	return tbl
+}
+
+// QualTable is the exported version of qualTable for use by app layer.
+func QualTable(driver, database, table string) string {
+	return qualTable(driver, database, table)
+}
+
+// TableRowCount returns total row count for a table. database is optional (MySQL: qualify db.table).
+func TableRowCount(db *gorm.DB, driver, database, table string) (int, error) {
+	q := "SELECT COUNT(*) FROM " + qualTable(driver, database, table)
 	var n int64
 	err := db.Raw(q).Scan(&n).Error
 	return int(n), err
 }
 
-// TableData returns columns, rows (for limit/offset), and total count.
-func TableData(db *gorm.DB, driver, table string, limit, offset int) (cols []string, rows []map[string]interface{}, total int, err error) {
-	total, err = TableRowCount(db, driver, table)
+// TableData returns columns, rows (for limit/offset), and total count. database is optional.
+func TableData(db *gorm.DB, driver, database, table string, limit, offset int) (cols []string, rows []map[string]interface{}, total int, err error) {
+	total, err = TableRowCount(db, driver, database, table)
 	if err != nil {
 		return nil, nil, 0, err
 	}
-	tbl := quoteIdent(driver, table)
-	q := fmt.Sprintf("SELECT * FROM %s LIMIT %d OFFSET %d", tbl, limit, offset)
+	qt := qualTable(driver, database, table)
+	q := fmt.Sprintf("SELECT * FROM %s LIMIT %d OFFSET %d", qt, limit, offset)
 	cols, rows, err = RawSelect(db, q)
 	return cols, rows, total, err
 }
@@ -151,4 +198,3 @@ func quoteIdent(driver, name string) string {
 		return name
 	}
 }
-

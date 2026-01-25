@@ -54,21 +54,21 @@ const handleConnectionConnect = async (connection: Connection) => {
   activeTabId.value = tabId
 }
 
-const handleTableSelected = (connectionId: string, tableName: string) => {
-  const conn = connections.value.find(c => c.id === connectionId)
+const handleTableSelected = (connectionId: string, database: string, tableName: string) => {
+  const conn = connections.value.find((c) => c.id === connectionId)
   if (!conn) return
 
-  const tabId = `table-${connectionId}-${tableName}`
-  const existingTab = tabs.value.find(t => t.id === tabId)
-  
+  const tabId = `table-${connectionId}-${database}-${tableName}`
+  const existingTab = tabs.value.find((t) => t.id === tabId)
   if (existingTab) {
     activeTabId.value = tabId
   } else {
     const newTab: TabItem = {
       id: tabId,
       type: 'table',
-      title: `${conn.name}.${tableName}`,
+      title: `${conn.name} / ${database} / ${tableName}`,
       connectionId,
+      database,
       tableName,
     }
     tabs.value.push(newTab)
@@ -132,7 +132,7 @@ const activeTab = computed(() => {
             @query-result="handleQueryResult"
           />
           <div v-else-if="activeTab?.type === 'table'" class="h-full flex items-center justify-center text-gray-500">
-            Table view for {{ activeTab.tableName }} (to be implemented)
+            Table view: {{ activeTab.database }}.{{ activeTab.tableName }} (to be implemented)
           </div>
           <div v-else class="h-full flex flex-col items-center justify-center text-gray-500">
             <p class="mb-4">No tabs open</p>
