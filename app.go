@@ -125,17 +125,33 @@ type UpdateRecord struct {
 	NewValue interface{} `json:"newValue"`
 }
 
+type QueryHistory struct {
+	ID          string `json:"id"`
+	ConnectionID string `json:"connectionId"`
+	SQL         string `json:"sql"`
+	ExecutedAt  string `json:"executedAt"`
+	Success     bool   `json:"success"`
+	Duration    int    `json:"duration,omitempty"` // milliseconds
+	RowCount    int    `json:"rowCount,omitempty"`
+}
+
 var (
 	connMu          sync.RWMutex
 	mockConnections []Connection
 	seedOnce        sync.Once
 	connFileOnce    sync.Once
 	connFilePath    string
+	historyMu      sync.RWMutex
+	queryHistory   []QueryHistory
+	historyFileOnce sync.Once
+	historyFilePath string
+	maxHistorySize  = 100 // Keep last 100 queries
 )
 
 const (
-	connFileName = "connections.json"
-	encKey       = "topology-connection-key-2026" // In production, use a proper key management system
+	connFileName    = "connections.json"
+	historyFileName = "query_history.json"
+	encKey          = "topology-connection-key-2026" // In production, use a proper key management system
 )
 
 func getConnectionsFilePath() string {
@@ -151,6 +167,19 @@ func getConnectionsFilePath() string {
 		connFilePath = filepath.Join(appDir, connFileName)
 	})
 	return connFilePath
+}
+
+func getHistoryFilePath() string {
+	historyFileOnce.Do(func() {
+		homeDir, err := os.UserConfigDir()
+		if err != nil {
+			homeDir = "."
+		}
+		appDir := filepath.Join(homeDir, "topology")
+		_ = os.MkdirAll(appDir, 0o755)
+		historyFilePath = filepath.Join(appDir, historyFileName)
+	})
+	return historyFilePath
 }
 
 func loadConnectionsFromFile() []Connection {
@@ -393,21 +422,38 @@ func (a *App) ExecuteQuery(connectionID, sql string) string {
 		return mustMarshalResult(nil, nil, 0, 0, err.Error())
 	}
 	start := time.Now()
+	var result string
+	var success bool
+	var rowCount int
+	var elapsed int
 
 	if db.IsSelect(sql) {
 		cols, rows, err := db.RawSelect(g, sql)
-		elapsed := int(time.Since(start).Milliseconds())
+		elapsed = int(time.Since(start).Milliseconds())
 		if err != nil {
-			return mustMarshalResult(nil, nil, 0, elapsed, err.Error())
+			result = mustMarshalResult(nil, nil, 0, elapsed, err.Error())
+			success = false
+		} else {
+			rowCount = len(rows)
+			result = mustMarshalResult(cols, rows, rowCount, elapsed, "")
+			success = true
 		}
-		return mustMarshalResult(cols, rows, len(rows), elapsed, "")
+	} else {
+		affected, err := db.RawExec(g, sql)
+		elapsed = int(time.Since(start).Milliseconds())
+		if err != nil {
+			result = mustMarshalResult(nil, nil, 0, elapsed, err.Error())
+			success = false
+		} else {
+			result = mustMarshalResult(nil, nil, 0, elapsed, "", int(affected))
+			success = true
+		}
 	}
-	affected, err := db.RawExec(g, sql)
-	elapsed := int(time.Since(start).Milliseconds())
-	if err != nil {
-		return mustMarshalResult(nil, nil, 0, elapsed, err.Error())
-	}
-	return mustMarshalResult(nil, nil, 0, elapsed, "", int(affected))
+
+	// Save to history
+	saveQueryHistory(connectionID, sql, success, elapsed, rowCount)
+
+	return result
 }
 
 func mustMarshalResult(cols []string, rows []map[string]interface{}, rowCount, execMs int, errMsg string, affected ...int) string {
@@ -581,6 +627,100 @@ func decryptPassword(encrypted string) (string, error) {
 		return "", err
 	}
 	return string(plaintext), nil
+}
+
+// Query history functions
+func loadQueryHistory() {
+	filePath := getHistoryFilePath()
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		queryHistory = make([]QueryHistory, 0)
+		return
+	}
+	if err := json.Unmarshal(data, &queryHistory); err != nil {
+		queryHistory = make([]QueryHistory, 0)
+	}
+}
+
+func saveQueryHistory(connectionID, sql string, success bool, duration, rowCount int) {
+	historyMu.Lock()
+	defer historyMu.Unlock()
+
+	// Load history if not loaded
+	if queryHistory == nil {
+		loadQueryHistory()
+	}
+
+	// Add new history entry
+	history := QueryHistory{
+		ID:          fmt.Sprintf("%d", time.Now().UnixNano()),
+		ConnectionID: connectionID,
+		SQL:         sql,
+		ExecutedAt:  time.Now().Format(time.RFC3339),
+		Success:     success,
+		Duration:    duration,
+		RowCount:    rowCount,
+	}
+	queryHistory = append([]QueryHistory{history}, queryHistory...)
+
+	// Keep only last maxHistorySize entries
+	if len(queryHistory) > maxHistorySize {
+		queryHistory = queryHistory[:maxHistorySize]
+	}
+
+	// Save to file
+	saveHistoryToFile()
+}
+
+func saveHistoryToFile() {
+	data, err := json.MarshalIndent(queryHistory, "", "  ")
+	if err != nil {
+		return
+	}
+	filePath := getHistoryFilePath()
+	_ = os.WriteFile(filePath, data, 0o600)
+}
+
+// GetQueryHistory returns query history, optionally filtered by connectionID and search term
+func (a *App) GetQueryHistory(connectionID, searchTerm string, limit int) string {
+	historyMu.RLock()
+	defer historyMu.RUnlock()
+
+	// Load history if not loaded
+	if queryHistory == nil {
+		loadQueryHistory()
+	}
+
+	var filtered []QueryHistory
+	for _, h := range queryHistory {
+		// Filter by connection ID if provided
+		if connectionID != "" && h.ConnectionID != connectionID {
+			continue
+		}
+		// Filter by search term if provided
+		if searchTerm != "" && !strings.Contains(strings.ToLower(h.SQL), strings.ToLower(searchTerm)) {
+			continue
+		}
+		filtered = append(filtered, h)
+		if limit > 0 && len(filtered) >= limit {
+			break
+		}
+	}
+
+	data, err := json.Marshal(filtered)
+	if err != nil {
+		return "[]"
+	}
+	return string(data)
+}
+
+// ClearQueryHistory clears all query history
+func (a *App) ClearQueryHistory() error {
+	historyMu.Lock()
+	defer historyMu.Unlock()
+	queryHistory = make([]QueryHistory, 0)
+	filePath := getHistoryFilePath()
+	return os.Remove(filePath)
 }
 
 // GetTableSchema returns table schema. database is optional (MySQL: scope by TABLE_SCHEMA).

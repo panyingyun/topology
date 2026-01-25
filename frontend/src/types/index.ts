@@ -114,3 +114,14 @@ export interface TabItem {
 
 // Export types
 export type ExportFormat = 'csv' | 'json' | 'sql';
+
+// Query history types
+export interface QueryHistory {
+  id: string
+  connectionId: string
+  sql: string
+  executedAt: string
+  success: boolean
+  duration?: number
+  rowCount?: number
+}

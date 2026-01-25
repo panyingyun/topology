@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, shallowRef } from 'vue'
-import { Play, Square, FileCode, Save } from 'lucide-vue-next'
+import { Play, Square, FileCode, Save, History } from 'lucide-vue-next'
 import loader from '@monaco-editor/loader'
 import { queryService } from '../services/queryService'
 import DataGrid from '../components/DataGrid.vue'
+import QueryHistory from '../components/QueryHistory.vue'
 import type { QueryResult } from '../types'
 
 const props = defineProps<{
@@ -22,6 +23,7 @@ const isRunning = ref(false)
 const queryResult = ref<QueryResult | null>(null)
 const editorLine = ref(1)
 const editorColumn = ref(1)
+const showHistory = ref(false)
 
 onMounted(async () => {
   const monaco = await loader.init()
@@ -107,6 +109,13 @@ const saveScript = () => {
   // In real implementation, save to file or local storage
   console.log('Save script:', sqlQuery.value)
 }
+
+const handleHistorySelect = (sql: string) => {
+  if (editor.value) {
+    editor.value.setValue(sql)
+    sqlQuery.value = sql
+  }
+}
 </script>
 
 <template>
@@ -153,6 +162,19 @@ const saveScript = () => {
           <Save :size="14" class="inline mr-1" />
           Save
         </button>
+
+        <button
+          @click="showHistory = !showHistory"
+          :class="[
+            'px-3 py-1 rounded text-xs transition-colors',
+            showHistory
+              ? 'bg-[#1677ff] text-white'
+              : 'bg-[#3c3c3c] hover:bg-[#4c4c4c] text-gray-300'
+          ]"
+        >
+          <History :size="14" class="inline mr-1" />
+          历史
+        </button>
       </div>
 
       <div class="flex items-center gap-4 text-[10px] text-gray-500 font-mono italic">
@@ -188,5 +210,13 @@ const saveScript = () => {
         </div>
       </div>
     </div>
+
+    <!-- Query History Panel -->
+    <QueryHistory
+      :connection-id="connectionId"
+      :show="showHistory"
+      @select="handleHistorySelect"
+      @close="showHistory = false"
+    />
   </div>
 </template>
