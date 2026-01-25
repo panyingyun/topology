@@ -7,13 +7,16 @@ import StatusBar from '../components/StatusBar.vue'
 import QueryConsole from './QueryConsole.vue'
 import DataViewer from './DataViewer.vue'
 import ConnectionManager from './ConnectionManager.vue'
+import TableDesigner from '../components/TableDesigner.vue'
 import { connectionService } from '../services/connectionService'
+import { queryService } from '../services/queryService'
 import type { TabItem, Connection, QueryResult } from '../types'
 
 const sidebarWidth = ref(260)
 const showConnectionManager = ref(false)
 const connectionManagerMode = ref<'create' | 'edit'>('create')
 const editingConnection = ref<Connection | null>(null)
+const showTableDesigner = ref(false)
 const connections = ref<Connection[]>([])
 const tabs = ref<TabItem[]>([])
 const activeTabId = ref('')
@@ -153,6 +156,23 @@ const handleEditorPosition = (line: number, column: number) => {
   editorColumn.value = column
 }
 
+const handleCreateTable = async (sql: string) => {
+  if (!currentConnection.value) {
+    alert('请先选择连接')
+    return
+  }
+  try {
+    await queryService.executeQuery(currentConnection.value.id, sql)
+    alert('表创建成功！')
+    showTableDesigner.value = false
+    // Refresh connections to show new table
+    await loadConnections()
+  } catch (error) {
+    console.error('Failed to create table:', error)
+    alert('创建表失败: ' + (error instanceof Error ? error.message : 'Unknown error'))
+  }
+}
+
 const activeTab = computed(() => {
   return tabs.value.find(t => t.id === activeTabId.value)
 })
@@ -172,6 +192,7 @@ const activeTab = computed(() => {
         @edit-connection="handleEditConnection"
         @refresh-connection="handleRefreshConnection"
         @delete-connection="handleDeleteConnection"
+        @new-table="showTableDesigner = true"
       />
 
       <div class="flex-1 flex flex-col overflow-hidden">
@@ -189,6 +210,7 @@ const activeTab = computed(() => {
             v-if="activeTab?.type === 'query'"
             :key="activeTab.id"
             :connection-id="activeTab.connectionId"
+            :connection="currentConnection"
             @query-result="handleQueryResult"
             @editor-position="handleEditorPosition"
           />
@@ -222,6 +244,15 @@ const activeTab = computed(() => {
       @close="showConnectionManager = false; editingConnection = null"
       @connect="handleConnectionConnect"
       @update="handleConnectionUpdate"
+    />
+
+    <TableDesigner
+      :show="showTableDesigner"
+      :connection-id="currentConnection?.id"
+      :database="currentConnection?.database"
+      :driver="currentConnection?.type"
+      @close="showTableDesigner = false"
+      @create="handleCreateTable"
     />
   </div>
 </template>

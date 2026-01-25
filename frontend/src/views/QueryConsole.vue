@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, shallowRef } from 'vue'
-import { Play, Square, FileCode, Save, History } from 'lucide-vue-next'
+import { Play, Square, FileCode, Save, History, Sparkles } from 'lucide-vue-next'
 import loader from '@monaco-editor/loader'
 import { queryService } from '../services/queryService'
 import DataGrid from '../components/DataGrid.vue'
 import QueryHistory from '../components/QueryHistory.vue'
-import type { QueryResult } from '../types'
+import SQLAnalyzer from '../components/SQLAnalyzer.vue'
+import type { QueryResult, Connection } from '../types'
 
 const props = defineProps<{
   connectionId?: string
+  connection?: Connection
 }>()
 
 const emit = defineEmits<{
@@ -24,6 +26,7 @@ const queryResult = ref<QueryResult | null>(null)
 const editorLine = ref(1)
 const editorColumn = ref(1)
 const showHistory = ref(false)
+const showAnalyzer = ref(false)
 
 onMounted(async () => {
   const monaco = await loader.init()
@@ -175,6 +178,14 @@ const handleHistorySelect = (sql: string) => {
           <History :size="14" class="inline mr-1" />
           历史
         </button>
+
+        <button
+          @click="showAnalyzer = true"
+          class="px-3 py-1 rounded text-xs bg-[#3c3c3c] hover:bg-[#4c4c4c] text-gray-300 transition-colors"
+        >
+          <Sparkles :size="14" class="inline mr-1" />
+          分析 SQL
+        </button>
       </div>
 
       <div class="flex items-center gap-4 text-[10px] text-gray-500 font-mono italic">
@@ -217,6 +228,14 @@ const handleHistorySelect = (sql: string) => {
       :show="showHistory"
       @select="handleHistorySelect"
       @close="showHistory = false"
+    />
+
+    <!-- SQL Analyzer -->
+    <SQLAnalyzer
+      :show="showAnalyzer"
+      :sql="sqlQuery"
+      :driver="connection?.type"
+      @close="showAnalyzer = false"
     />
   </div>
 </template>

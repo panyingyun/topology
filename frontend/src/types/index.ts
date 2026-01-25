@@ -141,3 +141,14 @@ export interface ImportResult {
   totalRows?: number
   error?: string
 }
+
+// SQL Analysis types
+export interface SQLAnalysis {
+  queryType: string
+  suggestions: string[]
+  warnings: string[]
+  performance: {
+    estimatedComplexity?: string
+    indexUsage?: string
+  }
+}

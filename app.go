@@ -1007,6 +1007,170 @@ func getTableColumns(g *gorm.DB, driver, database, tableName string) ([]string, 
 	return columns, nil
 }
 
+// GenerateCreateTableSQL generates CREATE TABLE SQL from TableSchema
+func (a *App) GenerateCreateTableSQL(schemaJSON, driver string) string {
+	var schema TableSchema
+	if err := json.Unmarshal([]byte(schemaJSON), &schema); err != nil {
+		return fmt.Sprintf("-- Error: %v", err)
+	}
+
+	var sql strings.Builder
+	sql.WriteString("CREATE TABLE ")
+	if driver == "mysql" && schema.Name != "" {
+		sql.WriteString(quoteIdent(driver, schema.Name))
+	} else {
+		sql.WriteString(quoteIdent(driver, schema.Name))
+	}
+	sql.WriteString(" (\n")
+
+	// Columns
+	columnDefs := make([]string, 0, len(schema.Columns))
+	for _, col := range schema.Columns {
+		colDef := "  " + quoteIdent(driver, col.Name) + " " + col.Type
+		if !col.Nullable {
+			colDef += " NOT NULL"
+		}
+		if col.DefaultValue != "" {
+			colDef += " DEFAULT " + col.DefaultValue
+		}
+		if col.IsPrimaryKey {
+			colDef += " PRIMARY KEY"
+		}
+		if col.IsUnique && !col.IsPrimaryKey {
+			colDef += " UNIQUE"
+		}
+		columnDefs = append(columnDefs, colDef)
+	}
+
+	// Primary key constraint (if multiple columns)
+	pkCols := make([]string, 0)
+	for _, col := range schema.Columns {
+		if col.IsPrimaryKey {
+			pkCols = append(pkCols, quoteIdent(driver, col.Name))
+		}
+	}
+	if len(pkCols) > 1 {
+		columnDefs = append(columnDefs, "  PRIMARY KEY ("+strings.Join(pkCols, ", ")+")")
+	}
+
+	sql.WriteString(strings.Join(columnDefs, ",\n"))
+
+	// Foreign keys
+	if len(schema.ForeignKeys) > 0 {
+		sql.WriteString(",\n")
+		fkDefs := make([]string, 0, len(schema.ForeignKeys))
+		for _, fk := range schema.ForeignKeys {
+			fkCols := make([]string, len(fk.Columns))
+			for i, col := range fk.Columns {
+				fkCols[i] = quoteIdent(driver, col)
+			}
+			refCols := make([]string, len(fk.ReferencedColumns))
+			for i, col := range fk.ReferencedColumns {
+				refCols[i] = quoteIdent(driver, col)
+			}
+			fkDef := fmt.Sprintf("  FOREIGN KEY (%s) REFERENCES %s (%s)",
+				strings.Join(fkCols, ", "),
+				quoteIdent(driver, fk.ReferencedTable),
+				strings.Join(refCols, ", "))
+			if fk.OnDelete != "" {
+				fkDef += " ON DELETE " + fk.OnDelete
+			}
+			if fk.OnUpdate != "" {
+				fkDef += " ON UPDATE " + fk.OnUpdate
+			}
+			fkDefs = append(fkDefs, fkDef)
+		}
+		sql.WriteString(strings.Join(fkDefs, ",\n"))
+	}
+
+	sql.WriteString("\n);\n")
+
+	// Indexes (CREATE INDEX statements)
+	if len(schema.Indexes) > 0 {
+		sql.WriteString("\n")
+		for _, idx := range schema.Indexes {
+			idxCols := make([]string, len(idx.Columns))
+			for i, col := range idx.Columns {
+				idxCols[i] = quoteIdent(driver, col)
+			}
+			if idx.IsUnique {
+				sql.WriteString(fmt.Sprintf("CREATE UNIQUE INDEX %s ON %s (%s);\n",
+					quoteIdent(driver, idx.Name),
+					quoteIdent(driver, schema.Name),
+					strings.Join(idxCols, ", ")))
+			} else {
+				sql.WriteString(fmt.Sprintf("CREATE INDEX %s ON %s (%s);\n",
+					quoteIdent(driver, idx.Name),
+					quoteIdent(driver, schema.Name),
+					strings.Join(idxCols, ", ")))
+			}
+		}
+	}
+
+	return sql.String()
+}
+
+// AnalyzeSQL provides basic SQL analysis and optimization suggestions
+func (a *App) AnalyzeSQL(sql, driver string) string {
+	sqlLower := strings.ToLower(strings.TrimSpace(sql))
+	analysis := map[string]interface{}{
+		"queryType":    "unknown",
+		"suggestions":  []string{},
+		"warnings":     []string{},
+		"performance":  map[string]interface{}{},
+	}
+
+	// Detect query type
+	if strings.HasPrefix(sqlLower, "select") {
+		analysis["queryType"] = "SELECT"
+		// Check for common issues
+		if strings.Contains(sqlLower, "select *") {
+			analysis["warnings"] = append(analysis["warnings"].([]string), "使用 SELECT * 可能影响性能，建议明确指定需要的列")
+		}
+		if !strings.Contains(sqlLower, "where") && !strings.Contains(sqlLower, "limit") {
+			analysis["warnings"] = append(analysis["warnings"].([]string), "查询没有 WHERE 条件或 LIMIT，可能返回大量数据")
+		}
+		if strings.Contains(sqlLower, "like '%") {
+			analysis["suggestions"] = append(analysis["suggestions"].([]string), "LIKE '%...' 无法使用索引，考虑使用全文搜索或前缀匹配")
+		}
+		if strings.Contains(sqlLower, "order by") && !strings.Contains(sqlLower, "limit") {
+			analysis["warnings"] = append(analysis["warnings"].([]string), "ORDER BY 没有 LIMIT，可能影响性能")
+		}
+	} else if strings.HasPrefix(sqlLower, "insert") {
+		analysis["queryType"] = "INSERT"
+		if strings.Contains(sqlLower, "values") && !strings.Contains(sqlLower, "values") {
+			analysis["suggestions"] = append(analysis["suggestions"].([]string), "考虑使用批量插入以提高性能")
+		}
+	} else if strings.HasPrefix(sqlLower, "update") {
+		analysis["queryType"] = "UPDATE"
+		if !strings.Contains(sqlLower, "where") {
+			analysis["warnings"] = append(analysis["warnings"].([]string), "UPDATE 语句缺少 WHERE 条件，将更新所有行！")
+		}
+	} else if strings.HasPrefix(sqlLower, "delete") {
+		analysis["queryType"] = "DELETE"
+		if !strings.Contains(sqlLower, "where") {
+			analysis["warnings"] = append(analysis["warnings"].([]string), "DELETE 语句缺少 WHERE 条件，将删除所有行！")
+		}
+	}
+
+	// Performance tips
+	perf := map[string]interface{}{
+		"estimatedComplexity": "low",
+		"indexUsage":          "unknown",
+	}
+	if strings.Contains(sqlLower, "join") {
+		perf["estimatedComplexity"] = "medium"
+		perf["indexUsage"] = "建议确保 JOIN 的列上有索引"
+	}
+	if strings.Contains(sqlLower, "group by") || strings.Contains(sqlLower, "having") {
+		perf["estimatedComplexity"] = "high"
+	}
+	analysis["performance"] = perf
+
+	data, _ := json.Marshal(analysis)
+	return string(data)
+}
+
 // GetTableSchema returns table schema. database is optional (MySQL: scope by TABLE_SCHEMA).
 func (a *App) GetTableSchema(connectionID, database, tableName string) string {
 	g, err := getOrOpenDB(connectionID)

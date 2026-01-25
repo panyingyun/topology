@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { Search, Plus } from 'lucide-vue-next'
+import { Search, Plus, Database } from 'lucide-vue-next'
 import ConnectionTree from './ConnectionTree.vue'
 import type { Connection } from '../types'
 
@@ -16,6 +16,7 @@ const emit = defineEmits<{
   (e: 'edit-connection', connection: Connection): void
   (e: 'refresh-connection', connectionId: string): void
   (e: 'delete-connection', connectionId: string): void
+  (e: 'new-table'): void
 }>()
 
 const searchQuery = ref('')
@@ -54,6 +55,13 @@ const startResize = (e: MouseEvent) => {
       >
         <Plus :size="14" />
         NEW CONNECTION
+      </button>
+      <button
+        @click="emit('new-table')"
+        class="w-full bg-[#3c3c3c] hover:bg-[#4c4c4c] text-gray-300 text-xs py-2 rounded-md font-bold transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+      >
+        <Database :size="14" />
+        NEW TABLE
       </button>
       <div class="relative">
         <Search :size="14" class="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
