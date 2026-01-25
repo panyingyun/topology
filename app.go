@@ -2,9 +2,15 @@ package main
 
 import (
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -123,12 +129,83 @@ var (
 	connMu          sync.RWMutex
 	mockConnections []Connection
 	seedOnce        sync.Once
+	connFileOnce    sync.Once
+	connFilePath    string
 )
+
+const (
+	connFileName = "connections.json"
+	encKey       = "topology-connection-key-2026" // In production, use a proper key management system
+)
+
+func getConnectionsFilePath() string {
+	connFileOnce.Do(func() {
+		// Use user config directory
+		homeDir, err := os.UserConfigDir()
+		if err != nil {
+			// Fallback to current directory
+			homeDir = "."
+		}
+		appDir := filepath.Join(homeDir, "topology")
+		_ = os.MkdirAll(appDir, 0o755)
+		connFilePath = filepath.Join(appDir, connFileName)
+	})
+	return connFilePath
+}
+
+func loadConnectionsFromFile() []Connection {
+	filePath := getConnectionsFilePath()
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil
+	}
+	var connections []Connection
+	if err := json.Unmarshal(data, &connections); err != nil {
+		return nil
+	}
+	// Decrypt passwords
+	for i := range connections {
+		if connections[i].Password != "" {
+			if decrypted, err := decryptPassword(connections[i].Password); err == nil {
+				connections[i].Password = decrypted
+			}
+		}
+	}
+	return connections
+}
+
+func saveConnectionsToFile(connections []Connection) error {
+	// Create a copy to encrypt passwords
+	saveConnections := make([]Connection, len(connections))
+	copy(saveConnections, connections)
+	for i := range saveConnections {
+		if saveConnections[i].Password != "" {
+			if encrypted, err := encryptPassword(saveConnections[i].Password); err == nil {
+				saveConnections[i].Password = encrypted
+			}
+		}
+	}
+	data, err := json.MarshalIndent(saveConnections, "", "  ")
+	if err != nil {
+		return err
+	}
+	filePath := getConnectionsFilePath()
+	return os.WriteFile(filePath, data, 0o600)
+}
 
 func seedTestConnections() {
 	seedOnce.Do(func() {
 		connMu.Lock()
 		defer connMu.Unlock()
+		
+		// Try to load from file first
+		saved := loadConnectionsFromFile()
+		if len(saved) > 0 {
+			mockConnections = saved
+			return
+		}
+
+		// Otherwise, use default test connections
 		mockConnections = make([]Connection, 0, 2)
 
 		// MySQL from testdb/mysql.url
@@ -237,7 +314,8 @@ func (a *App) CreateConnection(connJSON string) error {
 	connMu.Lock()
 	mockConnections = append(mockConnections, conn)
 	connMu.Unlock()
-	return nil
+	// Save to file
+	return saveConnectionsToFile(mockConnections)
 }
 
 // TestConnection tests a database connection
@@ -276,7 +354,8 @@ func (a *App) UpdateConnection(connJSON string) error {
 				conn.Status = c.Status
 			}
 			mockConnections[i] = conn
-			return nil
+			// Save to file
+			return saveConnectionsToFile(mockConnections)
 		}
 	}
 	return fmt.Errorf("connection not found")
@@ -296,7 +375,8 @@ func (a *App) DeleteConnection(id string) error {
 	for i, c := range mockConnections {
 		if c.ID == id {
 			mockConnections = append(mockConnections[:i], mockConnections[i+1:]...)
-			return nil
+			// Save to file
+			return saveConnectionsToFile(mockConnections)
 		}
 	}
 	return fmt.Errorf("connection not found")
@@ -445,6 +525,64 @@ func quoteIdent(driver, name string) string {
 	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
 }
 
+func escapeSQLValue(value, driver string) string {
+	// Escape single quotes and backslashes
+	value = strings.ReplaceAll(value, `\`, `\\`)
+	value = strings.ReplaceAll(value, `'`, `''`)
+	// Wrap in single quotes
+	return "'" + value + "'"
+}
+
+// Password encryption/decryption using AES-256
+func getEncryptionKey() []byte {
+	hash := sha256.Sum256([]byte(encKey))
+	return hash[:]
+}
+
+func encryptPassword(password string) (string, error) {
+	key := getEncryptionKey()
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return "", err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", err
+	}
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return "", err
+	}
+	ciphertext := gcm.Seal(nonce, nonce, []byte(password), nil)
+	return base64.StdEncoding.EncodeToString(ciphertext), nil
+}
+
+func decryptPassword(encrypted string) (string, error) {
+	key := getEncryptionKey()
+	data, err := base64.StdEncoding.DecodeString(encrypted)
+	if err != nil {
+		return "", err
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return "", err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", err
+	}
+	nonceSize := gcm.NonceSize()
+	if len(data) < nonceSize {
+		return "", fmt.Errorf("ciphertext too short")
+	}
+	nonce, ciphertext := data[:nonceSize], data[nonceSize:]
+	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		return "", err
+	}
+	return string(plaintext), nil
+}
+
 // GetTableSchema returns table schema. database is optional (MySQL: scope by TABLE_SCHEMA).
 func (a *App) GetTableSchema(connectionID, database, tableName string) string {
 	g, err := getOrOpenDB(connectionID)
@@ -535,6 +673,31 @@ func (a *App) ExportData(connectionID, database, tableName, format string) strin
 		enc.SetIndent("", "  ")
 		if err := enc.Encode(map[string]interface{}{"columns": cols, "rows": rows}); err != nil {
 			return exportError(err.Error())
+		}
+	case "sql":
+		f, err := os.Create(path)
+		if err != nil {
+			return exportError(err.Error())
+		}
+		defer f.Close()
+		tbl := db.QualTable(conn.Type, database, tableName)
+		// Generate INSERT statements
+		for _, r := range rows {
+			colNames := make([]string, 0, len(cols))
+			values := make([]string, 0, len(cols))
+			for _, col := range cols {
+				colNames = append(colNames, quoteIdent(conn.Type, col))
+				val := r[col]
+				if val == nil {
+					values = append(values, "NULL")
+				} else {
+					valStr := escapeSQLValue(fmt.Sprint(val), conn.Type)
+					values = append(values, valStr)
+				}
+			}
+			insertSQL := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s);\n",
+				tbl, strings.Join(colNames, ", "), strings.Join(values, ", "))
+			_, _ = f.WriteString(insertSQL)
 		}
 	default:
 		return exportError("unsupported format: " + format)
