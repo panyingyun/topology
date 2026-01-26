@@ -50,12 +50,12 @@ clean:
 build_ubuntu2204:
 	go mod tidy
 	gofumpt -l -w .
-	wails build -tags webkit2_40
+	wails build -clean -tags webkit2_40
 
 build_ubuntu2404:
 	go mod tidy
 	gofumpt -l -w .
-	wails build -tags webkit2_41
+	wails build -clean -tags webkit2_41
 
 build-windows:
-	wails build 
+	wails build -clean -webview2=embed --tags exp_gowebview2loader

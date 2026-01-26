@@ -63,11 +63,9 @@ builds:
     flags:
       - -trimpath
     
-    # 构建标签 - Ubuntu 24.04 使用 webkit2_41
+    # 构建标签 - 与 Makefile build_ubuntu2404 一致
     tags:
       - webkit2_41
-      - desktop
-      - production
     
     # LDFlags
     ldflags:

@@ -26,9 +26,10 @@ The `windows` directory contains the manifest and rc files used when building wi
 These may be customised for your application. To return these files to the default state, simply delete them and
 build with `wails build`.
 
-- `icon.ico` - The icon used for the application. This is used when building using `wails build`. If you wish to
-  use a different icon, simply replace this file with your own. If it is missing, a new `icon.ico` file
-  will be created using the `appicon.png` file in the build directory.
+- `icon.ico` - The icon used for the application. For the exe to show this icon when building with **GoReleaser** or
+  plain `go build`, the project uses [go-winres](https://github.com/tc-hib/go-winres): run `go-winres make` from the
+  project root (or rely on the committed `rsrc_windows_amd64.syso`). GoReleaser Windows config runs `go-winres make`
+  in its before hooks. Replace this file to change the exe icon, then run `go-winres make` again.
 - `installer/*` - The files used to create the Windows installer. These are used when building using `wails build`.
 - `info.json` - Application details used for Windows builds. The data here will be used by the Windows installer,
   as well as the application itself (right click the exe -> properties -> details)

@@ -63,11 +63,9 @@ builds:
     flags:
       - -trimpath
     
-    # 构建标签 - Ubuntu 22.04 使用 webkit2_40
+    # 构建标签 - 与 Makefile build_ubuntu2204 一致
     tags:
       - webkit2_40
-      - desktop
-      - production
     
     # LDFlags
     ldflags:

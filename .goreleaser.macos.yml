@@ -51,7 +51,7 @@ builds:
       - CGO_ENABLED=0
     flags:
       - -trimpath
-    # 构建标签 - macOS 平台
+    # 构建标签 - macOS（Makefile 无单独 target，保留通用 desktop/production）
     tags:
       - desktop
       - production
