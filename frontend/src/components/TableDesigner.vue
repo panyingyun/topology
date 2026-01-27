@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useMessage } from 'naive-ui'
 import { Plus, Trash2, X, Database, Key, Link, FileCode } from 'lucide-vue-next'
 import { schemaService } from '../services/schemaService'
 import type { TableSchema, Column, Index, ForeignKey, DatabaseType } from '../types'
 
 const { t } = useI18n()
+const message = useMessage()
 
 const props = defineProps<{
   show: boolean
@@ -84,11 +86,11 @@ const removeForeignKey = (index: number) => {
 
 const generateSQL = async () => {
   if (!tableName.value.trim()) {
-    alert(t('designer.enterTableName'))
+    message.warning(t('designer.enterTableName'))
     return
   }
   if (columns.value.length === 0) {
-    alert(t('designer.addAtLeastOneColumn'))
+    message.warning(t('designer.addAtLeastOneColumn'))
     return
   }
 
@@ -108,7 +110,7 @@ const generateSQL = async () => {
     showSQL.value = true
   } catch (error) {
     console.error('Failed to generate SQL:', error)
-    alert(t('designer.generateFailed') + ': ' + (error instanceof Error ? error.message : 'Unknown error'))
+    message.error(t('designer.generateFailed') + ': ' + (error instanceof Error ? error.message : 'Unknown error'))
   }
 }
 

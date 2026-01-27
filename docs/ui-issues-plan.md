@@ -245,4 +245,44 @@
 
 ---
 
+## 十一、检查结果（对照代码库验证）
+
+以下为对当前实现的逐项核对结果。验证时间：近期。
+
+### 已完成 ✅
+
+| 编号 | 标题 | 验证要点 |
+|------|------|----------|
+| 2.1 | 浅色主题不可用 | Vue 组件中无 `#1e1e1e` 等硬编码；`style.css` 仅作变量定义 |
+| 2.2 | Monaco 主题不随应用主题 | QueryConsole 用 `useTheme`，Monaco `vs`/`vs-dark` 随主题，`watch(theme)` 调 `setTheme` |
+| 2.3 | 等宽字体未加载 | `index.html` 引入 JetBrains Mono CDN，Monaco `fontFamily` 使用 |
+| 2.4 | 删除确认弹窗硬编码深色 | MainLayout 删除确认使用 `theme-bg-*`、`theme-border`、`theme-text` |
+| 3.1 | 连接管理器缺左侧连接列表 | ConnectionManager 左右分栏，左侧已保存连接列表 + 右侧表单 |
+| 3.2 | SQL/结果区分比与规范不符 | `DEFAULT_SQL_PERCENT = 60`，60/40 可拖拽，15%–85% 限制 |
+| 3.3 | 侧边栏宽度范围 | Sidebar `Math.max(240, Math.min(300, ...))`，240–300px |
+| 4.1 | 状态栏连接与当前 Tab 不一致 | `connectionForActiveTab` 依 `activeTab?.connectionId`，状态栏用其展示 |
+| 4.2 | 状态栏查询结果信息易误导 | `queryResultForStatusBar` 仅当 `tab?.type === 'query'` 取 `tab.queryResult` |
+| 4.3 | QueryConsole 传入的 connection 可能错误 | QueryConsole 的 `connection-id` 等来自 `activeTab`，与状态栏一致 |
+| 5.1 方案 A | 查询结果导出 | `handleExportQueryResult` 实现 CSV/JSON 下载，`@export` 已接，Message 提示 |
+| 5.2 只读策略 | 查询结果单元格修改未持久化 | 产品定只读；QueryConsole DataGrid `readonly`，`editConfig` 关闭 |
+| 5.3 | 保存脚本未实现 | `saveScript` 用 `downloadBlob` 保存 `.sql` 文件，Message 成功/失败 |
+| 5.4 | 密码明文切换未实现 | ConnectionManager 密码框旁 Eye/EyeOff 切换 `type="password"`/`text` |
+| 6.1 | 表导出成功无统一提示 | DataViewer、MainLayout 表导出均用 `message.success`/`message.error` |
+| 6.2 | 错误与加载态反馈不统一 | 已用 Message、NSpin；TableDesigner、DataImporter、SQLAnalyzer、Snippets 等 `alert` 已全部改为 `message.warning`/`message.error` |
+| 7.1 | DataGrid 筛选与文档一致 | 列配置 `filters`、`filterRender: { name: 'input' }`，表头筛选可用 |
+| 7.2 | DataViewer 使用主题变量 | DataViewer 使用 `theme-bg-content`、`theme-bg-panel`、`theme-border` 等 |
+| 7.3 | 表视图分页与加载更多 | DataViewer 有 `pageSize` 选择、上一页/下一页、加载更多，NSpin 加载 |
+| 8.2 | 无障碍与键盘支持 | QueryConsole Ctrl+Enter 执行，工具栏 `aria-label`/`aria-pressed` 等 |
+| 8.3 | 窗口缩放与响应式 | MainLayout `min-w-[800px]`，`min-h-0`/`overflow-hidden` 等布局防护 |
+
+### 未完成 / 不适用 ❌
+
+| 编号 | 标题 | 说明 |
+|------|------|------|
+| 5.1 方案 B | 后端「导出查询结果」接口 | 计划中为 [ ]；当前仅前端 CSV/JSON 下载，未走后端接口 |
+| 5.2 可编辑路径 | 按结果集更新 | 计划中为 [ ]；产品已定只读，此项不实施 |
+
+---
+
 *文档生成时间：2025-01-27*
+*检查结果更新时间：近期*

@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useMessage } from 'naive-ui'
 import { Sparkles, AlertTriangle, Lightbulb, TrendingUp, X } from 'lucide-vue-next'
 import { schemaService } from '../services/schemaService'
 import type { SQLAnalysis, DatabaseType } from '../types'
 
 const { t } = useI18n()
+const message = useMessage()
 
 const props = defineProps<{
   show: boolean
@@ -22,7 +24,7 @@ const isLoading = ref(false)
 
 const analyze = async () => {
   if (!props.sql.trim()) {
-    alert(t('analyzer.enterSQL'))
+    message.warning(t('analyzer.enterSQL'))
     return
   }
   isLoading.value = true
@@ -30,7 +32,7 @@ const analyze = async () => {
     analysis.value = await schemaService.analyzeSQL(props.sql, props.driver || 'mysql')
   } catch (error) {
     console.error('Failed to analyze SQL:', error)
-    alert(t('analyzer.analyzeFailed') + ': ' + (error instanceof Error ? error.message : 'Unknown error'))
+    message.error(t('analyzer.analyzeFailed') + ': ' + (error instanceof Error ? error.message : 'Unknown error'))
   } finally {
     isLoading.value = false
   }

@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { FileCode, Search, X, Trash2 } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
+import { useMessage } from 'naive-ui'
+import { FileCode, Search, X, Trash2 } from 'lucide-vue-next'
 import { snippetService } from '../services/snippetService'
 import type { Snippet } from '../types'
 
 const { t } = useI18n()
+const message = useMessage()
 
 const props = defineProps<{
   show: boolean
@@ -63,7 +65,7 @@ const handleDelete = async (e: Event, id: string) => {
 const handleSaveCurrent = () => {
   const alias = aliasToSave.value.trim()
   if (!alias) {
-    alert(t('snippets.aliasRequired'))
+    message.warning(t('snippets.aliasRequired'))
     return
   }
   isSaving.value = true

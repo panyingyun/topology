@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useMessage } from 'naive-ui'
 import { Upload, X, CheckCircle, AlertCircle, FileText, Database } from 'lucide-vue-next'
 import { importService } from '../services/importService'
 import type { ImportPreview, ImportFormat, ImportResult } from '../types'
 
 const { t } = useI18n()
+const message = useMessage()
 
 const props = defineProps<{
   show: boolean
@@ -57,7 +59,7 @@ const loadPreview = async () => {
     // For now, we'll use a placeholder path
     preview.value = await importService.previewImport(filePath.value, importFormat.value)
     if (preview.value.error) {
-      alert(t('importer.previewFailed') + ': ' + preview.value.error)
+      message.error(t('importer.previewFailed') + ': ' + preview.value.error)
       step.value = 'select'
     } else {
       // Initialize column mapping (file column -> table column)
@@ -69,7 +71,7 @@ const loadPreview = async () => {
     }
   } catch (error) {
     console.error('Failed to load preview:', error)
-    alert(t('importer.previewFailed') + ': ' + (error instanceof Error ? error.message : 'Unknown error'))
+    message.error(t('importer.previewFailed') + ': ' + (error instanceof Error ? error.message : 'Unknown error'))
     step.value = 'select'
   } finally {
     isPreviewing.value = false
@@ -95,12 +97,12 @@ const handleImport = async () => {
       step.value = 'result'
       emit('success', result)
     } else {
-      alert(t('importer.importFailed') + ': ' + (result.error || 'Unknown error'))
+      message.error(t('importer.importFailed') + ': ' + (result.error || 'Unknown error'))
       step.value = 'mapping'
     }
   } catch (error) {
     console.error('Failed to import:', error)
-    alert(t('importer.importFailed') + ': ' + (error instanceof Error ? error.message : 'Unknown error'))
+    message.error(t('importer.importFailed') + ': ' + (error instanceof Error ? error.message : 'Unknown error'))
     step.value = 'mapping'
   } finally {
     isImporting.value = false
