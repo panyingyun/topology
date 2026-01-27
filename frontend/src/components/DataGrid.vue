@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useMessage } from 'naive-ui'
 import { VxeGrid } from 'vxe-table'
 import type { VxeGridProps } from 'vxe-table'
 import { Download, ChevronDown, Filter } from 'lucide-vue-next'
 import type { QueryResult, UpdateRecord, ExportFormat } from '../types'
 
 const { t } = useI18n()
+const message = useMessage()
 
 const props = withDefaults(
   defineProps<{
@@ -83,6 +85,24 @@ const handleEditClosed = () => {
     } catch (error) {
       console.error('Error getting recordset:', error)
     }
+  }
+}
+
+function cellValueToString(val: unknown): string {
+  if (val == null) return ''
+  if (typeof val === 'object') return JSON.stringify(val)
+  return String(val)
+}
+
+async function handleCellDblclick({ row, column }: { row?: Record<string, unknown>; column?: { field?: string } }) {
+  if (!props.useLightTable || !row || !column?.field) return
+  const val = row[column.field]
+  const str = cellValueToString(val)
+  try {
+    await navigator.clipboard.writeText(str)
+    message.success(t('dataGrid.copiedToClipboard'))
+  } catch (e) {
+    message.error(t('common.error') + ': ' + (e instanceof Error ? e.message : 'Copy failed'))
   }
 }
 
@@ -234,6 +254,7 @@ onUnmounted(() => {
         ref="gridRef"
         v-bind="gridOptions"
         @edit-closed="handleEditClosed"
+        @cell-dblclick="handleCellDblclick"
         class="custom-scrollbar"
         style="height: 100%;"
       />

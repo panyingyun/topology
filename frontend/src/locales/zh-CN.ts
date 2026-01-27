@@ -119,6 +119,7 @@ export default {
     csv: 'CSV',
     json: 'JSON',
     sql: 'SQL Insert',
+    copiedToClipboard: '已复制到粘贴板',
   },
   history: {
     title: '查询历史',

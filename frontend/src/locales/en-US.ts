@@ -119,6 +119,7 @@ export default {
     csv: 'CSV',
     json: 'JSON',
     sql: 'SQL Insert',
+    copiedToClipboard: 'Copied to clipboard',
   },
   history: {
     title: 'Query History',
