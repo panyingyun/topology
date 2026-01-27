@@ -6,14 +6,17 @@ import * as monaco from 'monaco-editor'
 import { queryService } from '../services/queryService'
 import { snippetService } from '../services/snippetService'
 import { useSchemaMetadata } from '../composables/useSchemaMetadata'
+import { useTheme } from '../composables/useTheme'
 import DataGrid from '../components/DataGrid.vue'
 import QueryHistory from '../components/QueryHistory.vue'
 import Snippets from '../components/Snippets.vue'
 import SQLAnalyzer from '../components/SQLAnalyzer.vue'
 import ExecutionPlanViewer from '../components/ExecutionPlanViewer.vue'
 import type { QueryResult, Connection } from '../types'
+import type { ExportFormat } from '../types'
 
 const { t } = useI18n()
+const { theme } = useTheme()
 
 const props = defineProps<{
   /** Tab id for per-tab DB session isolation */
@@ -62,9 +65,9 @@ const {
 const connectionIdForCompletion = ref('')
 let completionProviderDisposable: monaco.IDisposable | null = null
 
-// SQL vs Results split: default 1/3 SQL, 2/3 results; user can drag to resize
+// SQL vs Results split: default 60% SQL, 40% results per spec; user can drag to resize
 const SPLIT_STORAGE_KEY = 'query-console-split'
-const DEFAULT_SQL_PERCENT = 100 / 3
+const DEFAULT_SQL_PERCENT = 60
 const sqlHeightPercent = ref(
   Math.min(85, Math.max(15, Number(localStorage.getItem(SPLIT_STORAGE_KEY)) || DEFAULT_SQL_PERCENT))
 )
@@ -106,10 +109,11 @@ onMounted(async () => {
   if (editorContainer.value) {
     const initialValue = props.initialSql ?? props.restoreSql ?? DEFAULT_SQL
     sqlQuery.value = initialValue
+    const monacoTheme = theme.value === 'light' ? 'vs' : 'vs-dark'
     editor.value = monaco.editor.create(editorContainer.value, {
       value: initialValue,
       language: 'sql',
-      theme: 'vs-dark',
+      theme: monacoTheme,
       automaticLayout: true,
       minimap: { enabled: true },
       fontSize: 14,
@@ -144,6 +148,13 @@ watch(() => props.connectionId, (id) => {
   connectionIdForCompletion.value = id || ''
   if (id) loadSchemaMetadata(id)
 }, { immediate: true })
+
+watch(theme, () => {
+  if (editor.value) {
+    const next = theme.value === 'light' ? 'vs' : 'vs-dark'
+    monaco.editor.setTheme(next)
+  }
+})
 
 function registerSQLCompletionProvider(_editorInstance: any): monaco.IDisposable {
   const kindTable = monaco.languages.CompletionItemKind.Class
@@ -343,6 +354,56 @@ const handleSaveSnippet = async (alias: string) => {
     throw error
   }
 }
+
+function escapeCsvCell(val: unknown): string {
+  if (val == null) return ''
+  const s = String(val)
+  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`
+  return s
+}
+
+function exportQueryResultAsCsv(data: QueryResult): string {
+  const { columns, rows } = data
+  const header = columns.map(escapeCsvCell).join(',')
+  const lines = rows.map((r) => columns.map((c) => escapeCsvCell(r[c])).join(','))
+  return [header, ...lines].join('\n')
+}
+
+function exportQueryResultAsJson(data: QueryResult): string {
+  return JSON.stringify(data.rows, null, 2)
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+const handleExportQueryResult = (format: ExportFormat) => {
+  const data = queryResult.value
+  if (!data || !data.columns.length || !data.rows.length) {
+    return
+  }
+  const ts = new Date().toISOString().slice(0, 19).replace(/[:-]/g, '')
+  const base = `query-result-${ts}`
+  try {
+    if (format === 'csv') {
+      const csv = exportQueryResultAsCsv(data)
+      const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' })
+      downloadBlob(blob, `${base}.csv`)
+    } else if (format === 'json') {
+      const json = exportQueryResultAsJson(data)
+      const blob = new Blob([json], { type: 'application/json' })
+      downloadBlob(blob, `${base}.json`)
+    }
+    // sql: skip for query results; table export uses backend
+  } catch (e) {
+    console.error('Export failed:', e)
+  }
+}
 </script>
 
 <template>
@@ -352,14 +413,14 @@ const handleSaveSnippet = async (alias: string) => {
       <div class="flex items-center gap-3">
         <span
           v-if="database && tableName"
-          class="flex items-center gap-1.5 px-3 py-1 rounded text-xs bg-[#3c3c3c] text-gray-400 font-mono border border-[#404040]"
+          class="flex items-center gap-1.5 px-3 py-1 rounded text-xs theme-bg-input theme-text-muted font-mono border theme-border-strong"
           :title="`库: ${database} / 表: ${tableName}`"
         >
-          <span class="text-gray-500">库</span>
-          <span class="text-gray-300">{{ database }}</span>
-          <span class="text-gray-600">/</span>
-          <span class="text-gray-500">表</span>
-          <span class="text-gray-300">{{ tableName }}</span>
+          <span class="opacity-80">库</span>
+          <span class="theme-text">{{ database }}</span>
+          <span class="opacity-60">/</span>
+          <span class="opacity-80">表</span>
+          <span class="theme-text">{{ tableName }}</span>
         </span>
         <button
           @click="runExecute"
@@ -387,7 +448,7 @@ const handleSaveSnippet = async (alias: string) => {
 
         <button
           @click="formatSQL"
-          class="px-3 py-1 rounded text-xs bg-[#3c3c3c] hover:bg-[#4c4c4c] text-gray-300 transition-colors"
+          class="px-3 py-1 rounded text-xs theme-bg-input theme-bg-input-hover theme-text transition-colors"
         >
           <FileCode :size="14" class="inline mr-1" />
           {{ t('query.formatSQL') }}
@@ -395,7 +456,7 @@ const handleSaveSnippet = async (alias: string) => {
 
         <button
           @click="saveScript"
-          class="px-3 py-1 rounded text-xs bg-[#3c3c3c] hover:bg-[#4c4c4c] text-gray-300 transition-colors"
+          class="px-3 py-1 rounded text-xs theme-bg-input theme-bg-input-hover theme-text transition-colors"
         >
           <Save :size="14" class="inline mr-1" />
           {{ t('query.save') }}
@@ -407,7 +468,7 @@ const handleSaveSnippet = async (alias: string) => {
             'px-3 py-1 rounded text-xs transition-colors',
             showHistory
               ? 'bg-[#1677ff] text-white'
-              : 'bg-[#3c3c3c] hover:bg-[#4c4c4c] text-gray-300'
+              : 'theme-bg-input theme-bg-input-hover theme-text'
           ]"
         >
           <History :size="14" class="inline mr-1" />
@@ -420,7 +481,7 @@ const handleSaveSnippet = async (alias: string) => {
             'px-3 py-1 rounded text-xs transition-colors',
             showSnippets
               ? 'bg-[#1677ff] text-white'
-              : 'bg-[#3c3c3c] hover:bg-[#4c4c4c] text-gray-300'
+              : 'theme-bg-input theme-bg-input-hover theme-text'
           ]"
         >
           <Bookmark :size="14" class="inline mr-1" />
@@ -429,7 +490,7 @@ const handleSaveSnippet = async (alias: string) => {
 
         <button
           @click="showAnalyzer = true"
-          class="px-3 py-1 rounded text-xs bg-[#3c3c3c] hover:bg-[#4c4c4c] text-gray-300 transition-colors"
+          class="px-3 py-1 rounded text-xs theme-bg-input theme-bg-input-hover theme-text transition-colors"
         >
           <Sparkles :size="14" class="inline mr-1" />
           {{ t('query.analyzeSQL') }}
@@ -437,7 +498,7 @@ const handleSaveSnippet = async (alias: string) => {
 
         <button
           @click="showExplainPlan = true"
-          class="px-3 py-1 rounded text-xs bg-[#3c3c3c] hover:bg-[#4c4c4c] text-gray-300 transition-colors"
+          class="px-3 py-1 rounded text-xs theme-bg-input theme-bg-input-hover theme-text transition-colors"
           :title="t('explainPlan.title')"
         >
           <GitBranch :size="14" class="inline mr-1" />
@@ -471,7 +532,7 @@ const handleSaveSnippet = async (alias: string) => {
           :data="queryResult"
           :query-text="sqlQuery"
           @update="(updates) => console.log('Updates:', updates)"
-          @export="(format) => console.log('Export:', format)"
+          @export="handleExportQueryResult"
         />
         <div v-else-if="queryResult && queryResult.error" class="h-full flex items-center justify-center">
           <div class="text-red-400 text-sm">
@@ -479,7 +540,7 @@ const handleSaveSnippet = async (alias: string) => {
             <p class="text-xs mt-1">{{ queryResult.error }}</p>
           </div>
         </div>
-        <div v-else class="h-full flex items-center justify-center text-gray-500 text-sm">
+        <div v-else class="h-full flex items-center justify-center theme-text-muted text-sm">
           {{ t('query.noResults') }}. {{ t('query.executeQuery') }}
         </div>
       </div>

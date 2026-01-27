@@ -65,15 +65,15 @@ function nodeTypeColor(node: ExecutionPlanNode): string {
       class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
       @click.self="emit('close')"
     >
-      <div class="bg-[#252526] rounded-lg border border-[#333] w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-        <div class="px-6 py-4 border-b border-[#333] flex items-center justify-between">
-          <h2 class="text-lg font-semibold text-gray-200 flex items-center gap-2">
+      <div class="theme-bg-panel rounded-lg border theme-border w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        <div class="px-6 py-4 border-b theme-border flex items-center justify-between">
+          <h2 class="text-lg font-semibold theme-text flex items-center gap-2">
             <GitBranch :size="20" class="text-[#1677ff]" />
             {{ t('explainPlan.title') }}
           </h2>
           <button
             @click="emit('close')"
-            class="text-gray-400 hover:text-gray-200 transition-colors p-1"
+            class="theme-text-muted-hover transition-colors p-1"
           >
             <X :size="20" />
           </button>
@@ -83,13 +83,13 @@ function nodeTypeColor(node: ExecutionPlanNode): string {
           <div v-if="isLoading" class="flex items-center justify-center h-64">
             <div class="text-center">
               <div class="w-8 h-8 border-2 border-[#1677ff] border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-              <p class="text-sm text-gray-400">{{ t('explainPlan.loading') }}</p>
+              <p class="text-sm theme-text-muted">{{ t('explainPlan.loading') }}</p>
             </div>
           </div>
 
           <div v-else-if="plan?.error" class="p-4 bg-red-500/10 rounded border border-red-500/50">
             <p class="text-sm text-red-400">{{ plan.error }}</p>
-            <p v-if="plan.error?.includes('MySQL')" class="text-xs text-gray-500 mt-2">{{ t('explainPlan.mysqlOnly') }}</p>
+            <p v-if="plan.error?.includes('MySQL')" class="text-xs theme-text-muted mt-2">{{ t('explainPlan.mysqlOnly') }}</p>
           </div>
 
           <div v-else-if="plan" class="space-y-6">
@@ -103,7 +103,7 @@ function nodeTypeColor(node: ExecutionPlanNode): string {
                 <!-- Connector line from previous node -->
                 <div
                   v-if="index > 0"
-                  class="w-0.5 h-6 bg-[#444] flex-shrink-0"
+                  class="w-0.5 h-6 bg-[var(--border-strong)] flex-shrink-0"
                 />
                 <div
                   :class="[
@@ -114,10 +114,10 @@ function nodeTypeColor(node: ExecutionPlanNode): string {
                   <div class="flex items-center justify-between gap-4 flex-wrap">
                     <div class="flex items-center gap-2 flex-wrap">
                       <Search v-if="node.type === 'Scan'" :size="16" class="text-[#1677ff] flex-shrink-0" />
-                      <span class="text-sm font-semibold text-gray-200">{{ node.type }}</span>
-                      <span class="text-sm text-gray-400">—</span>
-                      <span class="text-sm font-mono text-gray-300">{{ node.label }}</span>
-                      <span v-if="node.detail" class="text-xs text-gray-500">({{ node.detail }})</span>
+                      <span class="text-sm font-semibold theme-text">{{ node.type }}</span>
+                      <span class="text-sm theme-text-muted">—</span>
+                      <span class="text-sm font-mono theme-text">{{ node.label }}</span>
+                      <span v-if="node.detail" class="text-xs theme-text-muted opacity-80">({{ node.detail }})</span>
                     </div>
                     <div class="flex items-center gap-2">
                       <span
@@ -136,10 +136,10 @@ function nodeTypeColor(node: ExecutionPlanNode): string {
                       </span>
                     </div>
                   </div>
-                  <div v-if="node.rows !== undefined && node.rows > 0" class="mt-1 text-xs text-gray-500">
+                  <div v-if="node.rows !== undefined && node.rows > 0" class="mt-1 text-xs theme-text-muted">
                     ~{{ node.rows.toLocaleString() }} {{ t('explainPlan.rows') }}
                   </div>
-                  <div v-if="node.extra" class="mt-1 text-xs text-gray-500 truncate" :title="node.extra">
+                  <div v-if="node.extra" class="mt-1 text-xs theme-text-muted truncate" :title="node.extra">
                     {{ node.extra }}
                   </div>
                 </div>
@@ -169,7 +169,7 @@ function nodeTypeColor(node: ExecutionPlanNode): string {
           </div>
         </div>
 
-        <div class="px-6 py-4 border-t border-[#333] flex justify-end bg-[#2d2d30]">
+        <div class="px-6 py-4 border-t theme-border flex justify-end theme-bg-footer">
           <button
             @click="emit('close')"
             class="px-6 py-2 rounded text-xs font-semibold bg-[#1677ff] hover:bg-[#4096ff] text-white"

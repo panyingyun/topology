@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, watch, computed } from 'vue'
-import { Database, CheckCircle, XCircle, Loader, Lock, ChevronDown, ChevronRight } from 'lucide-vue-next'
+import { Database, CheckCircle, XCircle, Loader, Lock, ChevronDown, ChevronRight, Eye, EyeOff } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { connectionService } from '../services/connectionService'
 import type { Connection, DatabaseType } from '../types'
@@ -49,6 +49,8 @@ const form = reactive({
 })
 
 const showSshSection = ref(true)
+const passwordVisible = ref(false)
+const sshPasswordVisible = ref(false)
 
 const isEditMode = computed(() => props.mode === 'edit' && props.editConnection)
 
@@ -86,6 +88,8 @@ watch([() => props.show, () => props.editConnection], () => {
     }
     testStatus.value = 'idle'
     errorMessage.value = ''
+    passwordVisible.value = false
+    sshPasswordVisible.value = false
   }
 })
 
@@ -193,14 +197,14 @@ const dbTypes: Array<{ type: DatabaseType; label: string; icon: string; color: s
       class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
       @click.self="emit('close')"
     >
-      <div class="bg-[#252526] rounded-lg border border-[#333] w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-        <div class="px-6 py-4 border-b border-[#333] flex items-center justify-between">
-          <h2 class="text-lg font-semibold text-gray-200">
+      <div class="theme-bg-panel rounded-lg border theme-border w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        <div class="px-6 py-4 border-b theme-border flex items-center justify-between">
+          <h2 class="text-lg font-semibold theme-text">
             {{ isEditMode ? t('connection.editConnection') : t('connection.newConnection') }}
           </h2>
           <button
             @click="emit('close')"
-            class="text-gray-400 hover:text-gray-200 transition-colors"
+            class="theme-text-muted-hover transition-colors"
           >
             <XCircle :size="20" />
           </button>
@@ -209,7 +213,7 @@ const dbTypes: Array<{ type: DatabaseType; label: string; icon: string; color: s
         <div class="flex-1 overflow-y-auto custom-scrollbar p-6">
           <!-- Database Type Selection -->
           <div class="mb-6">
-            <label class="block text-xs font-semibold text-gray-400 mb-3 uppercase tracking-wider">
+            <label class="block text-xs font-semibold theme-text-muted mb-3 uppercase tracking-wider">
               {{ t('connection.databaseType') }}
             </label>
             <div class="grid grid-cols-3 gap-4">
@@ -221,11 +225,11 @@ const dbTypes: Array<{ type: DatabaseType; label: string; icon: string; color: s
                   'p-4 rounded-lg border-2 cursor-pointer transition-all',
                   activeDbType === db.type
                     ? 'border-[#1677ff] bg-[#1677ff]/10'
-                    : 'border-[#333] bg-[#2d2d30] hover:border-[#444]'
+                    : 'theme-border theme-bg-footer hover:border-[var(--border-strong)]'
                 ]"
               >
                 <div class="text-3xl mb-2">{{ db.icon }}</div>
-                <div class="text-sm font-semibold text-gray-200">{{ db.label }}</div>
+                <div class="text-sm font-semibold theme-text">{{ db.label }}</div>
               </div>
             </div>
           </div>
@@ -233,60 +237,71 @@ const dbTypes: Array<{ type: DatabaseType; label: string; icon: string; color: s
           <!-- Connection Form -->
           <div class="space-y-4">
             <div>
-              <label class="block text-xs font-semibold text-gray-400 mb-2">{{ t('connection.connectionName') }}</label>
+              <label class="block text-xs font-semibold theme-text-muted mb-2">{{ t('connection.connectionName') }}</label>
               <input
                 v-model="form.name"
                 type="text"
                 placeholder="My Database"
-                class="w-full bg-[#3c3c3c] border border-[#444] rounded px-3 py-2 text-sm text-gray-200 focus:border-[#1677ff] focus:outline-none"
+                class="w-full theme-input rounded px-3 py-2 text-sm"
               />
             </div>
 
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="block text-xs font-semibold text-gray-400 mb-2">{{ t('connection.host') }}</label>
+                <label class="block text-xs font-semibold theme-text-muted mb-2">{{ t('connection.host') }}</label>
                 <input
                   v-model="form.host"
                   type="text"
                   placeholder="localhost"
-                  class="w-full bg-[#3c3c3c] border border-[#444] rounded px-3 py-2 text-sm text-gray-200 focus:border-[#1677ff] focus:outline-none"
+                  class="w-full theme-input rounded px-3 py-2 text-sm"
                 />
               </div>
               <div>
-                <label class="block text-xs font-semibold text-gray-400 mb-2">{{ t('connection.port') }}</label>
+                <label class="block text-xs font-semibold theme-text-muted mb-2">{{ t('connection.port') }}</label>
                 <input
                   v-model.number="form.port"
                   type="number"
-                  class="w-full bg-[#3c3c3c] border border-[#444] rounded px-3 py-2 text-sm text-gray-200 focus:border-[#1677ff] focus:outline-none"
+                  class="w-full theme-input rounded px-3 py-2 text-sm"
                 />
               </div>
             </div>
 
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="block text-xs font-semibold text-gray-400 mb-2">{{ t('connection.username') }}</label>
+                <label class="block text-xs font-semibold theme-text-muted mb-2">{{ t('connection.username') }}</label>
                 <input
                   v-model="form.username"
                   type="text"
-                  class="w-full bg-[#3c3c3c] border border-[#444] rounded px-3 py-2 text-sm text-gray-200 focus:border-[#1677ff] focus:outline-none"
+                  class="w-full theme-input rounded px-3 py-2 text-sm"
                 />
               </div>
               <div>
-                <label class="block text-xs font-semibold text-gray-400 mb-2">{{ t('connection.password') }}</label>
-                <input
-                  v-model="form.password"
-                  type="password"
-                  class="w-full bg-[#3c3c3c] border border-[#444] rounded px-3 py-2 text-sm text-gray-200 focus:border-[#1677ff] focus:outline-none"
-                />
+                <label class="block text-xs font-semibold theme-text-muted mb-2">{{ t('connection.password') }}</label>
+                <div class="relative">
+                  <input
+                    v-model="form.password"
+                    :type="passwordVisible ? 'text' : 'password'"
+                    class="w-full theme-input rounded px-3 py-2 pr-9 text-sm"
+                  />
+                  <button
+                    type="button"
+                    class="absolute right-2 top-1/2 -translate-y-1/2 theme-text-muted-hover transition-colors"
+                    :title="passwordVisible ? t('connection.hidePassword') : t('connection.showPassword')"
+                    @click="passwordVisible = !passwordVisible"
+                  >
+                    <EyeOff v-if="passwordVisible" :size="14" />
+                    <Eye v-else :size="14" />
+                  </button>
+                </div>
               </div>
             </div>
 
             <div>
-              <label class="block text-xs font-semibold text-gray-400 mb-2">{{ t('connection.database') }} ({{ t('common.optional') }})</label>
+              <label class="block text-xs font-semibold theme-text-muted mb-2">{{ t('connection.database') }} ({{ t('common.optional') }})</label>
               <input
                 v-model="form.database"
                 type="text"
-                class="w-full bg-[#3c3c3c] border border-[#444] rounded px-3 py-2 text-sm text-gray-200 focus:border-[#1677ff] focus:outline-none"
+                class="w-full theme-input rounded px-3 py-2 text-sm"
               />
             </div>
 
@@ -295,82 +310,93 @@ const dbTypes: Array<{ type: DatabaseType; label: string; icon: string; color: s
                 v-model="form.useSSL"
                 type="checkbox"
                 id="useSSL"
-                class="w-4 h-4 rounded border-[#444] bg-[#3c3c3c] text-[#1677ff] focus:ring-[#1677ff]"
+                class="w-4 h-4 rounded theme-border-strong theme-bg-input text-[#1677ff] focus:ring-[#1677ff]"
               />
-              <label for="useSSL" class="text-xs text-gray-400">{{ t('connection.useSSL') }}</label>
+              <label for="useSSL" class="text-xs theme-text-muted">{{ t('connection.useSSL') }}</label>
             </div>
 
             <!-- SSH Tunnel (MySQL only in backend) -->
-            <div v-if="activeDbType === 'mysql'" class="mt-6 pt-4 border-t border-[#333]">
+            <div v-if="activeDbType === 'mysql'" class="mt-6 pt-4 border-t theme-border">
               <button
                 type="button"
                 class="flex items-center gap-2 w-full text-left mb-3"
                 @click="showSshSection = !showSshSection"
               >
                 <Lock :size="16" class="text-[#1677ff] flex-shrink-0" />
-                <span class="text-sm font-semibold text-gray-200">{{ t('connection.sshTunnel.title') }}</span>
-                <ChevronDown v-if="showSshSection" :size="16" class="text-gray-400 ml-auto" />
-                <ChevronRight v-else :size="16" class="text-gray-400 ml-auto" />
+                <span class="text-sm font-semibold theme-text">{{ t('connection.sshTunnel.title') }}</span>
+                <ChevronDown v-if="showSshSection" :size="16" class="theme-text-muted ml-auto" />
+                <ChevronRight v-else :size="16" class="theme-text-muted ml-auto" />
               </button>
-              <div v-show="showSshSection" class="space-y-4 pl-6 border-l-2 border-[#333] ml-1">
+              <div v-show="showSshSection" class="space-y-4 pl-6 border-l-2 theme-border ml-1">
                 <div class="flex items-center gap-2">
                   <input
                     v-model="form.sshTunnel.enabled"
                     type="checkbox"
                     id="sshEnabled"
-                    class="w-4 h-4 rounded border-[#444] bg-[#3c3c3c] text-[#1677ff] focus:ring-[#1677ff]"
+                    class="w-4 h-4 rounded theme-border-strong theme-bg-input text-[#1677ff] focus:ring-[#1677ff]"
                   />
-                  <label for="sshEnabled" class="text-xs text-gray-400">{{ t('connection.sshTunnel.enable') }}</label>
+                  <label for="sshEnabled" class="text-xs theme-text-muted">{{ t('connection.sshTunnel.enable') }}</label>
                 </div>
                 <template v-if="form.sshTunnel.enabled">
                   <div class="grid grid-cols-2 gap-4">
                     <div>
-                      <label class="block text-xs font-semibold text-gray-400 mb-2">{{ t('connection.sshTunnel.host') }}</label>
+                      <label class="block text-xs font-semibold theme-text-muted mb-2">{{ t('connection.sshTunnel.host') }}</label>
                       <input
                         v-model="form.sshTunnel.host"
                         type="text"
                         placeholder="jump.example.com"
-                        class="w-full bg-[#3c3c3c] border border-[#444] rounded px-3 py-2 text-sm text-gray-200 focus:border-[#1677ff] focus:outline-none"
+                        class="w-full theme-input rounded px-3 py-2 text-sm"
                       />
                     </div>
                     <div>
-                      <label class="block text-xs font-semibold text-gray-400 mb-2">{{ t('connection.sshTunnel.port') }}</label>
+                      <label class="block text-xs font-semibold theme-text-muted mb-2">{{ t('connection.sshTunnel.port') }}</label>
                       <input
                         v-model.number="form.sshTunnel.port"
                         type="number"
                         min="1"
                         max="65535"
-                        class="w-full bg-[#3c3c3c] border border-[#444] rounded px-3 py-2 text-sm text-gray-200 focus:border-[#1677ff] focus:outline-none"
+                        class="w-full theme-input rounded px-3 py-2 text-sm"
                       />
                     </div>
                   </div>
                   <div>
-                    <label class="block text-xs font-semibold text-gray-400 mb-2">{{ t('connection.sshTunnel.username') }}</label>
+                    <label class="block text-xs font-semibold theme-text-muted mb-2">{{ t('connection.sshTunnel.username') }}</label>
                     <input
                       v-model="form.sshTunnel.username"
                       type="text"
                       placeholder="ssh_user"
-                      class="w-full bg-[#3c3c3c] border border-[#444] rounded px-3 py-2 text-sm text-gray-200 focus:border-[#1677ff] focus:outline-none"
+                      class="w-full theme-input rounded px-3 py-2 text-sm"
                     />
                   </div>
                   <div>
-                    <label class="block text-xs font-semibold text-gray-400 mb-2">{{ t('connection.sshTunnel.password') }} ({{ t('common.optional') }})</label>
-                    <input
-                      v-model="form.sshTunnel.password"
-                      type="password"
-                      :placeholder="t('connection.sshTunnel.passwordPlaceholder')"
-                      class="w-full bg-[#3c3c3c] border border-[#444] rounded px-3 py-2 text-sm text-gray-200 focus:border-[#1677ff] focus:outline-none"
-                    />
+                    <label class="block text-xs font-semibold theme-text-muted mb-2">{{ t('connection.sshTunnel.password') }} ({{ t('common.optional') }})</label>
+                    <div class="relative">
+                      <input
+                        v-model="form.sshTunnel.password"
+                        :type="sshPasswordVisible ? 'text' : 'password'"
+                        :placeholder="t('connection.sshTunnel.passwordPlaceholder')"
+                        class="w-full theme-input rounded px-3 py-2 pr-9 text-sm"
+                      />
+                      <button
+                        type="button"
+                        class="absolute right-2 top-1/2 -translate-y-1/2 theme-text-muted-hover transition-colors"
+                        :title="sshPasswordVisible ? t('connection.hidePassword') : t('connection.showPassword')"
+                        @click="sshPasswordVisible = !sshPasswordVisible"
+                      >
+                        <EyeOff v-if="sshPasswordVisible" :size="14" />
+                        <Eye v-else :size="14" />
+                      </button>
+                    </div>
                   </div>
                   <div>
-                    <label class="block text-xs font-semibold text-gray-400 mb-2">{{ t('connection.sshTunnel.privateKey') }} ({{ t('common.optional') }})</label>
+                    <label class="block text-xs font-semibold theme-text-muted mb-2">{{ t('connection.sshTunnel.privateKey') }} ({{ t('common.optional') }})</label>
                     <textarea
                       v-model="form.sshTunnel.privateKey"
                       :placeholder="t('connection.sshTunnel.privateKeyPlaceholder')"
                       rows="4"
-                      class="w-full bg-[#3c3c3c] border border-[#444] rounded px-3 py-2 text-sm text-gray-200 focus:border-[#1677ff] focus:outline-none font-mono resize-y"
+                      class="w-full theme-input rounded px-3 py-2 text-sm font-mono resize-y"
                     />
-                    <p class="text-xs text-gray-500 mt-1">{{ t('connection.sshTunnel.mysqlOnly') }}</p>
+                    <p class="text-xs theme-text-muted opacity-80 mt-1">{{ t('connection.sshTunnel.mysqlOnly') }}</p>
                   </div>
                 </template>
               </div>
@@ -378,7 +404,7 @@ const dbTypes: Array<{ type: DatabaseType; label: string; icon: string; color: s
           </div>
         </div>
 
-        <div class="px-6 py-4 border-t border-[#333] flex items-center justify-between bg-[#2d2d30]">
+        <div class="px-6 py-4 border-t theme-border flex items-center justify-between theme-bg-footer">
           <div class="flex items-center gap-3">
             <button
               @click="testConnection"
@@ -386,8 +412,8 @@ const dbTypes: Array<{ type: DatabaseType; label: string; icon: string; color: s
               :class="[
                 'flex items-center gap-2 px-4 py-2 rounded text-xs font-semibold transition-all',
                 testStatus === 'loading'
-                  ? 'bg-gray-600 cursor-not-allowed'
-                  : 'bg-[#3c3c3c] hover:bg-[#4c4c4c] text-gray-300'
+                  ? 'bg-gray-600 cursor-not-allowed theme-text-muted'
+                  : 'theme-bg-input theme-bg-input-hover theme-text'
               ]"
             >
               <Loader v-if="testStatus === 'loading'" :size="14" class="animate-spin" />
@@ -402,7 +428,7 @@ const dbTypes: Array<{ type: DatabaseType; label: string; icon: string; color: s
           <div class="flex items-center gap-3">
             <button
               @click="emit('close')"
-              class="px-4 py-2 rounded text-xs font-semibold bg-[#3c3c3c] hover:bg-[#4c4c4c] text-gray-300 transition-colors"
+              class="px-4 py-2 rounded text-xs font-semibold theme-bg-input theme-bg-input-hover theme-text transition-colors"
             >
               {{ t('common.cancel') }}
             </button>

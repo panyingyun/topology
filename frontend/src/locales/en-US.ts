@@ -35,6 +35,8 @@ export default {
     port: 'Port',
     username: 'Username',
     password: 'Password',
+    showPassword: 'Show password',
+    hidePassword: 'Hide password',
     database: 'Database',
     useSSL: 'Use SSL/TLS',
     testConnection: 'Test Connection',

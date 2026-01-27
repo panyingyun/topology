@@ -237,18 +237,18 @@ onUnmounted(() => {
       <div
         @click="toggleConnection(conn.id)"
         @contextmenu="handleConnectionContextMenu($event, conn)"
-        class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-[#37373d] cursor-pointer group transition-colors"
+        class="flex items-center gap-2 px-2 py-1.5 rounded theme-bg-hover cursor-pointer group transition-colors"
       >
         <component
           :is="expandedConnections.has(conn.id) ? ChevronDown : ChevronRight"
           :size="14"
-          class="text-gray-400 shrink-0"
+          class="theme-text-muted shrink-0"
         />
-        <Database :size="14" class="text-gray-400 shrink-0" />
-        <span class="text-xs text-gray-300 flex-1 truncate">{{ conn.name }}</span>
+        <Database :size="14" class="theme-text-muted shrink-0" />
+        <span class="text-xs theme-text flex-1 truncate">{{ conn.name }}</span>
         <Circle
           :size="6"
-          :class="conn.status === 'connected' ? 'text-green-500' : 'text-gray-500'"
+          :class="conn.status === 'connected' ? 'text-green-500' : 'theme-text-muted'"
           :fill="conn.status === 'connected' ? 'currentColor' : 'none'"
           class="shrink-0"
         />
@@ -260,15 +260,15 @@ onUnmounted(() => {
           <div
             @click="toggleDatabase(conn.id, dbName)"
             @contextmenu="handleDatabaseContextMenu($event, conn, dbName)"
-            class="flex items-center gap-2 px-2 py-1 rounded hover:bg-[#37373d] cursor-pointer group transition-colors"
+            class="flex items-center gap-2 px-2 py-1 rounded theme-bg-hover cursor-pointer group transition-colors"
           >
             <component
               :is="expandedDatabases.has(dbKey(conn.id, dbName)) ? ChevronDown : ChevronRight"
               :size="12"
-              class="text-gray-400 shrink-0"
+              class="theme-text-muted shrink-0"
             />
-            <FolderOpen :size="12" class="text-gray-500 group-hover:text-[#1677ff] shrink-0" />
-            <span class="text-xs text-gray-400 group-hover:text-gray-200 truncate">{{ dbName }}</span>
+            <FolderOpen :size="12" class="theme-text-muted group-hover:text-[#1677ff] shrink-0" />
+            <span class="text-xs theme-text-muted group-hover:theme-text truncate">{{ dbName }}</span>
           </div>
 
           <!-- Level 2: Tables -->
@@ -281,11 +281,11 @@ onUnmounted(() => {
               :key="table.name"
               @click="handleTableClick(conn.id, dbName, table.name)"
               @contextmenu="handleTableContextMenu($event, conn, dbName, table.name)"
-              class="flex items-center gap-2 px-2 py-1 rounded hover:bg-[#37373d] cursor-pointer group transition-colors"
+              class="flex items-center gap-2 px-2 py-1 rounded theme-bg-hover cursor-pointer group transition-colors"
             >
-              <TableIcon :size="12" class="text-gray-500 group-hover:text-[#1677ff] shrink-0" />
-              <span class="text-xs text-gray-400 group-hover:text-gray-200 truncate">{{ table.name }}</span>
-              <span v-if="table.rowCount" class="text-[10px] text-gray-600 ml-auto">
+              <TableIcon :size="12" class="theme-text-muted group-hover:text-[#1677ff] shrink-0" />
+              <span class="text-xs theme-text-muted group-hover:theme-text truncate">{{ table.name }}</span>
+              <span v-if="table.rowCount" class="text-[10px] theme-text-muted opacity-80 ml-auto">
                 {{ table.rowCount.toLocaleString() }}
               </span>
             </div>
@@ -299,7 +299,7 @@ onUnmounted(() => {
       <Transition name="fade">
         <div
           v-if="contextMenu.show"
-          class="fixed z-[100] bg-[#252526] border border-[#333] rounded shadow-lg py-1 min-w-[160px]"
+          class="fixed z-[100] theme-bg-panel border theme-border rounded shadow-lg py-1 min-w-[160px]"
           :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }"
           @click.stop
         >
@@ -307,26 +307,26 @@ onUnmounted(() => {
           <template v-if="contextMenu.type === 'connection'">
             <button
               @click="handleEditConnection"
-              class="w-full px-4 py-2 text-left text-xs text-gray-300 hover:bg-[#37373d] transition-colors"
+              class="w-full px-4 py-2 text-left text-xs theme-text theme-bg-hover transition-colors"
             >
               {{ t('connection.editConnection') }}
             </button>
             <button
               @click="handleRefreshConnection"
-              class="w-full px-4 py-2 text-left text-xs text-gray-300 hover:bg-[#37373d] transition-colors"
+              class="w-full px-4 py-2 text-left text-xs theme-text theme-bg-hover transition-colors"
             >
               {{ t('connection.refresh') }}
             </button>
             <button
               @click="handleOpenMonitor"
-              class="w-full px-4 py-2 text-left text-xs text-gray-300 hover:bg-[#37373d] transition-colors"
+              class="w-full px-4 py-2 text-left text-xs theme-text theme-bg-hover transition-colors"
             >
               {{ t('monitor.openMonitor') }}
             </button>
-            <div class="h-px bg-[#333] my-1"></div>
+            <div class="h-px bg-[var(--border)] my-1"></div>
             <button
               @click="handleDeleteConnection"
-              class="w-full px-4 py-2 text-left text-xs text-red-400 hover:bg-[#37373d] transition-colors"
+              class="w-full px-4 py-2 text-left text-xs text-red-400 theme-bg-hover transition-colors"
             >
               {{ t('connection.delete') }}
             </button>
@@ -335,7 +335,7 @@ onUnmounted(() => {
           <template v-else-if="contextMenu.type === 'database'">
             <button
               @click="handleNewTable"
-              class="w-full px-4 py-2 text-left text-xs text-gray-300 hover:bg-[#37373d] transition-colors flex items-center gap-2"
+              class="w-full px-4 py-2 text-left text-xs theme-text theme-bg-hover transition-colors flex items-center gap-2"
             >
               <Database :size="12" />
               {{ t('sidebar.newTable') }}
@@ -345,20 +345,20 @@ onUnmounted(() => {
           <template v-else-if="contextMenu.type === 'table'">
             <button
               @click="handleTableQuery"
-              class="w-full px-4 py-2 text-left text-xs text-gray-300 hover:bg-[#37373d] transition-colors flex items-center gap-2"
+              class="w-full px-4 py-2 text-left text-xs theme-text theme-bg-hover transition-colors flex items-center gap-2"
             >
               <TableIcon :size="12" />
               {{ t('tableContext.query') }}
             </button>
             <button
               @click="handleTableImport"
-              class="w-full px-4 py-2 text-left text-xs text-gray-300 hover:bg-[#37373d] transition-colors flex items-center gap-2"
+              class="w-full px-4 py-2 text-left text-xs theme-text theme-bg-hover transition-colors flex items-center gap-2"
             >
               {{ t('tableContext.import') }}
             </button>
             <button
               @click="handleTableExport"
-              class="w-full px-4 py-2 text-left text-xs text-gray-300 hover:bg-[#37373d] transition-colors flex items-center gap-2"
+              class="w-full px-4 py-2 text-left text-xs theme-text theme-bg-hover transition-colors flex items-center gap-2"
             >
               {{ t('tableContext.export') }}
             </button>

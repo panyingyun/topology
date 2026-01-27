@@ -29,17 +29,17 @@
   - `MainLayout.vue`（删除确认弹窗）
   - `Sidebar.vue`、`QueryConsole.vue` 等
 - **计划**：
-  - [ ] 全局搜索 `#1e1e1e`、`#252526`、`#333`、`#3c3c3c`、`#37373d` 等硬编码色值。
-  - [ ] 用 `style.css` 中的 `--bg-*`、`--border`、`--text*` 及 `theme-*` 类替换。
-  - [ ] 为亮色主题补充/校验 `theme-light` 变量，确保对比度与可读性。
+  - [x] 全局搜索 `#1e1e1e`、`#252526`、`#333`、`#3c3c3c`、`#37373d` 等硬编码色值。
+  - [x] 用 `style.css` 中的 `--bg-*`、`--border`、`--text*` 及 `theme-*` 类替换。
+  - [x] 为亮色主题补充/校验 `theme-light` 变量，确保对比度与可读性。
 
 ### 2.2 Monaco 主题不随应用主题【高】
 
 - **现象**：`QueryConsole.vue` 中 Monaco 写死 `theme: 'vs-dark'`。
 - **影响**：浅色主题下 SQL 编辑器仍为深色，与整体不一致。
 - **计划**：
-  - [ ] 在 QueryConsole 中注入 `useTheme`，根据 `theme` 切换 Monaco `theme`（`vs` / `vs-dark`）。
-  - [ ] 主题切换时调用 `monaco.editor.setTheme(...)` 或重建实例时传入对应 theme。
+  - [x] 在 QueryConsole 中注入 `useTheme`，根据 `theme` 切换 Monaco `theme`（`vs` / `vs-dark`）。
+  - [x] 主题切换时调用 `monaco.editor.setTheme(...)` 或重建实例时传入对应 theme。
 
 ### 2.3 等宽字体未加载【低】
 
@@ -53,7 +53,7 @@
 
 - **现象**：`MainLayout.vue` 删除连接确认框中使用 `hover:bg-[#37373d]` 等。
 - **计划**：
-  - [ ] 改用 `theme-bg-hover`、`theme-border` 等主题类，确保随主题切换。
+  - [x] 改用 `theme-bg-hover`、`theme-border` 等主题类，确保随主题切换。
 
 ---
 
@@ -74,8 +74,8 @@
 - **规范**：上 60% SQL，下 40% 结果。
 - **现状**：`QueryConsole.vue` 中 `DEFAULT_SQL_PERCENT = 100/3`，约 33% SQL、67% 结果。
 - **计划**：
-  - [ ] 将默认比例改为 60 / 40（或通过配置项），并更新 `SPLIT_STORAGE_KEY` 的默认值。
-  - [ ] 保持可拖拽调节，比例限制仍为 15%–85%。
+  - [x] 将默认比例改为 60 / 40（或通过配置项），并更新 `SPLIT_STORAGE_KEY` 的默认值。
+  - [x] 保持可拖拽调节，比例限制仍为 15%–85%。
 
 ### 3.3 侧边栏宽度范围【低】
 
@@ -93,23 +93,23 @@
 - **现象**：`currentConnection` 仅在新建/连接或加载连接列表时更新；切换 Tab 不随 **当前 Tab 的 connection** 变化。
 - **影响**：多连接、多 Tab 时，状态栏显示的 Host/Port/User 可能不是当前 Tab 对应连接。
 - **计划**：
-  - [ ] 在 MainLayout 中根据 `activeTab?.connectionId` 解析出对应 `Connection`。
-  - [ ] 状态栏展示「当前 Tab 的连接」；无 Tab 时再回退到 `currentConnection`。
+  - [x] 在 MainLayout 中根据 `activeTab?.connectionId` 解析出对应 `Connection`。
+  - [x] 状态栏展示「当前 Tab 的连接」；无 Tab 时再回退到 `currentConnection`。
 
 ### 4.2 状态栏的查询结果信息易误导【高】
 
 - **现象**：`queryResult` 为全局 ref，切换 Tab 后仍显示最近一次执行的查询的耗时/行数。
 - **影响**：例如在 Tab A 执行查询后切到 Tab B（表视图），状态栏仍显示 Tab A 的统计。
 - **计划**：
-  - [ ] 状态栏的查询统计仅展示 **当前激活的 Query Tab** 的 `queryResult`。
-  - [ ] 当前为 Table Tab 或非 Query Tab 时，隐藏或清零查询耗时/行数等。
+  - [x] 状态栏的查询统计仅展示 **当前激活的 Query Tab** 的 `queryResult`。
+  - [x] 当前为 Table Tab 或非 Query Tab 时，隐藏或清零查询耗时/行数等。
 
 ### 4.3 QueryConsole 传入的 connection 可能错误【高】
 
 - **现象**：QueryConsole 使用 `connection="currentConnection"`，当激活 Tab 属于其他连接时，`currentConnection` 未必是该 Tab 的连接。
 - **影响**：SQL 分析、补全等若依赖 `connection`，可能用错连接。
 - **计划**：
-  - [ ] 按 `activeTab.connectionId` 解析 `Connection`，传入 QueryConsole 的 `connection` prop，与状态栏逻辑统一。
+  - [x] 按 `activeTab.connectionId` 解析 `Connection`，传入 QueryConsole 的 `connection` prop，与状态栏逻辑统一。
 
 ---
 
@@ -120,9 +120,9 @@
 - **现象**：QueryConsole 的 DataGrid 仅 `@export="... => console.log(...)"`，无实际导出；`dataService.exportData` 仅支持按表导出。
 - **影响**：任意 SQL 的查询结果无法导出为 CSV/JSON/SQL。
 - **计划**：
-  - [ ] 方案 A：前端将当前 `queryResult` 转为 CSV/JSON，触发下载（可先不支持 SQL Insert）。
+  - [x] 方案 A：前端将当前 `queryResult` 转为 CSV/JSON，触发下载（可先不支持 SQL Insert）。
   - [ ] 方案 B：新增后端「导出查询结果」接口，前端传 `connectionId`、`sql`、`format` 等，再接好 DataGrid `@export`。
-  - [ ] 在 QueryConsole 中实现 `handleExport`，替换 `console.log`，并统一导出成功/失败提示。
+  - [x] 在 QueryConsole 中实现 `handleExport`，替换 `console.log`，并统一导出成功/失败提示。
 
 ### 5.2 查询结果单元格修改未持久化【中】
 
@@ -145,8 +145,8 @@
 - **规范**：连接配置中密码支持明文/密文切换。
 - **现状**：仅 `type="password"`，无切换。
 - **计划**：
-  - [ ] 在 ConnectionManager 密码输入框旁增加显隐切换（如眼睛图标），切换 `type="password"` / `type="text"`。
-  - [ ] 注意无障碍与安全提示（如默认密文）。
+  - [x] 在 ConnectionManager 密码输入框旁增加显隐切换（如眼睛图标），切换 `type="password"` / `type="text"`。
+  - [x] 注意无障碍与安全提示（如默认密文）。
 
 ---
 
@@ -181,7 +181,7 @@
 
 - **现象**：`DataViewer.vue` 使用 `bg-[#1e1e1e]`、`bg-[#252526]`、`border-[#333]` 等硬编码。
 - **计划**：
-  - [ ] 改为 `theme-bg-content`、`theme-bg-panel`、`theme-border` 等，与 2.1 一并处理。
+  - [x] 改为 `theme-bg-content`、`theme-bg-panel`、`theme-border` 等，与 2.1 一并处理。
 
 ### 7.3 表视图分页与「加载更多」【低】
 

@@ -9,7 +9,11 @@
   --bg-panel: #252526;
   --bg-content: #1e1e1e;
   --bg-hover: #37373d;
+  --bg-input: #3c3c3c;
+  --bg-input-hover: #4c4c4c;
+  --bg-footer: #2d2d30;
   --border: #333;
+  --border-strong: #444;
   --text: #e5e5e5;
   --text-muted: #9ca3af;
 }
@@ -19,7 +23,11 @@
   --bg-panel: #ffffff;
   --bg-content: #fafafa;
   --bg-hover: #e5e5e5;
+  --bg-input: #f0f0f0;
+  --bg-input-hover: #e0e0e0;
+  --bg-footer: #f5f5f5;
   --border: #e0e0e0;
+  --border-strong: #d0d0d0;
   --text: #1a1a1a;
   --text-muted: #6b7280;
 }
@@ -46,9 +54,18 @@
   .theme-bg-panel { background-color: var(--bg-panel); }
   .theme-bg-content { background-color: var(--bg-content); }
   .theme-bg-hover:hover { background-color: var(--bg-hover); }
+  .theme-bg-input { background-color: var(--bg-input); }
+  .theme-bg-input-hover:hover { background-color: var(--bg-input-hover); }
+  .theme-bg-footer { background-color: var(--bg-footer); }
   .theme-border { border-color: var(--border); }
+  .theme-border-strong { border-color: var(--border-strong); }
   .theme-text { color: var(--text); }
   .theme-text-muted { color: var(--text-muted); }
+  .theme-text-muted-hover { color: var(--text-muted); }
+  .theme-text-muted-hover:hover { color: var(--text); }
+  .theme-input { background-color: var(--bg-input); border-color: var(--border-strong); color: var(--text); }
+  .theme-input:focus { border-color: #1677ff; outline: none; }
+  .theme-input::placeholder { color: var(--text-muted); }
 
   .custom-scrollbar::-webkit-scrollbar {
     width: 6px;

@@ -314,6 +314,24 @@ const handleCreateTable = async (sql: string) => {
 const activeTab = computed(() => {
   return tabs.value.find(t => t.id === activeTabId.value)
 })
+
+// 4.1–4.3: StatusBar and QueryConsole use current tab's connection and query result
+const connectionForActiveTab = computed(() => {
+  const tab = activeTab.value
+  if (tab?.connectionId) {
+    const c = connections.value.find((x) => x.id === tab.connectionId)
+    if (c) return c
+  }
+  return currentConnection.value
+})
+
+const queryResultForStatusBar = computed(() => {
+  const tab = activeTab.value
+  if (tab?.type === 'query') return tab.queryResult
+  return undefined
+})
+
+const showEditorPosition = computed(() => activeTab.value?.type === 'query')
 </script>
 
 <template>
@@ -354,7 +372,7 @@ const activeTab = computed(() => {
             :key="activeTab.id"
             :tab-id="activeTab.id"
             :connection-id="activeTab.connectionId"
-            :connection="currentConnection"
+            :connection="connectionForActiveTab"
             :initial-sql="activeTab.initialSql"
             :restore-sql="activeTab.sql"
             :saved-query-result="activeTab.queryResult"
@@ -376,19 +394,19 @@ const activeTab = computed(() => {
             @update="(updates) => console.log('Table updates:', updates)"
             @clear-import-trigger="clearTableImportTrigger"
           />
-          <div v-else class="h-full flex flex-col items-center justify-center text-gray-500">
+          <div v-else class="h-full flex flex-col items-center justify-center theme-text-muted">
             <p class="mb-4">{{ $t('tabs.noTabs') }}</p>
-            <p class="text-xs text-gray-600">{{ $t('tabs.selectTable') }}</p>
+            <p class="text-xs opacity-80">{{ $t('tabs.selectTable') }}</p>
           </div>
         </div>
       </div>
     </div>
 
     <StatusBar
-      :current-connection="currentConnection"
-      :query-result="queryResult"
-      :editor-line="editorLine"
-      :editor-column="editorColumn"
+      :current-connection="connectionForActiveTab"
+      :query-result="queryResultForStatusBar"
+      :editor-line="showEditorPosition ? editorLine : undefined"
+      :editor-column="showEditorPosition ? editorColumn : undefined"
     />
 
     <ConnectionManager
@@ -434,7 +452,7 @@ const activeTab = computed(() => {
             <div class="flex justify-end gap-2">
               <button
                 type="button"
-                class="text-xs px-3 py-1.5 rounded border theme-border theme-text hover:bg-[#37373d] transition-colors"
+                class="text-xs px-3 py-1.5 rounded border theme-border theme-text theme-bg-hover transition-colors"
                 @click="cancelDeleteConnection"
               >
                 {{ t('connection.no') }}

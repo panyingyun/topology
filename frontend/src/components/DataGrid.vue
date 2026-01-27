@@ -153,9 +153,9 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="flex flex-col h-full bg-[#1e1e1e]">
-    <div class="h-10 flex items-center justify-between px-4 bg-[#252526] border-b border-[#333]">
-      <div class="flex items-center gap-4 text-xs text-gray-400">
+  <div class="flex flex-col h-full theme-bg-content">
+    <div class="h-10 flex items-center justify-between px-4 theme-bg-panel border-b theme-border">
+      <div class="flex items-center gap-4 text-xs theme-text-muted">
         <span>{{ t('dataGrid.rows') }}: {{ data.rowCount.toLocaleString() }}</span>
         <span v-if="pendingChanges > 0" class="text-yellow-400">
           {{ pendingChanges }} {{ t('dataGrid.pendingChanges') }}
@@ -172,14 +172,14 @@ onUnmounted(() => {
         <button
           v-if="pendingChanges > 0"
           @click="rollbackChanges"
-          class="px-3 py-1 bg-[#3c3c3c] hover:bg-[#4c4c4c] text-gray-300 text-xs rounded transition-colors"
+          class="px-3 py-1 theme-bg-input theme-bg-input-hover theme-text text-xs rounded transition-colors"
         >
           {{ t('dataGrid.rollback') }}
         </button>
         <div class="relative" ref="exportMenuRef">
           <button
             @click.stop="showExportMenu = !showExportMenu"
-            class="flex items-center gap-1 px-3 py-1 bg-[#3c3c3c] hover:bg-[#4c4c4c] text-gray-300 text-xs rounded transition-colors"
+            class="flex items-center gap-1 px-3 py-1 theme-bg-input theme-bg-input-hover theme-text text-xs rounded transition-colors"
           >
             <Download :size="12" />
             {{ t('dataGrid.export') }}
@@ -188,14 +188,14 @@ onUnmounted(() => {
           <Transition name="fade">
             <div
               v-if="showExportMenu"
-              class="absolute right-0 top-full mt-1 bg-[#252526] border border-[#333] rounded shadow-lg py-1 min-w-[140px] z-50"
+              class="absolute right-0 top-full mt-1 theme-bg-panel border theme-border rounded shadow-lg py-1 min-w-[140px] z-50"
               @click.stop
             >
               <button
                 v-for="format in exportFormats"
                 :key="format.value"
                 @click="handleExport(format.value)"
-                class="w-full px-4 py-2 text-left text-xs text-gray-300 hover:bg-[#37373d] transition-colors"
+                class="w-full px-4 py-2 text-left text-xs theme-text theme-bg-hover transition-colors"
               >
                 {{ format.label }}
               </button>
@@ -231,30 +231,29 @@ onUnmounted(() => {
 </style>
 
 <style>
-/* vxe-table 样式覆盖 */
+/* vxe-table theme-aware overrides */
 .vxe-table {
-  background-color: #1e1e1e;
-  color: #d4d4d4;
+  background-color: var(--bg-content);
+  color: var(--text);
 }
 
 .vxe-header--column {
-  background-color: #252526;
-  color: #cccccc;
+  background-color: var(--bg-panel);
+  color: var(--text);
 }
 
 .vxe-body--row {
-  background-color: #1e1e1e;
+  background-color: var(--bg-content);
 }
 
 .vxe-body--row.row--hover {
-  background-color: #2a2d2e;
+  background-color: var(--bg-hover);
 }
 
 .vxe-body--column {
-  border-color: #333;
+  border-color: var(--border);
 }
 
-/* 编辑后的单元格黄色背景 */
 .vxe-body--column.col--update,
 .vxe-body--column.col--edit {
   background-color: #5c4a00 !important;
@@ -265,7 +264,6 @@ onUnmounted(() => {
   background-color: #6d5500 !important;
 }
 
-/* vxe-table 修改后的行标记 */
 .vxe-body--row.row--update {
   background-color: #2a2a1e !important;
 }
@@ -274,20 +272,15 @@ onUnmounted(() => {
   background-color: #3a3a2e !important;
 }
 
-/* 筛选器样式 */
-.vxe-filter--wrapper {
-  background-color: #252526;
-  border-color: #333;
-}
-
+.vxe-filter--wrapper,
 .vxe-filter--panel {
-  background-color: #252526;
-  border-color: #333;
+  background-color: var(--bg-panel);
+  border-color: var(--border);
 }
 
 .vxe-filter--panel .vxe-input {
-  background-color: #3c3c3c;
-  border-color: #444;
-  color: #d4d4d4;
+  background-color: var(--bg-input);
+  border-color: var(--border-strong);
+  color: var(--text);
 }
 </style>

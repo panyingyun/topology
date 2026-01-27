@@ -43,7 +43,7 @@ onUnmounted(() => {
   <div class="relative" ref="menuRef">
     <button
       @click.stop="showMenu = !showMenu"
-      class="flex items-center gap-1.5 px-2 py-1 rounded text-xs bg-[#3c3c3c] hover:bg-[#4c4c4c] text-gray-300 transition-colors"
+      class="flex items-center gap-1.5 px-2 py-1 rounded text-xs theme-bg-input theme-bg-input-hover theme-text transition-colors"
       :title="currentLanguage.label"
     >
       <Globe :size="12" />
@@ -53,7 +53,7 @@ onUnmounted(() => {
     <Transition name="fade">
       <div
         v-if="showMenu"
-        class="absolute right-0 top-full mt-1 bg-[#252526] border border-[#333] rounded shadow-lg py-1 min-w-[140px] z-50"
+        class="absolute right-0 top-full mt-1 theme-bg-panel border theme-border rounded shadow-lg py-1 min-w-[140px] z-50"
         @click.stop
       >
         <button
@@ -64,7 +64,7 @@ onUnmounted(() => {
             'w-full px-4 py-2 text-left text-xs transition-colors flex items-center gap-2',
             locale === lang.code
               ? 'bg-[#1677ff]/20 text-[#1677ff]'
-              : 'text-gray-300 hover:bg-[#37373d]'
+              : 'theme-text theme-bg-hover'
           ]"
         >
           <span>{{ lang.flag }}</span>

@@ -35,6 +35,8 @@ export default {
     port: '端口',
     username: '用户名',
     password: '密码',
+    showPassword: '显示密码',
+    hidePassword: '隐藏密码',
     database: '数据库',
     useSSL: '使用 SSL/TLS',
     testConnection: '测试连接',

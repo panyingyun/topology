@@ -153,11 +153,11 @@ watch(
 </script>
 
 <template>
-  <div class="flex flex-col h-full bg-[#1e1e1e] overflow-hidden">
+  <div class="flex flex-col h-full theme-bg-content overflow-hidden">
     <!-- Header with table info and pagination -->
-    <div class="h-12 flex items-center justify-between px-4 bg-[#252526] border-b border-[#333]">
-      <div class="flex items-center gap-4 text-xs text-gray-400">
-        <span class="font-semibold text-gray-300">{{ tableName }}</span>
+    <div class="h-12 flex items-center justify-between px-4 theme-bg-panel border-b theme-border">
+      <div class="flex items-center gap-4 text-xs theme-text-muted">
+        <span class="font-semibold theme-text">{{ tableName }}</span>
         <span>{{ t('table.totalRows') }}: {{ tableData.totalRows.toLocaleString() }}</span>
         <span>{{ t('table.page') }}: {{ currentPage }} / {{ Math.ceil(tableData.totalRows / pageSize) || 1 }}</span>
       </div>
@@ -173,21 +173,21 @@ watch(
         <button
           v-if="currentPage * pageSize < tableData.totalRows"
           @click="handleLoadMore"
-          class="px-3 py-1 bg-[#3c3c3c] hover:bg-[#4c4c4c] text-gray-300 text-xs rounded transition-colors"
+          class="px-3 py-1 theme-bg-input theme-bg-input-hover theme-text text-xs rounded transition-colors"
         >
           {{ t('table.loadMore') }}
         </button>
         <button
           v-if="currentPage > 1"
           @click="handlePageChange(currentPage - 1)"
-          class="px-3 py-1 bg-[#3c3c3c] hover:bg-[#4c4c4c] text-gray-300 text-xs rounded transition-colors"
+          class="px-3 py-1 theme-bg-input theme-bg-input-hover theme-text text-xs rounded transition-colors"
         >
           {{ t('table.previous') }}
         </button>
         <button
           v-if="currentPage * pageSize < tableData.totalRows"
           @click="handlePageChange(currentPage + 1)"
-          class="px-3 py-1 bg-[#3c3c3c] hover:bg-[#4c4c4c] text-gray-300 text-xs rounded transition-colors"
+          class="px-3 py-1 theme-bg-input theme-bg-input-hover theme-text text-xs rounded transition-colors"
         >
           {{ t('table.next') }}
         </button>
@@ -202,13 +202,13 @@ watch(
         @update="handleUpdate"
         @export="handleExport"
       />
-      <div v-else-if="isLoading" class="h-full flex items-center justify-center text-gray-500">
+      <div v-else-if="isLoading" class="h-full flex items-center justify-center theme-text-muted">
         <div class="text-center">
           <div class="w-8 h-8 border-2 border-[#1677ff] border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
           <p class="text-xs">{{ t('table.loading') }}</p>
         </div>
       </div>
-      <div v-else class="h-full flex items-center justify-center text-gray-500">
+      <div v-else class="h-full flex items-center justify-center theme-text-muted">
         <p class="text-sm">{{ t('table.noDataInTable') }}</p>
       </div>
     </div>

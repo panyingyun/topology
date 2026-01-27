@@ -37,7 +37,7 @@ const analyze = async () => {
 }
 
 const complexityColor = computed(() => {
-  if (!analysis.value) return 'text-gray-400'
+  if (!analysis.value) return 'theme-text-muted'
   const complexity = analysis.value.performance?.estimatedComplexity
   if (complexity === 'low') return 'text-green-400'
   if (complexity === 'medium') return 'text-yellow-400'
@@ -58,16 +58,16 @@ watch(() => props.show, (newVal) => {
       class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
       @click.self="emit('close')"
     >
-      <div class="bg-[#252526] rounded-lg border border-[#333] w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div class="theme-bg-panel rounded-lg border theme-border w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
         <!-- Header -->
-        <div class="px-6 py-4 border-b border-[#333] flex items-center justify-between">
-          <h2 class="text-lg font-semibold text-gray-200 flex items-center gap-2">
+        <div class="px-6 py-4 border-b theme-border flex items-center justify-between">
+          <h2 class="text-lg font-semibold theme-text flex items-center gap-2">
             <Sparkles :size="20" class="text-[#1677ff]" />
             {{ t('analyzer.title') }}
           </h2>
           <button
             @click="emit('close')"
-            class="text-gray-400 hover:text-gray-200 transition-colors"
+            class="theme-text-muted-hover transition-colors"
           >
             <X :size="20" />
           </button>
@@ -78,34 +78,34 @@ watch(() => props.show, (newVal) => {
           <div v-if="isLoading" class="flex items-center justify-center h-64">
             <div class="text-center">
               <div class="w-8 h-8 border-2 border-[#1677ff] border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-              <p class="text-sm text-gray-400">{{ t('analyzer.analyzing') }}</p>
+              <p class="text-sm theme-text-muted">{{ t('analyzer.analyzing') }}</p>
             </div>
           </div>
 
           <div v-else-if="analysis" class="space-y-4">
             <!-- Query Type -->
-            <div class="p-4 bg-[#1e1e1e] rounded border border-[#333]">
+            <div class="p-4 theme-bg-content rounded border theme-border">
               <div class="flex items-center gap-2 mb-2">
                 <TrendingUp :size="16" class="text-[#1677ff]" />
-                <span class="text-sm font-semibold text-gray-300">{{ t('analyzer.queryType') }}</span>
+                <span class="text-sm font-semibold theme-text">{{ t('analyzer.queryType') }}</span>
               </div>
-              <span class="text-xs text-gray-400 uppercase">{{ analysis.queryType }}</span>
+              <span class="text-xs theme-text-muted uppercase">{{ analysis.queryType }}</span>
             </div>
 
             <!-- Performance -->
-            <div class="p-4 bg-[#1e1e1e] rounded border border-[#333]">
+            <div class="p-4 theme-bg-content rounded border theme-border">
               <div class="flex items-center gap-2 mb-3">
                 <TrendingUp :size="16" class="text-[#1677ff]" />
-                <span class="text-sm font-semibold text-gray-300">{{ t('analyzer.performance') }}</span>
+                <span class="text-sm font-semibold theme-text">{{ t('analyzer.performance') }}</span>
               </div>
               <div class="space-y-2">
                 <div class="flex items-center justify-between">
-                  <span class="text-xs text-gray-400">{{ t('analyzer.complexity') }}</span>
+                  <span class="text-xs theme-text-muted">{{ t('analyzer.complexity') }}</span>
                   <span :class="['text-xs font-semibold uppercase', complexityColor]">
                     {{ analysis.performance?.estimatedComplexity || 'unknown' }}
                   </span>
                 </div>
-                <div v-if="analysis.performance?.indexUsage" class="text-xs text-gray-400">
+                <div v-if="analysis.performance?.indexUsage" class="text-xs theme-text-muted">
                   {{ analysis.performance.indexUsage }}
                 </div>
               </div>
@@ -154,7 +154,7 @@ watch(() => props.show, (newVal) => {
         </div>
 
         <!-- Footer -->
-        <div class="px-6 py-4 border-t border-[#333] flex items-center justify-end bg-[#2d2d30]">
+        <div class="px-6 py-4 border-t theme-border flex items-center justify-end theme-bg-footer">
           <button
             @click="emit('close')"
             class="px-6 py-2 rounded text-xs font-semibold bg-[#1677ff] hover:bg-[#4096ff] text-white transition-colors"

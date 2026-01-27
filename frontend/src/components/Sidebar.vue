@@ -66,18 +66,18 @@ const startResize = (e: MouseEvent) => {
       </button>
       <button
         @click="emit('import-navicat')"
-        class="w-full border theme-border text-xs py-2 rounded-md font-medium transition-all active:scale-[0.98] flex items-center justify-center gap-2 theme-text hover:bg-[#37373d]"
+        class="w-full border theme-border text-xs py-2 rounded-md font-medium transition-all active:scale-[0.98] flex items-center justify-center gap-2 theme-text theme-bg-hover"
       >
         <FileDown :size="14" />
         {{ t('sidebar.importNavicat') }}
       </button>
       <div class="relative">
-        <Search :size="14" class="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
+        <Search :size="14" class="absolute left-2 top-1/2 -translate-y-1/2 theme-text-muted" />
         <input
           v-model="searchQuery"
           type="text"
           :placeholder="t('sidebar.filter')"
-          class="w-full bg-[#3c3c3c] text-xs pl-8 pr-3 py-1.5 rounded border border-transparent focus:border-[#1677ff] outline-none transition-all text-gray-200"
+          class="w-full theme-input text-xs pl-8 pr-3 py-1.5 rounded border transition-all"
         />
       </div>
     </div>

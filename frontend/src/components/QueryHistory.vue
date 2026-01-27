@@ -96,40 +96,40 @@ onMounted(() => {
   <Transition name="slide">
     <div
       v-if="show"
-      class="fixed right-0 top-0 bottom-0 w-96 bg-[#252526] border-l border-[#333] z-50 flex flex-col shadow-2xl"
+      class="fixed right-0 top-0 bottom-0 w-96 theme-bg-panel border-l theme-border z-50 flex flex-col shadow-2xl"
     >
       <!-- Header -->
-      <div class="h-12 flex items-center justify-between px-4 border-b border-[#333] bg-[#2d2d30]">
+      <div class="h-12 flex items-center justify-between px-4 border-b theme-border theme-bg-footer">
         <div class="flex items-center gap-2">
           <History :size="16" class="text-[#1677ff]" />
-          <span class="text-sm font-semibold text-gray-200">{{ t('history.title') }}</span>
+          <span class="text-sm font-semibold theme-text">{{ t('history.title') }}</span>
         </div>
         <div class="flex items-center gap-2">
           <button
             @click="handleClear"
-            class="p-1.5 hover:bg-[#37373d] rounded transition-colors"
+            class="p-1.5 theme-bg-hover rounded transition-colors"
             :title="t('history.clear')"
           >
-            <Trash2 :size="14" class="text-gray-400" />
+            <Trash2 :size="14" class="theme-text-muted" />
           </button>
           <button
             @click="emit('close')"
-            class="p-1.5 hover:bg-[#37373d] rounded transition-colors"
+            class="p-1.5 theme-bg-hover rounded transition-colors"
           >
-            <X :size="16" class="text-gray-400" />
+            <X :size="16" class="theme-text-muted" />
           </button>
         </div>
       </div>
 
       <!-- Search -->
-      <div class="p-3 border-b border-[#333]">
+      <div class="p-3 border-b theme-border">
         <div class="relative">
-          <Search :size="14" class="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
+          <Search :size="14" class="absolute left-2 top-1/2 -translate-y-1/2 theme-text-muted" />
           <input
             v-model="searchTerm"
             type="text"
             :placeholder="t('history.search')"
-            class="w-full bg-[#3c3c3c] text-xs pl-8 pr-3 py-2 rounded border border-transparent focus:border-[#1677ff] outline-none transition-all text-gray-200"
+            class="w-full theme-input text-xs pl-8 pr-3 py-2 rounded border transition-all"
           />
         </div>
       </div>
@@ -139,16 +139,16 @@ onMounted(() => {
         <div v-if="isLoading" class="flex items-center justify-center h-32">
           <div class="w-6 h-6 border-2 border-[#1677ff] border-t-transparent rounded-full animate-spin"></div>
         </div>
-        <div v-else-if="filteredHistory.length === 0" class="flex flex-col items-center justify-center h-32 text-gray-500">
+        <div v-else-if="filteredHistory.length === 0" class="flex flex-col items-center justify-center h-32 theme-text-muted">
           <History :size="32" class="mb-2 opacity-50" />
           <p class="text-xs">{{ t('history.noHistory') }}</p>
         </div>
-        <div v-else class="divide-y divide-[#333]">
+        <div v-else class="divide-y divide-[var(--border)]">
           <button
             v-for="item in filteredHistory"
             :key="item.id"
             @click="handleSelect(item)"
-            class="w-full text-left px-4 py-3 hover:bg-[#2d2d30] transition-colors group"
+            class="w-full text-left px-4 py-3 theme-bg-hover transition-colors group"
           >
             <div class="flex items-start gap-2 mb-1">
               <component
@@ -158,18 +158,18 @@ onMounted(() => {
               />
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 mb-1">
-                  <span class="text-xs text-gray-400 flex items-center gap-1">
+                  <span class="text-xs theme-text-muted flex items-center gap-1">
                     <Clock :size="10" />
                     {{ formatTime(item.executedAt) }}
                   </span>
-                  <span v-if="item.duration" class="text-xs text-gray-500">
+                  <span v-if="item.duration" class="text-xs theme-text-muted opacity-80">
                     {{ item.duration }}ms
                   </span>
-                  <span v-if="item.rowCount !== undefined" class="text-xs text-gray-500">
+                  <span v-if="item.rowCount !== undefined" class="text-xs theme-text-muted opacity-80">
                     {{ item.rowCount }} 行
                   </span>
                 </div>
-                <p class="text-xs text-gray-300 font-mono line-clamp-2 group-hover:text-gray-200 transition-colors">
+                <p class="text-xs theme-text font-mono line-clamp-2 opacity-90 group-hover:opacity-100 transition-colors">
                   {{ item.sql }}
                 </p>
               </div>

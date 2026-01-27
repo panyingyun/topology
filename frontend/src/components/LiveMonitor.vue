@@ -92,7 +92,7 @@ const isSlow = (time: number) => time >= SLOW_THRESHOLD_SEC
             </h2>
             <button
               type="button"
-              class="p-1.5 rounded hover:bg-[#37373d] theme-text transition-colors"
+              class="p-1.5 rounded theme-bg-hover theme-text transition-colors"
               @click="emit('close')"
             >
               <X :size="18" />
