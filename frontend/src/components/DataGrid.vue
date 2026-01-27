@@ -8,10 +8,17 @@ import type { QueryResult, UpdateRecord, ExportFormat } from '../types'
 
 const { t } = useI18n()
 
-const props = defineProps<{
-  data: QueryResult
-  queryText?: string
-}>()
+const props = withDefaults(
+  defineProps<{
+    data: QueryResult
+    queryText?: string
+    /** When true, disable cell editing (e.g. for query results). Table DataViewer keeps editable. */
+    readonly?: boolean
+    /** When true, use light table theme + border-only selection (for query results). */
+    useLightTable?: boolean
+  }>(),
+  { readonly: false, useLightTable: false }
+)
 
 const emit = defineEmits<{
   (e: 'update', updates: UpdateRecord[]): void
@@ -27,7 +34,7 @@ const gridOptions = ref<VxeGridProps>({
   border: true,
   height: '100%',
   columnConfig: { resizable: true },
-  rowConfig: { isCurrent: true, isHover: true },
+  rowConfig: { isCurrent: true, isHover: false },
   scrollY: { enabled: true, gt: 20 },
   editConfig: { trigger: 'dblclick', mode: 'cell' },
   filterConfig: { remote: false },
@@ -35,25 +42,36 @@ const gridOptions = ref<VxeGridProps>({
   data: [],
 })
 
-watch(() => props.data, (newData) => {
-  if (newData && newData.columns) {
-    gridOptions.value.columns = newData.columns.map(col => ({
-      field: col,
-      title: col,
-      editRender: { name: 'input' },
-      width: 150,
-      filters: [
-        { label: '包含', value: 'contains' },
-        { label: '等于', value: 'equals' },
-        { label: '不为空', value: 'notEmpty' },
-        { label: '为空', value: 'isEmpty' },
-      ],
-      filterRender: { name: 'input' },
-    }))
-    gridOptions.value.data = newData.rows
+watch(
+  () => [props.data, props.readonly] as const,
+  (tuple) => {
+    const [data, ro] = tuple
+    if (!data?.columns) return
+    const isReadonly = !!ro
+    gridOptions.value.editConfig = isReadonly
+      ? { enabled: false }
+      : { trigger: 'dblclick', mode: 'cell' }
+    gridOptions.value.columns = data.columns.map((col: string) => {
+      const colDef: Record<string, unknown> = {
+        field: col,
+        title: col,
+        width: 150,
+        filters: [
+          { label: '包含', value: 'contains' },
+          { label: '等于', value: 'equals' },
+          { label: '不为空', value: 'notEmpty' },
+          { label: '为空', value: 'isEmpty' },
+        ],
+        filterRender: { name: 'input' },
+      }
+      if (!isReadonly) (colDef as any).editRender = { name: 'input' }
+      return colDef
+    })
+    gridOptions.value.data = data.rows
     pendingChanges.value = 0
-  }
-}, { immediate: true })
+  },
+  { immediate: true }
+)
 
 const handleEditClosed = () => {
   if (gridRef.value) {
@@ -129,11 +147,14 @@ const handleExport = (format: ExportFormat) => {
   showExportMenu.value = false
 }
 
-const exportFormats = computed(() => [
-  { label: t('dataGrid.csv'), value: 'csv' as ExportFormat },
-  { label: t('dataGrid.json'), value: 'json' as ExportFormat },
-  { label: t('dataGrid.sql'), value: 'sql' as ExportFormat },
-])
+const exportFormats = computed(() => {
+  const all: { label: string; value: ExportFormat }[] = [
+    { label: t('dataGrid.csv'), value: 'csv' },
+    { label: t('dataGrid.json'), value: 'json' },
+    { label: t('dataGrid.sql'), value: 'sql' },
+  ]
+  return props.readonly ? all.filter((f) => f.value !== 'sql' as ExportFormat) : all
+})
 
 // Close export menu when clicking outside
 const handleClickOutside = (e: MouseEvent) => {
@@ -157,20 +178,20 @@ onUnmounted(() => {
     <div class="h-10 flex items-center justify-between px-4 theme-bg-panel border-b theme-border">
       <div class="flex items-center gap-4 text-xs theme-text-muted">
         <span>{{ t('dataGrid.rows') }}: {{ data.rowCount.toLocaleString() }}</span>
-        <span v-if="pendingChanges > 0" class="text-yellow-400">
+        <span v-if="!props.readonly && pendingChanges > 0" class="text-yellow-400">
           {{ pendingChanges }} {{ t('dataGrid.pendingChanges') }}
         </span>
       </div>
       <div class="flex items-center gap-2">
         <button
-          v-if="pendingChanges > 0"
+          v-if="!props.readonly && pendingChanges > 0"
           @click="commitChanges"
           class="px-3 py-1 bg-green-600 hover:bg-green-500 text-white text-xs rounded transition-colors"
         >
           {{ t('dataGrid.commit') }}
         </button>
         <button
-          v-if="pendingChanges > 0"
+          v-if="!props.readonly && pendingChanges > 0"
           @click="rollbackChanges"
           class="px-3 py-1 theme-bg-input theme-bg-input-hover theme-text text-xs rounded transition-colors"
         >
@@ -204,7 +225,11 @@ onUnmounted(() => {
         </div>
       </div>
     </div>
-    <div class="flex-1 overflow-hidden" style="height: calc(100% - 40px);">
+    <div
+      class="flex-1 overflow-hidden"
+      :class="{ 'data-grid-light': props.useLightTable }"
+      style="height: calc(100% - 40px);"
+    >
       <VxeGrid
         ref="gridRef"
         v-bind="gridOptions"
@@ -231,56 +256,72 @@ onUnmounted(() => {
 </style>
 
 <style>
-/* vxe-table theme-aware overrides */
-.vxe-table {
-  background-color: var(--bg-content);
-  color: var(--text);
+/* 表格：浅色主题；仅常态与选中态，选中用左边框 */
+.data-grid-light {
+  --table-bg: #fafafa;
+  --table-header-bg: #f0f0f0;
+  --table-border: #e0e0e0;
+  --table-text: #1a1a1a;
+  --table-border-current: #1677ff;
 }
 
-.vxe-header--column {
-  background-color: var(--bg-panel);
-  color: var(--text);
+.data-grid-light .vxe-table {
+  background-color: var(--table-bg);
+  color: var(--table-text);
 }
 
-.vxe-body--row {
-  background-color: var(--bg-content);
+.data-grid-light .vxe-header--column {
+  background-color: var(--table-header-bg);
+  color: var(--table-text);
+  border-color: var(--table-border);
 }
 
-.vxe-body--row.row--hover {
-  background-color: var(--bg-hover);
+.data-grid-light .vxe-body--row {
+  background-color: var(--table-bg);
 }
 
-.vxe-body--column {
-  border-color: var(--border);
+.data-grid-light .vxe-body--row.row--current {
+  background-color: var(--table-bg) !important;
+  box-shadow: inset 3px 0 0 var(--table-border-current);
+}
+.data-grid-light .vxe-body--row.row--current > .vxe-body--column {
+  background-color: transparent !important;
 }
 
-.vxe-body--column.col--update,
-.vxe-body--column.col--edit {
-  background-color: #5c4a00 !important;
+.data-grid-light .vxe-body--column {
+  background-color: var(--table-bg);
+  border-color: var(--table-border);
+  color: var(--table-text);
 }
 
-.vxe-body--column.col--update:hover,
-.vxe-body--column.col--edit:hover {
-  background-color: #6d5500 !important;
+.data-grid-light .vxe-body--column.col--update,
+.data-grid-light .vxe-body--column.col--edit {
+  background-color: #fef9e7 !important;
+  border: 1px solid #e6a23c;
 }
 
-.vxe-body--row.row--update {
-  background-color: #2a2a1e !important;
+.data-grid-light .vxe-body--column.col--update:hover,
+.data-grid-light .vxe-body--column.col--edit:hover {
+  background-color: #fdf6dc !important;
 }
 
-.vxe-body--row.row--update:hover {
-  background-color: #3a3a2e !important;
+.data-grid-light .vxe-body--row.row--update {
+  background-color: #fef9e7 !important;
 }
 
-.vxe-filter--wrapper,
-.vxe-filter--panel {
-  background-color: var(--bg-panel);
-  border-color: var(--border);
+.data-grid-light .vxe-body--row.row--update:hover {
+  background-color: #fdf6dc !important;
 }
 
-.vxe-filter--panel .vxe-input {
-  background-color: var(--bg-input);
-  border-color: var(--border-strong);
-  color: var(--text);
+.data-grid-light .vxe-filter--wrapper,
+.data-grid-light .vxe-filter--panel {
+  background-color: var(--table-header-bg);
+  border-color: var(--table-border);
+}
+
+.data-grid-light .vxe-filter--panel .vxe-input {
+  background-color: #fff;
+  border-color: var(--table-border);
+  color: var(--table-text);
 }
 </style>

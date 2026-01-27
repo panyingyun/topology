@@ -47,6 +47,7 @@ export default {
     yes: '是',
     no: '否',
     refresh: '刷新连接',
+    noSavedConnections: '暂无已保存连接',
     status: {
       connected: '已连接',
       disconnected: '未连接',
@@ -84,6 +85,7 @@ export default {
     stop: '停止',
     formatSQL: '格式化 SQL',
     save: '保存',
+    saveEmpty: 'SQL 为空',
     history: '历史',
     analyzeSQL: '分析 SQL',
     noResults: '暂无结果',
@@ -98,6 +100,7 @@ export default {
     title: '表数据',
     totalRows: '总行数',
     page: '页码',
+    rowsPerPage: '每页',
     loadMore: '加载更多',
     previous: '上一页',
     next: '下一页',

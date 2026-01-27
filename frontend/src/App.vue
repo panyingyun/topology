@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue'
+import { onMounted, onUnmounted, computed } from 'vue'
 import MainLayout from './views/MainLayout.vue'
 import { useTheme } from './composables/useTheme'
+import { darkTheme, lightTheme } from 'naive-ui'
 
-useTheme()
+const { theme } = useTheme()
+const naiveTheme = computed(() => (theme.value === 'dark' ? darkTheme : lightTheme))
 
 // 禁用默认右键菜单（Back/Forward/Reload/Inspect 等），点击任意处右键无响应
 function preventContextMenu(e: MouseEvent) {
@@ -20,5 +22,9 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <MainLayout />
+  <n-config-provider :theme="naiveTheme">
+    <n-message-provider>
+      <MainLayout />
+    </n-message-provider>
+  </n-config-provider>
 </template>

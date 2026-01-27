@@ -2,12 +2,14 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { Upload } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
+import { useMessage } from 'naive-ui'
 import DataGrid from '../components/DataGrid.vue'
 import DataImporter from '../components/DataImporter.vue'
 import { dataService } from '../services/dataService'
 import type { TableData, UpdateRecord, ExportFormat, QueryResult, ImportResult } from '../types'
 
 const { t } = useI18n()
+const message = useMessage()
 
 const props = defineProps<{
   /** Tab id for per-tab DB session isolation */
@@ -37,6 +39,8 @@ const tableData = ref<TableData>({
 const isLoading = ref(false)
 const currentPage = ref(1)
 const pageSize = ref(100)
+const pageSizeOptions = [50, 100, 200, 500]
+const totalPages = computed(() => Math.ceil(tableData.value.totalRows / pageSize.value) || 1)
 
 const LOAD_TIMEOUT_MS = 15000
 
@@ -88,6 +92,12 @@ const handleLoadMore = () => {
   }
 }
 
+const handlePageSizeChange = (size: number) => {
+  pageSize.value = size
+  currentPage.value = 1
+  loadTableData(1)
+}
+
 const handleUpdate = (updates: UpdateRecord[]) => {
   emit('update', updates)
 }
@@ -102,13 +112,13 @@ const handleExport = async (format: ExportFormat) => {
       props.tabId ?? ''
     )
     if (result.success) {
-      console.log('Export successful:', result.filename)
-      // Note: In production, show a notification to user
+      message.success(t('common.success') + ': ' + (result.filename ?? 'Export completed'))
     } else {
-      console.error('Export failed:', result.error)
+      message.error(t('common.error') + ': ' + (result.error ?? 'Export failed'))
     }
   } catch (error) {
     console.error('Export error:', error)
+    message.error(t('common.error') + ': ' + (error instanceof Error ? error.message : 'Export failed'))
   }
 }
 
@@ -156,10 +166,20 @@ watch(
   <div class="flex flex-col h-full theme-bg-content overflow-hidden">
     <!-- Header with table info and pagination -->
     <div class="h-12 flex items-center justify-between px-4 theme-bg-panel border-b theme-border">
-      <div class="flex items-center gap-4 text-xs theme-text-muted">
+      <div class="flex items-center gap-4 text-xs theme-text-muted flex-wrap">
         <span class="font-semibold theme-text">{{ tableName }}</span>
         <span>{{ t('table.totalRows') }}: {{ tableData.totalRows.toLocaleString() }}</span>
-        <span>{{ t('table.page') }}: {{ currentPage }} / {{ Math.ceil(tableData.totalRows / pageSize) || 1 }}</span>
+        <span>{{ t('table.page') }}: {{ currentPage }} / {{ totalPages }}</span>
+        <span class="flex items-center gap-1">
+          {{ t('table.rowsPerPage') }}
+          <select
+            :value="pageSize"
+            @change="(e) => handlePageSizeChange(Number((e.target as HTMLSelectElement).value))"
+            class="theme-bg-input theme-text rounded px-1.5 py-0.5 text-xs border theme-border-strong"
+          >
+            <option v-for="n in pageSizeOptions" :key="n" :value="n">{{ n }}</option>
+          </select>
+        </span>
       </div>
 
       <div class="flex items-center gap-2">
@@ -203,10 +223,10 @@ watch(
         @export="handleExport"
       />
       <div v-else-if="isLoading" class="h-full flex items-center justify-center theme-text-muted">
-        <div class="text-center">
-          <div class="w-8 h-8 border-2 border-[#1677ff] border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-          <p class="text-xs">{{ t('table.loading') }}</p>
-        </div>
+        <n-spin :show="true" size="medium">
+          <div class="h-12 w-12" />
+          <template #description>{{ t('table.loading') }}</template>
+        </n-spin>
       </div>
       <div v-else class="h-full flex items-center justify-center theme-text-muted">
         <p class="text-sm">{{ t('table.noDataInTable') }}</p>

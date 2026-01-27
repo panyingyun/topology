@@ -36,7 +36,7 @@ const startResize = (e: MouseEvent) => {
   const startWidth = props.width
 
   const handleMouseMove = (e: MouseEvent) => {
-    const newWidth = Math.max(240, Math.min(400, startWidth + (e.clientX - startX)))
+    const newWidth = Math.max(240, Math.min(300, startWidth + (e.clientX - startX)))
     emit('update:width', newWidth)
   }
 

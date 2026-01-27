@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, watch, computed } from 'vue'
-import { Database, CheckCircle, XCircle, Loader, Lock, ChevronDown, ChevronRight, Eye, EyeOff } from 'lucide-vue-next'
+import { Database, CheckCircle, XCircle, Loader, Lock, ChevronDown, ChevronRight, Eye, EyeOff, Plus, Trash2 } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { connectionService } from '../services/connectionService'
 import type { Connection, DatabaseType } from '../types'
@@ -17,8 +17,11 @@ const emit = defineEmits<{
   (e: 'close'): void
   (e: 'connect', connection: Connection): void
   (e: 'update', connection: Connection): void
+  (e: 'deleted'): void
 }>()
 
+const savedConnections = ref<Connection[]>([])
+const selectedId = ref<string | null>(null)
 const activeDbType = ref<DatabaseType>('mysql')
 const testStatus = ref<'idle' | 'loading' | 'success' | 'error'>('idle')
 const errorMessage = ref('')
@@ -52,39 +55,57 @@ const showSshSection = ref(true)
 const passwordVisible = ref(false)
 const sshPasswordVisible = ref(false)
 
-const isEditMode = computed(() => props.mode === 'edit' && props.editConnection)
+const isEditMode = computed(() => !!selectedId.value)
 
-watch([() => props.show, () => props.editConnection], () => {
-  if (props.show) {
-    if (isEditMode.value && props.editConnection) {
-      const conn = props.editConnection
-      activeDbType.value = (conn.type as DatabaseType) || 'mysql'
-      form.name = conn.name || ''
-      form.host = conn.host || '127.0.0.1'
-      form.port = conn.port || (activeDbType.value === 'mysql' ? 3306 : 5432)
-      form.username = conn.username || 'root'
-      form.password = conn.password || ''
-      form.database = conn.database || ''
-      form.useSSL = conn.useSSL || false
-      const st = conn.sshTunnel
-      form.sshTunnel = {
-        enabled: st?.enabled ?? false,
-        host: st?.host ?? '',
-        port: st?.port ?? 22,
-        username: st?.username ?? '',
-        password: st?.password ?? '',
-        privateKey: st?.privateKey ?? '',
-      }
+function loadFormFrom(conn: Connection | null) {
+  if (!conn) {
+    activeDbType.value = 'mysql'
+    form.name = ''
+    form.host = '127.0.0.1'
+    form.port = 3306
+    form.username = 'root'
+    form.password = ''
+    form.database = ''
+    form.useSSL = false
+    form.sshTunnel = { enabled: false, host: '', port: 22, username: '', password: '', privateKey: '' }
+    return
+  }
+  activeDbType.value = (conn.type as DatabaseType) || 'mysql'
+  form.name = conn.name || ''
+  form.host = conn.host || '127.0.0.1'
+  form.port = conn.port || (activeDbType.value === 'mysql' ? 3306 : 5432)
+  form.username = conn.username || 'root'
+  form.password = conn.password || ''
+  form.database = conn.database || ''
+  form.useSSL = conn.useSSL || false
+  const st = conn.sshTunnel
+  form.sshTunnel = {
+    enabled: st?.enabled ?? false,
+    host: st?.host ?? '',
+    port: st?.port ?? 22,
+    username: st?.username ?? '',
+    password: st?.password ?? '',
+    privateKey: st?.privateKey ?? '',
+  }
+}
+
+async function loadConnections() {
+  try {
+    savedConnections.value = await connectionService.getConnections()
+  } catch (e) {
+    console.error('Failed to load connections:', e)
+  }
+}
+
+watch(() => props.show, async (visible) => {
+  if (visible) {
+    await loadConnections()
+    if (props.mode === 'edit' && props.editConnection) {
+      selectedId.value = props.editConnection.id
+      loadFormFrom(props.editConnection)
     } else {
-      activeDbType.value = 'mysql'
-      form.name = ''
-      form.host = '127.0.0.1'
-      form.port = 3306
-      form.username = 'root'
-      form.password = ''
-      form.database = ''
-      form.useSSL = false
-      form.sshTunnel = { enabled: false, host: '', port: 22, username: '', password: '', privateKey: '' }
+      selectedId.value = null
+      loadFormFrom(null)
     }
     testStatus.value = 'idle'
     errorMessage.value = ''
@@ -92,6 +113,34 @@ watch([() => props.show, () => props.editConnection], () => {
     sshPasswordVisible.value = false
   }
 })
+
+function selectNew() {
+  selectedId.value = null
+  loadFormFrom(null)
+  errorMessage.value = ''
+}
+
+function selectConnection(conn: Connection) {
+  selectedId.value = conn.id
+  loadFormFrom(conn)
+  errorMessage.value = ''
+}
+
+async function deleteConnection(e: MouseEvent, id: string) {
+  e.stopPropagation()
+  try {
+    await connectionService.deleteConnection(id)
+    await loadConnections()
+    if (selectedId.value === id) {
+      selectedId.value = null
+      loadFormFrom(null)
+    }
+    emit('deleted')
+  } catch (err) {
+    console.error('Delete connection failed:', err)
+    errorMessage.value = err instanceof Error ? err.message : 'Delete failed'
+  }
+}
 
 const handleTypeChange = (type: DatabaseType) => {
   activeDbType.value = type
@@ -159,11 +208,14 @@ const handleConnect = async () => {
 }
 
 const handleUpdate = async () => {
-  if (!isEditMode.value || !props.editConnection) return
+  const id = selectedId.value
+  if (!id) return
+  const existing = savedConnections.value.find((c) => c.id === id)
+  if (!existing) return
   try {
     const payload = buildConnectionPayload()
     const updated: Connection = {
-      ...props.editConnection,
+      ...existing,
       name: payload.name,
       type: payload.type,
       host: payload.host,
@@ -197,7 +249,7 @@ const dbTypes: Array<{ type: DatabaseType; label: string; icon: string; color: s
       class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
       @click.self="emit('close')"
     >
-      <div class="theme-bg-panel rounded-lg border theme-border w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div class="theme-bg-panel rounded-lg border theme-border w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
         <div class="px-6 py-4 border-b theme-border flex items-center justify-between">
           <h2 class="text-lg font-semibold theme-text">
             {{ isEditMode ? t('connection.editConnection') : t('connection.newConnection') }}
@@ -210,7 +262,50 @@ const dbTypes: Array<{ type: DatabaseType; label: string; icon: string; color: s
           </button>
         </div>
 
-        <div class="flex-1 overflow-y-auto custom-scrollbar p-6">
+        <div class="flex-1 flex overflow-hidden min-h-0">
+          <!-- Left: saved connections list -->
+          <div class="w-56 flex-shrink-0 border-r theme-border flex flex-col theme-bg-footer/50">
+            <div class="p-2 border-b theme-border">
+              <button
+                type="button"
+                @click="selectNew"
+                :class="[
+                  'w-full flex items-center justify-center gap-2 py-2 rounded text-xs font-semibold transition-colors',
+                  !selectedId ? 'bg-[#1677ff] text-white' : 'theme-bg-input theme-bg-input-hover theme-text'
+                ]"
+              >
+                <Plus :size="14" />
+                {{ t('connection.newConnection') }}
+              </button>
+            </div>
+            <div class="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
+              <div
+                v-for="c in savedConnections"
+                :key="c.id"
+                @click="selectConnection(c)"
+                :class="[
+                  'flex items-center gap-2 px-3 py-2 rounded text-left text-xs transition-colors cursor-pointer',
+                  selectedId === c.id ? 'theme-bg-input ring-1 ring-[#1677ff]/50' : 'theme-bg-hover theme-text'
+                ]"
+              >
+                <span class="flex-1 truncate theme-text">{{ c.name }}</span>
+                <button
+                  type="button"
+                  @click="deleteConnection($event, c.id)"
+                  class="theme-text-muted-hover p-0.5 rounded"
+                  :title="t('connection.delete')"
+                >
+                  <Trash2 :size="12" />
+                </button>
+              </div>
+              <p v-if="savedConnections.length === 0" class="px-3 py-4 text-xs theme-text-muted">
+                {{ t('connection.noSavedConnections') }}
+              </p>
+            </div>
+          </div>
+
+          <!-- Right: form -->
+          <div class="flex-1 overflow-y-auto custom-scrollbar p-6 min-w-0">
           <!-- Database Type Selection -->
           <div class="mb-6">
             <label class="block text-xs font-semibold theme-text-muted mb-3 uppercase tracking-wider">
@@ -402,6 +497,7 @@ const dbTypes: Array<{ type: DatabaseType; label: string; icon: string; color: s
               </div>
             </div>
           </div>
+        </div>
         </div>
 
         <div class="px-6 py-4 border-t theme-border flex items-center justify-between theme-bg-footer">

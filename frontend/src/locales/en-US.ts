@@ -47,6 +47,7 @@ export default {
     yes: 'Yes',
     no: 'No',
     refresh: 'Refresh Connection',
+    noSavedConnections: 'No saved connections',
     status: {
       connected: 'Connected',
       disconnected: 'Disconnected',
@@ -84,6 +85,7 @@ export default {
     stop: 'STOP',
     formatSQL: 'Format SQL',
     save: 'Save',
+    saveEmpty: 'SQL is empty',
     history: 'History',
     analyzeSQL: 'Analyze SQL',
     noResults: 'No results yet',
@@ -98,6 +100,7 @@ export default {
     title: 'Table Data',
     totalRows: 'Total rows',
     page: 'Page',
+    rowsPerPage: 'Per page',
     loadMore: 'Load More',
     previous: 'Previous',
     next: 'Next',

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useMessage } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 import TitleBar from '../components/TitleBar.vue'
 import Sidebar from '../components/Sidebar.vue'
@@ -17,6 +18,7 @@ import { dataService } from '../services/dataService'
 import type { TabItem, Connection, QueryResult } from '../types'
 
 const { t } = useI18n()
+const message = useMessage()
 
 const sidebarWidth = ref(260)
 const showConnectionManager = ref(false)
@@ -68,8 +70,10 @@ const handleConnectionUpdate = async (connection: Connection) => {
     await loadConnections()
     showConnectionManager.value = false
     editingConnection.value = null
+    message.success(t('common.success'))
   } catch (error) {
     console.error('Failed to update connection:', error)
+    message.error(t('common.error') + ': ' + (error instanceof Error ? error.message : 'Unknown'))
   }
 }
 
@@ -77,8 +81,10 @@ const handleRefreshConnection = async (connectionId: string) => {
   try {
     await connectionService.reconnectConnection(connectionId)
     await loadConnections()
+    message.success(t('common.success'))
   } catch (error) {
     console.error('Failed to refresh connection:', error)
+    message.error(t('common.error') + ': ' + (error instanceof Error ? error.message : 'Unknown'))
   }
 }
 
@@ -114,6 +120,7 @@ const confirmDeleteConnection = async () => {
     }
   } catch (error) {
     console.error('Failed to delete connection:', error)
+    message.error(t('common.error') + ': ' + (error instanceof Error ? error.message : 'Unknown'))
   } finally {
     cancelDeleteConnection()
   }
@@ -205,13 +212,13 @@ const handleTableExport = async (connectionId: string, database: string, tableNa
   try {
     const result = await dataService.exportData(connectionId, database, tableName, 'csv')
     if (result.success) {
-      alert(t('common.success') + ': ' + (result.filename ?? 'Export completed'))
+      message.success(t('common.success') + ': ' + (result.filename ?? 'Export completed'))
     } else {
-      alert(t('common.error') + ': ' + (result.error ?? 'Export failed'))
+      message.error(t('common.error') + ': ' + (result.error ?? 'Export failed'))
     }
   } catch (error) {
     console.error('Export error:', error)
-    alert(t('common.error') + ': ' + (error instanceof Error ? error.message : 'Unknown error'))
+    message.error(t('common.error') + ': ' + (error instanceof Error ? error.message : 'Unknown error'))
   }
 }
 
@@ -275,13 +282,13 @@ const handleImportNavicat = async () => {
       const msg = result.errors?.length
         ? t('navicatImport.result', { imported: result.imported, skipped: result.skipped }) + '\n' + result.errors.slice(0, 3).join('\n')
         : t('navicatImport.result', { imported: result.imported, skipped: result.skipped })
-      alert(msg)
+      message.success(msg)
     } else if (result.errors?.length) {
-      alert(t('navicatImport.error') + ': ' + result.errors[0])
+      message.error(t('navicatImport.error') + ': ' + result.errors[0])
     }
   } catch (error) {
     console.error('Import Navicat failed:', error)
-    alert(t('navicatImport.error') + ': ' + (error instanceof Error ? error.message : 'Unknown error'))
+    message.error(t('navicatImport.error') + ': ' + (error instanceof Error ? error.message : 'Unknown error'))
   }
 }
 
@@ -293,7 +300,7 @@ const handleNewTable = (connectionId: string, database: string) => {
 const handleCreateTable = async (sql: string) => {
   const connId = tableDesignerContext.value?.connectionId ?? currentConnection.value?.id
   if (!connId) {
-    alert(t('common.error') + ': ' + 'Please select a connection first')
+    message.error(t('common.error') + ': ' + 'Please select a connection first')
     return
   }
   const database = tableDesignerContext.value?.database
@@ -301,13 +308,13 @@ const handleCreateTable = async (sql: string) => {
   const sqlToRun = database && driver === 'mysql' ? `USE \`${database}\`;\n${sql}` : sql
   try {
     await queryService.executeQuery(connId, '', sqlToRun)
-    alert(t('common.success') + ': ' + 'Table created successfully!')
+    message.success(t('common.success') + ': ' + 'Table created successfully!')
     showTableDesigner.value = false
     tableDesignerContext.value = null
     await loadConnections()
   } catch (error) {
     console.error('Failed to create table:', error)
-    alert(t('common.error') + ': ' + (error instanceof Error ? error.message : 'Unknown error'))
+    message.error(t('common.error') + ': ' + (error instanceof Error ? error.message : 'Unknown error'))
   }
 }
 
@@ -335,10 +342,10 @@ const showEditorPosition = computed(() => activeTab.value?.type === 'query')
 </script>
 
 <template>
-  <div class="flex h-screen w-screen flex-col theme-bg-content theme-text overflow-hidden select-none font-sans">
+  <div class="flex h-screen w-screen min-w-[800px] flex-col theme-bg-content theme-text overflow-hidden select-none font-sans" role="application" aria-label="Topology">
     <TitleBar />
 
-    <div class="flex flex-1 overflow-hidden">
+    <div class="flex flex-1 overflow-hidden min-h-0">
       <Sidebar
         :width="sidebarWidth"
         :connections="connections"
@@ -356,7 +363,7 @@ const showEditorPosition = computed(() => activeTab.value?.type === 'query')
         @import-navicat="handleImportNavicat"
       />
 
-      <div class="flex-1 flex flex-col overflow-hidden">
+      <div class="flex-1 flex flex-col overflow-hidden min-w-0">
         <TabBar
           v-if="tabs.length > 0"
           :tabs="tabs"
@@ -416,6 +423,7 @@ const showEditorPosition = computed(() => activeTab.value?.type === 'query')
       @close="showConnectionManager = false; editingConnection = null"
       @connect="handleConnectionConnect"
       @update="handleConnectionUpdate"
+      @deleted="loadConnections"
     />
 
     <TableDesigner

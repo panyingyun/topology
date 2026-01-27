@@ -7,6 +7,7 @@ import { queryService } from '../services/queryService'
 import { snippetService } from '../services/snippetService'
 import { useSchemaMetadata } from '../composables/useSchemaMetadata'
 import { useTheme } from '../composables/useTheme'
+import { useMessage } from 'naive-ui'
 import DataGrid from '../components/DataGrid.vue'
 import QueryHistory from '../components/QueryHistory.vue'
 import Snippets from '../components/Snippets.vue'
@@ -17,6 +18,7 @@ import type { ExportFormat } from '../types'
 
 const { t } = useI18n()
 const { theme } = useTheme()
+const message = useMessage()
 
 const props = defineProps<{
   /** Tab id for per-tab DB session isolation */
@@ -315,15 +317,29 @@ const formatSQL = async () => {
     try {
       const formatted = await queryService.formatSQL(sqlQuery.value)
       editor.value.setValue(formatted)
+      message.success(t('common.success'))
     } catch (error) {
       console.error('Format error:', error)
+      message.error(t('common.error') + ': ' + (error instanceof Error ? error.message : 'Format failed'))
     }
   }
 }
 
 const saveScript = () => {
-  // In real implementation, save to file or local storage
-  console.log('Save script:', sqlQuery.value)
+  const sql = sqlQuery.value
+  if (!sql?.trim()) {
+    message.warning(t('query.saveEmpty') || 'SQL is empty')
+    return
+  }
+  try {
+    const ts = new Date().toISOString().slice(0, 19).replace(/[:-]/g, '')
+    const blob = new Blob([sql], { type: 'text/plain;charset=utf-8' })
+    downloadBlob(blob, `script-${ts}.sql`)
+    message.success(t('common.success') + ': ' + (t('query.save') || 'Saved'))
+  } catch (e) {
+    console.error('Save script failed:', e)
+    message.error(t('common.error') + ': ' + (e instanceof Error ? e.message : 'Save failed'))
+  }
 }
 
 const handleHistorySelect = (sql: string) => {
@@ -385,6 +401,7 @@ function downloadBlob(blob: Blob, filename: string) {
 const handleExportQueryResult = (format: ExportFormat) => {
   const data = queryResult.value
   if (!data || !data.columns.length || !data.rows.length) {
+    message.warning(t('query.noResults') || 'No results to export')
     return
   }
   const ts = new Date().toISOString().slice(0, 19).replace(/[:-]/g, '')
@@ -400,8 +417,10 @@ const handleExportQueryResult = (format: ExportFormat) => {
       downloadBlob(blob, `${base}.json`)
     }
     // sql: skip for query results; table export uses backend
+    message.success(t('common.success') + ': ' + (t('dataGrid.export') || 'Export completed'))
   } catch (e) {
     console.error('Export failed:', e)
+    message.error(t('common.error') + ': ' + (e instanceof Error ? e.message : 'Export failed'))
   }
 }
 </script>
@@ -425,6 +444,7 @@ const handleExportQueryResult = (format: ExportFormat) => {
         <button
           @click="runExecute"
           :disabled="isRunning"
+          :aria-label="isRunning ? t('query.running') : t('query.execute')"
           :class="[
             'flex items-center gap-2 px-4 py-1 rounded text-xs font-bold transition-all',
             isRunning
@@ -440,6 +460,7 @@ const handleExportQueryResult = (format: ExportFormat) => {
         <button
           v-if="isRunning"
           @click="stopQuery"
+          :aria-label="t('query.stop')"
           class="flex items-center gap-2 px-3 py-1 rounded text-xs font-bold bg-red-600 hover:bg-red-500 transition-all"
         >
           <Square :size="14" />
@@ -448,6 +469,7 @@ const handleExportQueryResult = (format: ExportFormat) => {
 
         <button
           @click="formatSQL"
+          :aria-label="t('query.formatSQL')"
           class="px-3 py-1 rounded text-xs theme-bg-input theme-bg-input-hover theme-text transition-colors"
         >
           <FileCode :size="14" class="inline mr-1" />
@@ -456,6 +478,7 @@ const handleExportQueryResult = (format: ExportFormat) => {
 
         <button
           @click="saveScript"
+          :aria-label="t('query.save')"
           class="px-3 py-1 rounded text-xs theme-bg-input theme-bg-input-hover theme-text transition-colors"
         >
           <Save :size="14" class="inline mr-1" />
@@ -464,6 +487,8 @@ const handleExportQueryResult = (format: ExportFormat) => {
 
         <button
           @click="showHistory = !showHistory"
+          :aria-label="t('query.history')"
+          :aria-pressed="showHistory"
           :class="[
             'px-3 py-1 rounded text-xs transition-colors',
             showHistory
@@ -477,6 +502,8 @@ const handleExportQueryResult = (format: ExportFormat) => {
 
         <button
           @click="showSnippets = !showSnippets"
+          :aria-label="t('snippets.title')"
+          :aria-pressed="showSnippets"
           :class="[
             'px-3 py-1 rounded text-xs transition-colors',
             showSnippets
@@ -531,6 +558,8 @@ const handleExportQueryResult = (format: ExportFormat) => {
           v-if="queryResult && queryResult.rows.length > 0"
           :data="queryResult"
           :query-text="sqlQuery"
+          :readonly="true"
+          :use-light-table="true"
           @update="(updates) => console.log('Updates:', updates)"
           @export="handleExportQueryResult"
         />
