@@ -1,5 +1,7 @@
 # Topology
 
+<img src="build/appicon.png" width="20%" height="20%">
+
 A cross-platform database management tool built with Wails framework, providing a Navicat-like experience.
 
 ![Status](https://img.shields.io/badge/status-in%20development-yellow)

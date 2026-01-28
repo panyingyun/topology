@@ -1,5 +1,7 @@
 # Topology
 
+<img src="build/appicon.png" width="20%" height="20%">
+
 一款基于 Wails 框架开发的跨平台数据库管理工具，提供类似 Navicat 的功能体验。
 
 ![Status](https://img.shields.io/badge/status-in%20development-yellow)
