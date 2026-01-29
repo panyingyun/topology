@@ -36,6 +36,8 @@ const showRestoreModal = ref(false)
 const restoreConnectionId = ref('')
 const showBackupManager = ref(false)
 const connections = ref<Connection[]>([])
+/** When set, ConnectionTree clears cache for this connection and refetches if expanded. */
+const connectionInvalidation = ref<{ id: string; at: number } | null>(null)
 const tabs = ref<TabItem[]>([])
 const activeTabId = ref('')
 const currentConnection = ref<Connection | undefined>()
@@ -74,6 +76,7 @@ const handleConnectionUpdate = async (connection: Connection) => {
   try {
     await connectionService.updateConnection(connection)
     await loadConnections()
+    connectionInvalidation.value = { id: connection.id, at: Date.now() }
     showConnectionManager.value = false
     editingConnection.value = null
     message.success(t('common.success'))
@@ -87,6 +90,7 @@ const handleRefreshConnection = async (connectionId: string) => {
   try {
     await connectionService.reconnectConnection(connectionId)
     await loadConnections()
+    connectionInvalidation.value = { id: connectionId, at: Date.now() }
     message.success(t('common.success'))
   } catch (error) {
     console.error('Failed to refresh connection:', error)
@@ -373,6 +377,7 @@ const showEditorPosition = computed(() => activeTab.value?.type === 'query')
       <Sidebar
         :width="sidebarWidth"
         :connections="connections"
+        :connection-invalidation="connectionInvalidation"
         @update:width="sidebarWidth = $event"
         @new-connection="handleNewConnection"
         @table-selected="handleTableSelected"

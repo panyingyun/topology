@@ -10,6 +10,7 @@ const { t } = useI18n()
 const props = defineProps<{
   searchQuery: string
   connections: Connection[]
+  connectionInvalidation?: { id: string; at: number } | null
 }>()
 
 const emit = defineEmits<{
@@ -68,6 +69,21 @@ watch(() => props.connections, (newConns) => {
     if (!connIds.has(connId)) delete tablesCache.value[key]
   })
 }, { immediate: true })
+
+watch(
+  () => props.connectionInvalidation?.at,
+  (at) => {
+    const inv = props.connectionInvalidation
+    if (!inv || at == null) return
+    const id = inv.id
+    delete databasesCache.value[id]
+    Object.keys(tablesCache.value).forEach((key) => {
+      if (key.startsWith(id + ':')) delete tablesCache.value[key]
+    })
+    expandedConnections.value = new Set([...expandedConnections.value, id])
+    loadDatabases(id)
+  }
+)
 
 const loadDatabases = async (connectionId: string) => {
   if (databasesCache.value[connectionId]) return

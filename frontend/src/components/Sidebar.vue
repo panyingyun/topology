@@ -10,6 +10,7 @@ const { t } = useI18n()
 const props = defineProps<{
   width: number
   connections: Connection[]
+  connectionInvalidation?: { id: string; at: number } | null
 }>()
 
 const emit = defineEmits<{
@@ -95,6 +96,7 @@ const startResize = (e: MouseEvent) => {
       <ConnectionTree
         :search-query="searchQuery"
         :connections="connections"
+        :connection-invalidation="connectionInvalidation"
         @table-selected="(connId, db, tableName) => emit('table-selected', connId, db, tableName)"
         @table-query="(connId, db, tableName) => emit('table-query', connId, db, tableName)"
         @edit-connection="(conn) => emit('edit-connection', conn)"
