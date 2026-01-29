@@ -21,7 +21,9 @@ import (
 
 	"gorm.io/gorm"
 
+	"topology/internal/backup"
 	"topology/internal/db"
+	"topology/internal/logger"
 	"topology/internal/sshtunnel"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -41,6 +43,13 @@ func NewApp() *App {
 // so we can call the runtime methods
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	logDir := filepath.Join(getAppDir(), "logs")
+	if err := logger.Init(logDir); err != nil {
+		// non-fatal; app continues without file logging
+		_ = err
+	} else {
+		logger.Info("topology started; log dir %s", logDir)
+	}
 }
 
 // Connection types
@@ -260,14 +269,36 @@ var (
 	snippetsFilePath    string
 	monitorMu           sync.Mutex
 	monitorStop         = make(map[string]chan struct{}) // connectionID -> stop channel
+	backupMu            sync.Mutex
+	backupRecords       []BackupRecord
+	backupsFilePath     string
 )
 
 const (
 	connFileName     = "connections.json"
 	historyFileName  = "query_history.json"
 	snippetsFileName = "snippets.json"
+	backupsFileName  = "backups.json"
+	maxBackupRecords = 50
 	encKey           = "topology-connection-key-2026" // In production, use a proper key management system
 )
+
+// BackupRecord holds one backup entry for listing and restore.
+type BackupRecord struct {
+	ConnectionID string `json:"connectionId"`
+	Path         string `json:"path"`
+	At           string `json:"at"` // ISO8601
+}
+
+func getAppDir() string {
+	home, _ := os.UserConfigDir()
+	if home == "" {
+		home = "."
+	}
+	appDir := filepath.Join(home, "topology")
+	_ = os.MkdirAll(appDir, 0o755)
+	return appDir
+}
 
 func getConnectionsFilePath() string {
 	connFileOnce.Do(func() {
@@ -308,6 +339,45 @@ func getSnippetsFilePath() string {
 		snippetsFilePath = filepath.Join(appDir, snippetsFileName)
 	})
 	return snippetsFilePath
+}
+
+func getBackupsFilePath() string {
+	if backupsFilePath == "" {
+		backupsFilePath = filepath.Join(getAppDir(), backupsFileName)
+	}
+	return backupsFilePath
+}
+
+func loadBackupRecords() []BackupRecord {
+	data, err := os.ReadFile(getBackupsFilePath())
+	if err != nil {
+		return nil
+	}
+	var recs []BackupRecord
+	_ = json.Unmarshal(data, &recs)
+	return recs
+}
+
+func saveBackupRecords(recs []BackupRecord) error {
+	data, err := json.MarshalIndent(recs, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(getBackupsFilePath(), data, 0o644)
+}
+
+func appendBackupRecord(connID, path string) {
+	backupMu.Lock()
+	defer backupMu.Unlock()
+	if backupRecords == nil {
+		backupRecords = loadBackupRecords()
+	}
+	rec := BackupRecord{ConnectionID: connID, Path: path, At: time.Now().UTC().Format(time.RFC3339)}
+	backupRecords = append(backupRecords, rec)
+	if len(backupRecords) > maxBackupRecords {
+		backupRecords = backupRecords[len(backupRecords)-maxBackupRecords:]
+	}
+	_ = saveBackupRecords(backupRecords)
 }
 
 // loadConnectionsFromFile returns (connections, fileExisted). When fileExisted is true, use the result
@@ -1255,6 +1325,170 @@ func (a *App) GetSchemaMetadata(connectionID string) string {
 	}
 	data, _ := json.Marshal(meta)
 	return string(data)
+}
+
+// BackupResult is JSON returned by BackupNow.
+type BackupResult struct {
+	Success bool   `json:"success"`
+	Path    string `json:"path,omitempty"`
+	Error   string `json:"error,omitempty"`
+}
+
+// RestoreResult is JSON returned by RestoreBackup.
+type RestoreResult struct {
+	Success bool   `json:"success"`
+	Error   string `json:"error,omitempty"`
+}
+
+// BackupNow opens a save-file dialog, runs mysqldump/pg_dump/sqlite3 .dump, saves to the chosen path, and records the backup. Returns BackupResult JSON.
+// SSH tunnel is not supported for backup.
+func (a *App) BackupNow(connectionID string) string {
+	var out BackupResult
+	conn := getConnByID(connectionID)
+	if conn == nil {
+		out.Error = "connection not found"
+		data, _ := json.Marshal(out)
+		return string(data)
+	}
+	ty := conn.Type
+	if ty != "mysql" && ty != "postgresql" && ty != "postgres" && ty != "sqlite" {
+		out.Error = "backup only supported for MySQL, PostgreSQL, SQLite"
+		data, _ := json.Marshal(out)
+		return string(data)
+	}
+	ext := ".sql"
+	if ty == "sqlite" {
+		ext = ".sql"
+	}
+	defName := fmt.Sprintf("topology-backup-%s-%s%s", conn.Name, time.Now().Format("20060102-150405"), ext)
+	safeName := strings.Map(func(r rune) rune {
+		if r == ' ' || r == '/' || r == '\\' || r == ':' {
+			return '-'
+		}
+		return r
+	}, defName)
+
+	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title:            "保存备份文件",
+		DefaultFilename:  safeName,
+		DefaultDirectory: getAppDir(),
+		Filters: []runtime.FileFilter{
+			{DisplayName: "SQL (*.sql)", Pattern: "*.sql"},
+			{DisplayName: "All Files", Pattern: "*"},
+		},
+	})
+	if err != nil || path == "" {
+		if path == "" {
+			data, _ := json.Marshal(out)
+			return string(data)
+		}
+		out.Error = err.Error()
+		data, _ := json.Marshal(out)
+		return string(data)
+	}
+
+	pc := &backup.Conn{
+		Type:     ty,
+		Host:     conn.Host,
+		Port:     conn.Port,
+		Username: conn.Username,
+		Password: conn.Password,
+		Database: conn.Database,
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	if err := backup.RunBackup(ctx, pc, path); err != nil {
+		out.Error = userFacingError(err).Message
+		data, _ := json.Marshal(out)
+		return string(data)
+	}
+	appendBackupRecord(connectionID, path)
+	out.Success = true
+	out.Path = path
+	data, _ := json.Marshal(out)
+	return string(data)
+}
+
+// RestoreBackup restores from backupPath using mysql/psql/sqlite3. Call only after user confirmation. Returns RestoreResult JSON.
+func (a *App) RestoreBackup(connectionID, backupPath string) string {
+	var out RestoreResult
+	conn := getConnByID(connectionID)
+	if conn == nil {
+		out.Error = "connection not found"
+		data, _ := json.Marshal(out)
+		return string(data)
+	}
+	ty := conn.Type
+	if ty != "mysql" && ty != "postgresql" && ty != "postgres" && ty != "sqlite" {
+		out.Error = "restore only supported for MySQL, PostgreSQL, SQLite"
+		data, _ := json.Marshal(out)
+		return string(data)
+	}
+	if _, err := os.Stat(backupPath); err != nil {
+		out.Error = "backup file not found"
+		data, _ := json.Marshal(out)
+		return string(data)
+	}
+	pc := &backup.Conn{
+		Type:     ty,
+		Host:     conn.Host,
+		Port:     conn.Port,
+		Username: conn.Username,
+		Password: conn.Password,
+		Database: conn.Database,
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	defer cancel()
+	if err := backup.RunRestore(ctx, pc, backupPath); err != nil {
+		out.Error = userFacingError(err).Message
+		data, _ := json.Marshal(out)
+		return string(data)
+	}
+	out.Success = true
+	data, _ := json.Marshal(out)
+	return string(data)
+}
+
+// ListBackups returns JSON array of recent backup records for the connection (or all if connectionID is empty). Newest first.
+func (a *App) ListBackups(connectionID string) string {
+	backupMu.Lock()
+	if backupRecords == nil {
+		backupRecords = loadBackupRecords()
+	}
+	recs := make([]BackupRecord, len(backupRecords))
+	copy(recs, backupRecords)
+	backupMu.Unlock()
+
+	if connectionID != "" {
+		filtered := make([]BackupRecord, 0, len(recs))
+		for _, r := range recs {
+			if r.ConnectionID == connectionID {
+				filtered = append(filtered, r)
+			}
+		}
+		recs = filtered
+	}
+	// reverse so newest first (recs is a copy)
+	for i, j := 0, len(recs)-1; i < j; i, j = i+1, j-1 {
+		recs[i], recs[j] = recs[j], recs[i]
+	}
+	data, _ := json.Marshal(recs)
+	return string(data)
+}
+
+// PickBackupFile opens a file dialog for *.sql and returns the chosen path, or empty if cancelled.
+func (a *App) PickBackupFile() string {
+	path, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: "选择备份文件",
+		Filters: []runtime.FileFilter{
+			{DisplayName: "SQL (*.sql)", Pattern: "*.sql"},
+			{DisplayName: "All Files", Pattern: "*"},
+		},
+	})
+	if err != nil || path == "" {
+		return ""
+	}
+	return path
 }
 
 // GetDatabases returns database names for a connection (MySQL: SHOW DATABASES; PostgreSQL: schema names of current DB; SQLite: ["main"]). sessionID optional for tab isolation.

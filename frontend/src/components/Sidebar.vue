@@ -24,6 +24,8 @@ const emit = defineEmits<{
   (e: 'table-import', connectionId: string, database: string, tableName: string): void
   (e: 'table-export', connectionId: string, database: string, tableName: string): void
   (e: 'open-monitor', connection: import('../types').Connection): void
+  (e: 'backup', connectionId: string): void
+  (e: 'restore', connectionId: string): void
   (e: 'import-navicat'): void
 }>()
 
@@ -95,6 +97,8 @@ const startResize = (e: MouseEvent) => {
         @table-import="(connId, db, tableName) => emit('table-import', connId, db, tableName)"
         @table-export="(connId, db, tableName) => emit('table-export', connId, db, tableName)"
         @open-monitor="(conn) => emit('open-monitor', conn)"
+        @backup="(id) => emit('backup', id)"
+        @restore="(id) => emit('restore', id)"
       />
     </div>
 

@@ -11,10 +11,12 @@ import DataViewer from './DataViewer.vue'
 import ConnectionManager from './ConnectionManager.vue'
 import TableDesigner from '../components/TableDesigner.vue'
 import LiveMonitor from '../components/LiveMonitor.vue'
+import RestoreBackupModal from '../components/RestoreBackupModal.vue'
 import { ReleaseSession } from '../../wailsjs/go/main/App'
 import { connectionService } from '../services/connectionService'
 import { queryService } from '../services/queryService'
 import { dataService } from '../services/dataService'
+import { backupService } from '../services/backupService'
 import type { TabItem, Connection, QueryResult } from '../types'
 
 const { t } = useI18n()
@@ -29,6 +31,8 @@ const tableDesignerContext = ref<{ connectionId: string; database: string } | nu
 const tableImportTrigger = ref<{ connectionId: string; database: string; tableName: string } | null>(null)
 const showLiveMonitor = ref(false)
 const monitorConnection = ref<Connection | null>(null)
+const showRestoreModal = ref(false)
+const restoreConnectionId = ref('')
 const connections = ref<Connection[]>([])
 const tabs = ref<TabItem[]>([])
 const activeTabId = ref('')
@@ -274,6 +278,24 @@ const handleCloseLiveMonitor = () => {
   monitorConnection.value = null
 }
 
+const handleBackup = async (connectionId: string) => {
+  try {
+    const res = await backupService.backupNow(connectionId)
+    if (res.success) {
+      message.success(t('backup.backupSuccess') + (res.path ? `: ${res.path}` : ''))
+    } else {
+      message.error(t('backup.backupFailed') + (res.error ? `: ${res.error}` : ''))
+    }
+  } catch (e) {
+    message.error(t('backup.backupFailed') + ': ' + (e instanceof Error ? e.message : ''))
+  }
+}
+
+const handleRestore = (connectionId: string) => {
+  restoreConnectionId.value = connectionId
+  showRestoreModal.value = true
+}
+
 const handleImportNavicat = async () => {
   try {
     const result = await connectionService.importNavicatFromDialog()
@@ -360,6 +382,8 @@ const showEditorPosition = computed(() => activeTab.value?.type === 'query')
         @table-import="handleTableImport"
         @table-export="handleTableExport"
         @open-monitor="handleOpenMonitor"
+        @backup="handleBackup"
+        @restore="handleRestore"
         @import-navicat="handleImportNavicat"
       />
 
@@ -440,6 +464,12 @@ const showEditorPosition = computed(() => activeTab.value?.type === 'query')
       :connection-id="monitorConnection?.id ?? ''"
       :connection-name="monitorConnection?.name ?? ''"
       @close="handleCloseLiveMonitor"
+    />
+
+    <RestoreBackupModal
+      :show="showRestoreModal"
+      :connection-id="restoreConnectionId"
+      @close="showRestoreModal = false; restoreConnectionId = ''"
     />
 
     <!-- 删除连接确认 -->

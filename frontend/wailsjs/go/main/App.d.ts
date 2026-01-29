@@ -3,6 +3,8 @@
 
 export function AnalyzeSQL(arg1:string,arg2:string):Promise<string>;
 
+export function BackupNow(arg1:string):Promise<string>;
+
 export function ClearQueryHistory():Promise<void>;
 
 export function CreateConnection(arg1:string):Promise<void>;
@@ -45,11 +47,17 @@ export function ImportNavicatConnections(arg1:string):Promise<string>;
 
 export function ImportNavicatConnectionsFromDialog():Promise<string>;
 
+export function ListBackups(arg1:string):Promise<string>;
+
 export function LoadSchemaMetadata(arg1:string):Promise<void>;
+
+export function PickBackupFile():Promise<string>;
 
 export function ReconnectConnection(arg1:string):Promise<void>;
 
 export function ReleaseSession(arg1:string,arg2:string):Promise<void>;
+
+export function RestoreBackup(arg1:string,arg2:string):Promise<string>;
 
 export function SaveSnippet(arg1:string,arg2:string):Promise<void>;
 

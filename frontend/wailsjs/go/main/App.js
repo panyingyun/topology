@@ -6,6 +6,10 @@ export function AnalyzeSQL(arg1, arg2) {
   return window['go']['main']['App']['AnalyzeSQL'](arg1, arg2);
 }
 
+export function BackupNow(arg1) {
+  return window['go']['main']['App']['BackupNow'](arg1);
+}
+
 export function ClearQueryHistory() {
   return window['go']['main']['App']['ClearQueryHistory']();
 }
@@ -90,8 +94,16 @@ export function ImportNavicatConnectionsFromDialog() {
   return window['go']['main']['App']['ImportNavicatConnectionsFromDialog']();
 }
 
+export function ListBackups(arg1) {
+  return window['go']['main']['App']['ListBackups'](arg1);
+}
+
 export function LoadSchemaMetadata(arg1) {
   return window['go']['main']['App']['LoadSchemaMetadata'](arg1);
+}
+
+export function PickBackupFile() {
+  return window['go']['main']['App']['PickBackupFile']();
 }
 
 export function ReconnectConnection(arg1) {
@@ -100,6 +112,10 @@ export function ReconnectConnection(arg1) {
 
 export function ReleaseSession(arg1, arg2) {
   return window['go']['main']['App']['ReleaseSession'](arg1, arg2);
+}
+
+export function RestoreBackup(arg1, arg2) {
+  return window['go']['main']['App']['RestoreBackup'](arg1, arg2);
 }
 
 export function SaveSnippet(arg1, arg2) {

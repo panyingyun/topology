@@ -22,6 +22,8 @@ const emit = defineEmits<{
   (e: 'table-import', connectionId: string, database: string, tableName: string): void
   (e: 'table-export', connectionId: string, database: string, tableName: string): void
   (e: 'open-monitor', connection: Connection): void
+  (e: 'backup', connectionId: string): void
+  (e: 'restore', connectionId: string): void
 }>()
 
 const connections = ref<Connection[]>([])
@@ -184,6 +186,20 @@ const handleOpenMonitor = () => {
   closeContextMenu()
 }
 
+const handleBackup = () => {
+  if (contextMenu.value.connection) {
+    emit('backup', contextMenu.value.connection.id)
+  }
+  closeContextMenu()
+}
+
+const handleRestore = () => {
+  if (contextMenu.value.connection) {
+    emit('restore', contextMenu.value.connection.id)
+  }
+  closeContextMenu()
+}
+
 const handleNewTable = () => {
   if (contextMenu.value.type === 'database' && contextMenu.value.connectionId && contextMenu.value.database) {
     emit('new-table', contextMenu.value.connectionId, contextMenu.value.database)
@@ -316,6 +332,20 @@ onUnmounted(() => {
               class="w-full px-4 py-2 text-left text-xs theme-text theme-bg-hover transition-colors"
             >
               {{ t('connection.refresh') }}
+            </button>
+            <button
+              v-if="['mysql','postgresql','postgres','sqlite'].includes(contextMenu.connection?.type || '')"
+              @click="handleBackup"
+              class="w-full px-4 py-2 text-left text-xs theme-text theme-bg-hover transition-colors"
+            >
+              {{ t('backup.backupNow') }}
+            </button>
+            <button
+              v-if="['mysql','postgresql','postgres','sqlite'].includes(contextMenu.connection?.type || '')"
+              @click="handleRestore"
+              class="w-full px-4 py-2 text-left text-xs theme-text theme-bg-hover transition-colors"
+            >
+              {{ t('backup.restoreBackup') }}
             </button>
             <button
               @click="handleOpenMonitor"

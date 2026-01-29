@@ -125,11 +125,13 @@
 
 **验收 Checklist**：
 
-- [ ] MySQL / PostgreSQL 可执行全量备份并选择保存位置。
-- [ ] 可从已有备份执行恢复（含二次确认）。
-- [ ] 应用产生分级日志文件，便于排查问题。
+- [x] MySQL / PostgreSQL 可执行全量备份并选择保存位置。
+- [x] 可从已有备份执行恢复（含二次确认）。
+- [x] 应用产生分级日志文件，便于排查问题。
 
 **依赖**：1.1、1.2。**对应 improve-plan**：8. 备份恢复、13.(4) 日志系统。
+
+**1.4 完成说明**：备份一期：`internal/backup` 封装 mysqldump、pg_dump、sqlite3 .dump；App `BackupNow` 打开保存对话框、执行备份、写入 `backups.json`（最近 50 条）；`RestoreBackup`、`ListBackups`、`PickBackupFile`。连接右键「立即备份」「从备份恢复」；恢复弹窗列出最近备份、选择文件、二次确认后还原。日志：`internal/logger` 分级 DEBUG/INFO/WARN/ERROR，输出至 `topology/logs/topology.log`，`TOPOLOGY_LOG_LEVEL` 可配。README 已补充备份恢复与日志说明。
 
 ---
 
@@ -451,7 +453,7 @@
 | 1.1 | PostgreSQL 基础 + 测试框架 | 已完成 | 见 1.1 完成说明 |
 | 1.2 | PG 查询/计划 + 错误处理 | 已完成 | 见 1.2 完成说明 |
 | 1.3 | PG 特性 + SQL 智能提示一期 | 已完成 | 见 1.3 完成说明 |
-| 1.4 | 备份恢复一期 + 日志 | 待开始 | - |
+| 1.4 | 备份恢复一期 + 日志 | 已完成 | 见 1.4 完成说明 |
 | 1.5 | 定时备份 + 文档 | 待开始 | - |
 | 1.6 | 稳定性收尾 + 阶段复盘 | 待开始 | - |
 | 2.1 | 查询缓存 + 索引建议 | 待开始 | - |
