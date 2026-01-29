@@ -708,3 +708,64 @@ func TestIntegration_ExplainPostgreSQL(t *testing.T) {
 		t.Errorf("EXPLAIN JSON missing Plan")
 	}
 }
+
+func TestIntegration_SchemaNamesPostgreSQL(t *testing.T) {
+	dsn, ok := postgresDSN(t)
+	if !ok {
+		return
+	}
+	connID := "itest-pg-schemas"
+	db, err := Open(connID, "", "postgresql", dsn)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer Close(connID, "")
+
+	names, err := SchemaNames(db)
+	if err != nil {
+		t.Fatalf("SchemaNames: %v", err)
+	}
+	if len(names) == 0 {
+		t.Error("expected at least one schema")
+	}
+	found := false
+	for _, n := range names {
+		if n == "public" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected public in schemas, got %v", names)
+	}
+}
+
+// TestIntegration_PGTreeFlow verifies PG sidebar flow: SchemaNames -> TableNames(public) -> TableData.
+func TestIntegration_PGTreeFlow(t *testing.T) {
+	dsn, ok := postgresDSN(t)
+	if !ok {
+		return
+	}
+	connID := "itest-pg-tree"
+	db, err := Open(connID, "", "postgresql", dsn)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer Close(connID, "")
+
+	schemas, err := SchemaNames(db)
+	if err != nil {
+		t.Fatalf("SchemaNames: %v", err)
+	}
+	if len(schemas) == 0 {
+		t.Fatal("no schemas")
+	}
+	_, err = TableNames(db, "postgresql", "public")
+	if err != nil {
+		t.Fatalf("TableNames: %v", err)
+	}
+	_, _, err = RawSelect(db, "SELECT 1")
+	if err != nil {
+		t.Fatalf("RawSelect: %v", err)
+	}
+}

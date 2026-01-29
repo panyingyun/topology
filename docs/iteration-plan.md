@@ -102,11 +102,13 @@
 
 **验收 Checklist**：
 
-- [ ] PG 数据库在侧边栏有完整树形结构。
-- [ ] SQL 编辑器具备表/列/关键字补全。
-- [ ] 新增/更新的 E2E 或集成测试通过。
+- [x] PG 数据库在侧边栏有完整树形结构。
+- [x] SQL 编辑器具备表/列/关键字补全。
+- [x] 新增/更新的 E2E 或集成测试通过。
 
 **依赖**：1.1、1.2。**对应 improve-plan**：1.(1)、2.(1) SQL 智能提示。
+
+**1.3 完成说明**：PG 元数据：新增 `SchemaNames`，GetDatabases / loadSchemaMetadata 对 PG 使用 schema 列表（当前库），侧边栏展示 Connection → Schemas → Tables；JSON/JSONB 只读展示：`formatColumnValue` 对 JSON/JSONB 类型 pretty-print；SQL 智能提示：扩展关键字（DISTINCT、UNION、HAVING、CREATE、DROP 等），表名/列名/关键字补全沿用 useSchemaMetadata + Monaco 补全；集成测试 SchemaNames、PGTreeFlow 通过。
 
 ---
 
@@ -448,7 +450,7 @@
 |------|----------|------|----------|
 | 1.1 | PostgreSQL 基础 + 测试框架 | 已完成 | 见 1.1 完成说明 |
 | 1.2 | PG 查询/计划 + 错误处理 | 已完成 | 见 1.2 完成说明 |
-| 1.3 | PG 特性 + SQL 智能提示一期 | 待开始 | - |
+| 1.3 | PG 特性 + SQL 智能提示一期 | 已完成 | 见 1.3 完成说明 |
 | 1.4 | 备份恢复一期 + 日志 | 待开始 | - |
 | 1.5 | 定时备份 + 文档 | 待开始 | - |
 | 1.6 | 稳定性收尾 + 阶段复盘 | 待开始 | - |

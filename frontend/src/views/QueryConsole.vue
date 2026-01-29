@@ -223,7 +223,12 @@ function registerSQLCompletionProvider(_editorInstance: any): monaco.IDisposable
         }
       }
 
-      const sqlKeywords = ['SELECT', 'FROM', 'WHERE', 'JOIN', 'LEFT', 'RIGHT', 'INNER', 'ON', 'GROUP BY', 'ORDER BY', 'LIMIT', 'INSERT', 'INTO', 'VALUES', 'UPDATE', 'SET', 'DELETE', 'AS', 'AND', 'OR', 'ASC', 'DESC']
+      const sqlKeywords = [
+        'SELECT', 'FROM', 'WHERE', 'JOIN', 'LEFT', 'RIGHT', 'INNER', 'OUTER', 'ON', 'GROUP BY', 'ORDER BY', 'LIMIT', 'OFFSET',
+        'INSERT', 'INTO', 'VALUES', 'UPDATE', 'SET', 'DELETE', 'AS', 'AND', 'OR', 'ASC', 'DESC',
+        'DISTINCT', 'UNION', 'HAVING', 'EXISTS', 'BETWEEN', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END',
+        'CREATE', 'DROP', 'TABLE', 'INDEX', 'VIEW', 'NULL', 'CAST', 'COUNT', 'SUM', 'AVG', 'MIN', 'MAX',
+      ]
       for (const kw of sqlKeywords) {
         if (!word.word || kw.toLowerCase().startsWith(word.word.toLowerCase())) {
           suggestions.push({

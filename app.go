@@ -1213,9 +1213,11 @@ func (a *App) loadSchemaMetadataWorker(connectionID string) {
 		runtime.EventsEmit(a.ctx, "schema-metadata-ready", connectionID)
 		return
 	}
-	dbNames, err := db.DatabaseNames(g, conn.Type)
-	if err != nil {
-		dbNames = nil
+	var dbNames []string
+	if conn.Type == "postgresql" || conn.Type == "postgres" {
+		dbNames, _ = db.SchemaNames(g)
+	} else {
+		dbNames, _ = db.DatabaseNames(g, conn.Type)
 	}
 	for _, dbName := range dbNames {
 		dbMeta := SchemaDBMeta{Name: dbName}
@@ -1255,7 +1257,7 @@ func (a *App) GetSchemaMetadata(connectionID string) string {
 	return string(data)
 }
 
-// GetDatabases returns database names for a connection (MySQL: SHOW DATABASES; SQLite: ["main"]). sessionID optional for tab isolation.
+// GetDatabases returns database names for a connection (MySQL: SHOW DATABASES; PostgreSQL: schema names of current DB; SQLite: ["main"]). sessionID optional for tab isolation.
 func (a *App) GetDatabases(connectionID, sessionID string) string {
 	g, err := getOrOpenDB(connectionID, sessionID)
 	if err != nil {
@@ -1265,7 +1267,12 @@ func (a *App) GetDatabases(connectionID, sessionID string) string {
 	if conn == nil {
 		return "[]"
 	}
-	names, err := db.DatabaseNames(g, conn.Type)
+	var names []string
+	if conn.Type == "postgresql" || conn.Type == "postgres" {
+		names, err = db.SchemaNames(g)
+	} else {
+		names, err = db.DatabaseNames(g, conn.Type)
+	}
 	if err != nil {
 		return "[]"
 	}

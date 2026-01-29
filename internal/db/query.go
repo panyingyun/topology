@@ -2,6 +2,7 @@ package db
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -51,7 +52,18 @@ func RawSelect(db *gorm.DB, q string) (cols []string, rows []map[string]interfac
 func formatColumnValue(val interface{}, dbType string) interface{} {
 	switch v := val.(type) {
 	case []byte:
-		return string(v)
+		s := string(v)
+		dt := strings.ToUpper(dbType)
+		if (strings.Contains(dt, "JSON") || strings.Contains(dt, "JSONB")) && len(v) > 0 {
+			var x interface{}
+			if json.Unmarshal(v, &x) == nil {
+				b, err := json.MarshalIndent(x, "", "  ")
+				if err == nil {
+					return string(b)
+				}
+			}
+		}
+		return s
 	default:
 		return v
 	}
@@ -92,7 +104,28 @@ func IsSelect(q string) bool {
 		strings.HasPrefix(upper, "EXPLAIN") || strings.HasPrefix(upper, "PRAGMA")
 }
 
-// DatabaseNames returns database names for the given driver. MySQL: SHOW DATABASES; PostgreSQL: pg_database; SQLite: ["main"].
+// SchemaNames returns schema names for the current PostgreSQL database (e.g. public, user schemas). Only for driver "postgresql"/"postgres".
+func SchemaNames(db *gorm.DB) ([]string, error) {
+	cols, rows, err := RawSelect(db, `SELECT schema_name FROM information_schema.schemata
+		WHERE schema_name NOT IN ('pg_catalog','information_schema') AND schema_name NOT LIKE 'pg_toast%'
+		ORDER BY schema_name`)
+	if err != nil {
+		return nil, err
+	}
+	col := "schema_name"
+	if len(cols) > 0 {
+		col = cols[0]
+	}
+	var names []string
+	for _, r := range rows {
+		if v, ok := r[col]; ok && v != nil {
+			names = append(names, fmt.Sprint(v))
+		}
+	}
+	return names, nil
+}
+
+// DatabaseNames returns database names for the given driver. MySQL: SHOW DATABASES; PostgreSQL: pg_database (or use SchemaNames for tree); SQLite: ["main"].
 func DatabaseNames(db *gorm.DB, driver string) ([]string, error) {
 	switch driver {
 	case "mysql":
