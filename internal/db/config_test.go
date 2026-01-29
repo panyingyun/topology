@@ -24,17 +24,18 @@ func TestLoadMySQLTestConfig(t *testing.T) {
 		t.Skipf("%s not found or unreadable: %v", path, err)
 		return
 	}
-	if cfg.Host != "192.168.1.120" {
-		t.Errorf("expected Host 192.168.1.120, got %q", cfg.Host)
+	// testdb/mysql.url: host=127.0.0.1 port=3306 user=topology password=topology
+	if cfg.Host != "127.0.0.1" {
+		t.Errorf("expected Host 127.0.0.1, got %q", cfg.Host)
 	}
-	if cfg.Port != 6306 {
-		t.Errorf("expected Port 6306, got %d", cfg.Port)
+	if cfg.Port != 3306 {
+		t.Errorf("expected Port 3306, got %d", cfg.Port)
 	}
-	if cfg.Username != "root" {
-		t.Errorf("expected Username root, got %q", cfg.Username)
+	if cfg.Username != "topology" {
+		t.Errorf("expected Username topology, got %q", cfg.Username)
 	}
-	if cfg.Password != "Cjj123" {
-		t.Errorf("expected Password Cjj123, got %q", cfg.Password)
+	if cfg.Password != "topology" {
+		t.Errorf("expected Password topology, got %q", cfg.Password)
 	}
 }
 
