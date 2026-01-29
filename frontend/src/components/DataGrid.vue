@@ -65,6 +65,7 @@ watch(
           { label: '为空', value: 'isEmpty' },
         ],
         filterRender: { name: 'input' },
+        formatter: ({ cellValue }: { cellValue: unknown }) => formatCellDisplay(cellValue),
       }
       if (!isReadonly) (colDef as any).editRender = { name: 'input' }
       return colDef
@@ -92,6 +93,15 @@ function cellValueToString(val: unknown): string {
   if (val == null) return ''
   if (typeof val === 'object') return JSON.stringify(val)
   return String(val)
+}
+
+const CELL_TRUNCATE_LEN = 30
+const CELL_TRUNCATE_SHOW = 30
+
+function formatCellDisplay(val: unknown): string {
+  const s = cellValueToString(val)
+  if (s.length > CELL_TRUNCATE_LEN) return s.slice(0, CELL_TRUNCATE_SHOW) + '...'
+  return s
 }
 
 async function handleCellDblclick({ row, column }: { row?: Record<string, unknown>; column?: { field?: string } }) {
