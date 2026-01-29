@@ -394,6 +394,29 @@ function exportQueryResultAsJson(data: QueryResult): string {
   return JSON.stringify(data.rows, null, 2)
 }
 
+function quoteIdent(name: string): string {
+  return `"${String(name).replace(/"/g, '""')}"`
+}
+
+function escapeSqlValue(val: unknown): string {
+  if (val == null) return 'NULL'
+  if (typeof val === 'number' && !Number.isNaN(val)) return String(val)
+  if (typeof val === 'boolean') return val ? '1' : '0'
+  const s = typeof val === 'object' ? JSON.stringify(val) : String(val)
+  return "'" + s.replace(/\\/g, '\\\\').replace(/'/g, "''") + "'"
+}
+
+function exportQueryResultAsSql(data: QueryResult, tableName: string): string {
+  const { columns, rows } = data
+  const quotedCols = columns.map((c) => quoteIdent(c))
+  const lines: string[] = []
+  for (const r of rows) {
+    const vals = columns.map((c) => escapeSqlValue(r[c]))
+    lines.push(`INSERT INTO ${quoteIdent(tableName)} (${quotedCols.join(', ')}) VALUES (${vals.join(', ')});`)
+  }
+  return lines.join('\n')
+}
+
 function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -420,8 +443,12 @@ const handleExportQueryResult = (format: ExportFormat) => {
       const json = exportQueryResultAsJson(data)
       const blob = new Blob([json], { type: 'application/json' })
       downloadBlob(blob, `${base}.json`)
+    } else if (format === 'sql') {
+      const tableName = props.tableName || 'exported_data'
+      const sql = exportQueryResultAsSql(data, tableName)
+      const blob = new Blob([sql], { type: 'application/sql' })
+      downloadBlob(blob, `${base}.sql`)
     }
-    // sql: skip for query results; table export uses backend
     message.success(t('common.success') + ': ' + (t('dataGrid.export') || 'Export completed'))
   } catch (e) {
     console.error('Export failed:', e)

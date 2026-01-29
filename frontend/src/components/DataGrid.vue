@@ -177,14 +177,11 @@ const handleExport = (format: ExportFormat) => {
   showExportMenu.value = false
 }
 
-const exportFormats = computed(() => {
-  const all: { label: string; value: ExportFormat }[] = [
-    { label: t('dataGrid.csv'), value: 'csv' },
-    { label: t('dataGrid.json'), value: 'json' },
-    { label: t('dataGrid.sql'), value: 'sql' },
-  ]
-  return props.readonly ? all.filter((f) => f.value !== 'sql' as ExportFormat) : all
-})
+const exportFormats = computed(() => [
+  { label: t('dataGrid.csv'), value: 'csv' as ExportFormat },
+  { label: t('dataGrid.json'), value: 'json' as ExportFormat },
+  { label: t('dataGrid.sql'), value: 'sql' as ExportFormat },
+])
 
 // Close export menu when clicking outside
 const handleClickOutside = (e: MouseEvent) => {
