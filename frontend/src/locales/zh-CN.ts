@@ -214,6 +214,7 @@ export default {
     rows: '行',
     warnings: '优化建议',
     mysqlOnly: '仅支持 MySQL',
+    unsupportedDriver: '执行计划仅支持 MySQL 与 PostgreSQL',
   },
   monitor: {
     title: '实时监控',

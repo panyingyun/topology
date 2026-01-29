@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -664,4 +665,46 @@ func TestIntegration_RawExecPostgreSQL(t *testing.T) {
 		t.Errorf("INSERT RowsAffected: expected 1, got %d", n)
 	}
 	_, _ = RawExec(db, "DROP TABLE IF EXISTS _topology_itest")
+}
+
+func TestIntegration_ExplainPostgreSQL(t *testing.T) {
+	dsn, ok := postgresDSN(t)
+	if !ok {
+		return
+	}
+	connID := "itest-pg-explain"
+	db, err := Open(connID, "", "postgresql", dsn)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer Close(connID, "")
+
+	cols, rows, err := RawSelect(db, "EXPLAIN (FORMAT JSON) SELECT 1")
+	if err != nil {
+		t.Fatalf("EXPLAIN: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Errorf("expected 1 row, got %d", len(rows))
+	}
+	if len(cols) == 0 {
+		t.Error("expected at least one column")
+	}
+	firstCol := cols[0]
+	v, ok := rows[0][firstCol]
+	if !ok || v == nil {
+		t.Error("expected non-nil EXPLAIN JSON value")
+	}
+	var js string
+	switch x := v.(type) {
+	case string:
+		js = x
+	case []byte:
+		js = string(x)
+	}
+	if js == "" || len(js) < 10 {
+		t.Errorf("EXPLAIN JSON too short: %q", js)
+	}
+	if !strings.Contains(js, "Plan") {
+		t.Errorf("EXPLAIN JSON missing Plan")
+	}
 }

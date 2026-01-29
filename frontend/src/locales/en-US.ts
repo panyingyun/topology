@@ -214,6 +214,7 @@ export default {
     rows: 'rows',
     warnings: 'Suggestions',
     mysqlOnly: 'MySQL only',
+    unsupportedDriver: 'Execution plan is supported for MySQL and PostgreSQL only.',
   },
   monitor: {
     title: 'Live Monitor',

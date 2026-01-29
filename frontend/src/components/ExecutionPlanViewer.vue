@@ -89,7 +89,8 @@ function nodeTypeColor(node: ExecutionPlanNode): string {
 
           <div v-else-if="plan?.error" class="p-4 bg-red-500/10 rounded border border-red-500/50">
             <p class="text-sm text-red-400">{{ plan.error }}</p>
-            <p v-if="plan.error?.includes('MySQL')" class="text-xs theme-text-muted mt-2">{{ t('explainPlan.mysqlOnly') }}</p>
+            <p v-if="plan.error?.includes('MySQL and PostgreSQL only')" class="text-xs theme-text-muted mt-2">{{ t('explainPlan.unsupportedDriver') }}</p>
+            <p v-else-if="plan.error?.includes('MySQL') && !plan.error?.includes('PostgreSQL')" class="text-xs theme-text-muted mt-2">{{ t('explainPlan.mysqlOnly') }}</p>
           </div>
 
           <div v-else-if="plan" class="space-y-6">

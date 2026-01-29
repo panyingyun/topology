@@ -43,7 +43,7 @@ export const queryService = {
     }
   },
 
-  /** Get structured execution plan (EXPLAIN) for visualization. MySQL only. */
+  /** Get structured execution plan (EXPLAIN) for visualization. MySQL and PostgreSQL supported. */
   async getExecutionPlan(connectionId: string, sessionId: string, sql: string): Promise<ExecutionPlanResult> {
     try {
       const result = await GetExecutionPlan(connectionId, sessionId, sql)

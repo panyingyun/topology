@@ -79,11 +79,13 @@
 
 **验收 Checklist**：
 
-- [ ] PostgreSQL 上执行查询、查看执行计划与结果。
-- [ ] 连接失败、语法错误等场景有清晰用户提示。
-- [ ] 相关测试覆盖并通过。
+- [x] PostgreSQL 上执行查询、查看执行计划与结果。
+- [x] 连接失败、语法错误等场景有清晰用户提示。
+- [x] 相关测试覆盖并通过。
 
 **依赖**：1.1。**对应 improve-plan**：1.(1) PostgreSQL、7.(1) 错误处理、13.(1)。
+
+**1.2 完成说明**：PG 执行计划已支持：`EXPLAIN (ANALYZE, VERBOSE, FORMAT JSON)`，解析 JSON 映射为 ExecutionPlanNode，复用现有 ExecutionPlanViewer；错误处理增强：`ApiError`（Code/Message）、`userFacingError` 统一映射连接失败、语法错误、超时等为友好提示，ExecuteQuery/GetExecutionPlan 返回可解析错误；前端 i18n 新增 `unsupportedDriver`，执行计划错误提示区分 MySQL 仅支持与 MySQL+PG 支持；单元测试覆盖 `userFacingError`、`parsePGExplainJSON`、`extractPGExplainJSON`，集成测试 `TestIntegration_ExplainPostgreSQL` 通过。
 
 ---
 
@@ -445,7 +447,7 @@
 | 迭代 | 主题概要 | 状态 | 完成日期 |
 |------|----------|------|----------|
 | 1.1 | PostgreSQL 基础 + 测试框架 | 已完成 | 见 1.1 完成说明 |
-| 1.2 | PG 查询/计划 + 错误处理 | 待开始 | - |
+| 1.2 | PG 查询/计划 + 错误处理 | 已完成 | 见 1.2 完成说明 |
 | 1.3 | PG 特性 + SQL 智能提示一期 | 待开始 | - |
 | 1.4 | 备份恢复一期 + 日志 | 待开始 | - |
 | 1.5 | 定时备份 + 文档 | 待开始 | - |

@@ -684,11 +684,11 @@ func (a *App) DeleteConnection(id string) error {
 func (a *App) ExecuteQuery(connectionID, sessionID, sql string) string {
 	conn := getConnByID(connectionID)
 	if conn == nil {
-		return mustMarshalResult(nil, nil, 0, 0, fmt.Sprintf("connection not found: %s", connectionID))
+		return mustMarshalResult(nil, nil, 0, 0, userFacingError(fmt.Errorf("connection not found: %s", connectionID)).Message)
 	}
 	g, err := getOrOpenDB(connectionID, sessionID)
 	if err != nil {
-		return mustMarshalResult(nil, nil, 0, 0, err.Error())
+		return mustMarshalResult(nil, nil, 0, 0, userFacingError(err).Message)
 	}
 	start := time.Now()
 	var result string
@@ -700,7 +700,7 @@ func (a *App) ExecuteQuery(connectionID, sessionID, sql string) string {
 		cols, rows, err := db.RawSelect(g, sql)
 		elapsed = int(time.Since(start).Milliseconds())
 		if err != nil {
-			result = mustMarshalResult(nil, nil, 0, elapsed, err.Error())
+			result = mustMarshalResult(nil, nil, 0, elapsed, userFacingError(err).Message)
 			success = false
 		} else {
 			rowCount = len(rows)
@@ -711,7 +711,7 @@ func (a *App) ExecuteQuery(connectionID, sessionID, sql string) string {
 		affected, err := db.RawExec(g, sql)
 		elapsed = int(time.Since(start).Milliseconds())
 		if err != nil {
-			result = mustMarshalResult(nil, nil, 0, elapsed, err.Error())
+			result = mustMarshalResult(nil, nil, 0, elapsed, userFacingError(err).Message)
 			success = false
 		} else {
 			result = mustMarshalResult(nil, nil, 0, elapsed, "", int(affected))
@@ -867,89 +867,306 @@ func (a *App) GetExecutionPlan(connectionID, sessionID, sql string) string {
 		data, _ := json.Marshal(out)
 		return string(data)
 	}
-	if conn.Type != "mysql" {
-		out.Error = "execution plan is only supported for MySQL"
-		data, _ := json.Marshal(out)
-		return string(data)
-	}
 	g, err := getOrOpenDB(connectionID, sessionID)
 	if err != nil {
-		out.Error = err.Error()
+		out.Error = userFacingError(err).Message
 		data, _ := json.Marshal(out)
 		return string(data)
 	}
-	explainSQL := "EXPLAIN " + sql
-	cols, rows, err := db.RawSelect(g, explainSQL)
-	if err != nil {
-		out.Error = err.Error()
-		data, _ := json.Marshal(out)
-		return string(data)
-	}
-	_ = cols // column order not needed; we look up by name
-	getVal := func(row map[string]interface{}, keys ...string) string {
-		for _, k := range keys {
-			for mapK, v := range row {
-				if strings.EqualFold(mapK, k) && v != nil {
-					return fmt.Sprint(v)
+
+	switch conn.Type {
+	case "mysql":
+		explainSQL := "EXPLAIN " + sql
+		cols, rows, err := db.RawSelect(g, explainSQL)
+		if err != nil {
+			out.Error = userFacingError(err).Message
+			data, _ := json.Marshal(out)
+			return string(data)
+		}
+		_ = cols
+		getVal := func(row map[string]interface{}, keys ...string) string {
+			for _, k := range keys {
+				for mapK, v := range row {
+					if strings.EqualFold(mapK, k) && v != nil {
+						return fmt.Sprint(v)
+					}
 				}
 			}
+			return ""
 		}
-		return ""
-	}
-	getInt64 := func(row map[string]interface{}, key string) int64 {
-		s := getVal(row, key)
-		if s == "" {
-			return 0
+		getInt64 := func(row map[string]interface{}, key string) int64 {
+			s := getVal(row, key)
+			if s == "" {
+				return 0
+			}
+			var n int64
+			_, _ = fmt.Sscanf(s, "%d", &n)
+			return n
 		}
-		var n int64
-		_, _ = fmt.Sscanf(s, "%d", &n)
-		return n
+		var warnings []string
+		nodes := make([]ExecutionPlanNode, 0, len(rows))
+		var lastID *string
+		for i, row := range rows {
+			id := fmt.Sprintf("%d", i+1)
+			typeVal := getVal(row, "type", "Type")
+			tableVal := getVal(row, "table", "Table")
+			keyVal := getVal(row, "key", "Key")
+			extraVal := getVal(row, "extra", "Extra")
+			selectType := getVal(row, "select_type", "select_type")
+			rowsEst := getInt64(row, "rows")
+			fullScan := typeVal == "ALL" || typeVal == "index"
+			indexUsed := keyVal != "" && keyVal != "NULL"
+			nodeType := "Table"
+			if strings.Contains(strings.ToLower(extraVal), "where") {
+				nodeType = "Filter"
+			}
+			if selectType == "SIMPLE" && tableVal != "" {
+				nodeType = "Scan"
+			}
+			label := tableVal
+			if label == "" {
+				label = typeVal
+			}
+			node := ExecutionPlanNode{
+				ID:            id,
+				ParentID:      lastID,
+				Type:          nodeType,
+				Label:         label,
+				Detail:        typeVal,
+				Rows:          rowsEst,
+				Extra:         extraVal,
+				FullTableScan: fullScan,
+				IndexUsed:     indexUsed,
+			}
+			nodes = append(nodes, node)
+			lastID = &id
+			if fullScan && !indexUsed && tableVal != "" {
+				warnings = append(warnings, "Full table scan on '"+tableVal+"'; consider adding an index")
+			}
+		}
+		out.Nodes = nodes
+		out.Summary.Warnings = warnings
+	case "postgresql", "postgres":
+		explainSQL := "EXPLAIN (ANALYZE, VERBOSE, FORMAT JSON) " + sql
+		cols, rows, err := db.RawSelect(g, explainSQL)
+		if err != nil {
+			out.Error = userFacingError(err).Message
+			data, _ := json.Marshal(out)
+			return string(data)
+		}
+		if len(rows) == 0 {
+			out.Error = "PostgreSQL EXPLAIN returned no rows"
+			data, _ := json.Marshal(out)
+			return string(data)
+		}
+		jsonStr := extractPGExplainJSON(rows[0], cols)
+		if jsonStr == "" {
+			out.Error = "could not extract EXPLAIN JSON from PostgreSQL result"
+			data, _ := json.Marshal(out)
+			return string(data)
+		}
+		nodes, warnings, parseErr := parsePGExplainJSON(jsonStr)
+		if parseErr != nil {
+			out.Error = userFacingError(parseErr).Message
+			data, _ := json.Marshal(out)
+			return string(data)
+		}
+		out.Nodes = nodes
+		out.Summary.Warnings = warnings
+	default:
+		out.Error = "execution plan is supported for MySQL and PostgreSQL only"
 	}
-	var warnings []string
-	nodes := make([]ExecutionPlanNode, 0, len(rows))
+	data, _ := json.Marshal(out)
+	return string(data)
+}
+
+// extractPGExplainJSON gets the JSON string from EXPLAIN (FORMAT JSON) result (one row, one column).
+func extractPGExplainJSON(row map[string]interface{}, cols []string) string {
+	for _, c := range cols {
+		if v, ok := row[c]; ok && v != nil {
+			switch x := v.(type) {
+			case string:
+				return x
+			case []byte:
+				return string(x)
+			}
+		}
+	}
+	for _, v := range row {
+		if v == nil {
+			continue
+		}
+		switch x := v.(type) {
+		case string:
+			if strings.HasPrefix(strings.TrimSpace(x), "[") {
+				return x
+			}
+		case []byte:
+			s := string(x)
+			if strings.HasPrefix(strings.TrimSpace(s), "[") {
+				return s
+			}
+		}
+	}
+	return ""
+}
+
+// parsePGExplainJSON parses PostgreSQL EXPLAIN (FORMAT JSON) output into ExecutionPlanNode list and warnings.
+func parsePGExplainJSON(jsonStr string) (nodes []ExecutionPlanNode, warnings []string, err error) {
+	var arr []interface{}
+	if e := json.Unmarshal([]byte(jsonStr), &arr); e != nil {
+		return nil, nil, fmt.Errorf("invalid EXPLAIN JSON: %w", e)
+	}
+	if len(arr) == 0 {
+		return nil, nil, fmt.Errorf("EXPLAIN JSON empty array")
+	}
+	top, _ := arr[0].(map[string]interface{})
+	if top == nil {
+		return nil, nil, fmt.Errorf("EXPLAIN JSON invalid structure")
+	}
+	plan, _ := top["Plan"].(map[string]interface{})
+	if plan == nil {
+		return nil, nil, fmt.Errorf("EXPLAIN JSON missing Plan")
+	}
+
+	nodes = make([]ExecutionPlanNode, 0)
+	warnings = make([]string, 0)
 	var lastID *string
-	for i, row := range rows {
-		id := fmt.Sprintf("%d", i+1)
-		typeVal := getVal(row, "type", "Type")
-		tableVal := getVal(row, "table", "Table")
-		keyVal := getVal(row, "key", "Key")
-		extraVal := getVal(row, "extra", "Extra")
-		selectType := getVal(row, "select_type", "select_type")
-		rowsEst := getInt64(row, "rows")
-		fullScan := typeVal == "ALL" || typeVal == "index"
-		indexUsed := keyVal != "" && keyVal != "NULL"
-		nodeType := "Table"
-		if strings.Contains(strings.ToLower(extraVal), "where") {
-			nodeType = "Filter"
+	idSeq := 0
+
+	var walk func(m map[string]interface{})
+	walk = func(m map[string]interface{}) {
+		nodeType := getStr(m, "Node Type")
+		rel := getStr(m, "Relation Name")
+		alias := getStr(m, "Alias")
+		planRows := getFloat(m, "Plan Rows")
+		actualRows := getFloat(m, "Actual Rows")
+		totalCost := getFloat(m, "Total Cost")
+		indexName := getStr(m, "Index Name")
+
+		rowsEst := int64(planRows)
+		if actualRows > 0 {
+			rowsEst = int64(actualRows)
 		}
-		if selectType == "SIMPLE" && tableVal != "" {
-			nodeType = "Scan"
+		costStr := ""
+		if totalCost > 0 {
+			costStr = fmt.Sprintf("%.2f", totalCost)
 		}
-		label := tableVal
+
+		fullScan := nodeType == "Seq Scan"
+		indexUsed := indexName != "" || strings.Contains(nodeType, "Index")
+
+		ourType := "Table"
+		switch {
+		case strings.Contains(nodeType, "Scan"):
+			ourType = "Scan"
+		case strings.Contains(nodeType, "Join") || strings.Contains(nodeType, "Loop"):
+			ourType = "Join"
+		case strings.Contains(nodeType, "Sort"):
+			ourType = "Sort"
+		case strings.Contains(nodeType, "Aggregate"):
+			ourType = "Aggregate"
+		case strings.Contains(nodeType, "Limit"):
+			ourType = "Limit"
+		}
+
+		label := rel
 		if label == "" {
-			label = typeVal
+			label = alias
 		}
+		if label == "" {
+			label = nodeType
+		}
+
+		idSeq++
+		id := fmt.Sprintf("%d", idSeq)
 		node := ExecutionPlanNode{
 			ID:            id,
 			ParentID:      lastID,
-			Type:          nodeType,
+			Type:          ourType,
 			Label:         label,
-			Detail:        typeVal,
+			Detail:        nodeType,
 			Rows:          rowsEst,
-			Extra:         extraVal,
+			Cost:          costStr,
 			FullTableScan: fullScan,
 			IndexUsed:     indexUsed,
 		}
+		if indexName != "" {
+			node.Extra = "Index: " + indexName
+		}
 		nodes = append(nodes, node)
 		lastID = &id
-		if fullScan && !indexUsed && tableVal != "" {
-			warnings = append(warnings, "Full table scan on '"+tableVal+"'; consider adding an index")
+
+		if fullScan && rel != "" {
+			warnings = append(warnings, "Full table scan on '"+rel+"'; consider adding an index")
+		}
+
+		subPlans, _ := m["Plans"].([]interface{})
+		for _, sp := range subPlans {
+			if sub, _ := sp.(map[string]interface{}); sub != nil {
+				walk(sub)
+			}
 		}
 	}
-	out.Nodes = nodes
-	out.Summary.Warnings = warnings
-	data, _ := json.Marshal(out)
-	return string(data)
+	walk(plan)
+	return nodes, warnings, nil
+}
+
+func getStr(m map[string]interface{}, key string) string {
+	if v, ok := m[key]; ok && v != nil {
+		return fmt.Sprint(v)
+	}
+	return ""
+}
+
+func getFloat(m map[string]interface{}, key string) float64 {
+	if v, ok := m[key]; ok && v != nil {
+		switch x := v.(type) {
+		case float64:
+			return x
+		case int:
+			return float64(x)
+		case int64:
+			return float64(x)
+		case string:
+			var f float64
+			_, _ = fmt.Sscanf(x, "%f", &f)
+			return f
+		}
+	}
+	return 0
+}
+
+// ApiError holds a user-facing error code and message for API responses.
+type ApiError struct {
+	Code    string `json:"code,omitempty"`
+	Message string `json:"message"`
+}
+
+func userFacingError(err error) ApiError {
+	if err == nil {
+		return ApiError{}
+	}
+	msg := err.Error()
+	low := strings.ToLower(msg)
+	switch {
+	case strings.Contains(low, "connection not found"):
+		return ApiError{Code: "CONNECTION_NOT_FOUND", Message: "Connection not found. It may have been deleted."}
+	case strings.Contains(low, "connection refused") || strings.Contains(low, "connect: connection refused") || strings.Contains(low, "connection reset"):
+		return ApiError{Code: "CONNECTION_REFUSED", Message: "Cannot connect to database: connection refused. Check host, port, and that the server is running."}
+	case strings.Contains(low, "access denied") || (strings.Contains(low, "password") && strings.Contains(low, "failed")) || strings.Contains(low, "authentication failed"):
+		return ApiError{Code: "ACCESS_DENIED", Message: "Access denied. Check username and password."}
+	case strings.Contains(low, "syntax error") || strings.Contains(low, "syntaxerror") || strings.Contains(low, "unexpected token"):
+		return ApiError{Code: "SYNTAX_ERROR", Message: "SQL syntax error. Check your query."}
+	case strings.Contains(low, "does not exist") || strings.Contains(low, "relation ") && strings.Contains(low, " does not exist"):
+		return ApiError{Code: "NOT_FOUND", Message: msg}
+	case strings.Contains(low, "duplicate key") || strings.Contains(low, "unique constraint"):
+		return ApiError{Code: "DUPLICATE_KEY", Message: "Duplicate key or unique constraint violation."}
+	case strings.Contains(low, "timeout") || strings.Contains(low, "deadline exceeded"):
+		return ApiError{Code: "TIMEOUT", Message: "Operation timed out. Try again or simplify the query."}
+	default:
+		return ApiError{Message: msg}
+	}
 }
 
 func mustMarshalResult(cols []string, rows []map[string]interface{}, rowCount, execMs int, errMsg string, affected ...int) string {
