@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"gorm.io/driver/mysql"
+	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -34,7 +35,7 @@ func cacheKey(connID, sessionID string) string {
 	return connID + "\x00" + sessionID
 }
 
-// BuildDSN builds DSN for mysql or sqlite. For sqlite, host is unused; database is the file path.
+// BuildDSN builds DSN for mysql, postgresql, or sqlite. For sqlite, host is unused; database is the file path.
 func BuildDSN(driver, host string, port int, user, pass, database string) (string, error) {
 	switch driver {
 	case "mysql":
@@ -44,6 +45,16 @@ func BuildDSN(driver, host string, port int, user, pass, database string) (strin
 		}
 		return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local",
 			user, pass, host, port, db), nil
+	case "postgresql", "postgres":
+		db := database
+		if db == "" {
+			db = "postgres"
+		}
+		if port <= 0 {
+			port = 5432
+		}
+		return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
+			host, port, user, pass, db), nil
 	case "sqlite":
 		path := database
 		if path == "" {
@@ -90,6 +101,7 @@ func Open(connID, sessionID, driver, dsn string) (*gorm.DB, error) {
 		if driver == "sqlite" {
 			return nil, err
 		}
+		// PostgreSQL: retry same as MySQL
 	}
 	return nil, lastErr
 }
@@ -100,6 +112,8 @@ func openOnce(key, driver, dsn string) (*gorm.DB, error) {
 	switch driver {
 	case "mysql":
 		dial = mysql.Open(dsn)
+	case "postgresql", "postgres":
+		dial = postgres.Open(dsn)
 	case "sqlite":
 		dial = sqlite.Open(dsn)
 	default:
@@ -197,6 +211,8 @@ func openTemp(driver, dsn string) (*gorm.DB, error) {
 	switch driver {
 	case "mysql":
 		dial = mysql.Open(dsn)
+	case "postgresql", "postgres":
+		dial = postgres.Open(dsn)
 	case "sqlite":
 		dial = sqlite.Open(dsn)
 	default:

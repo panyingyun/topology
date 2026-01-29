@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -51,12 +52,44 @@ func TestBuildDSN(t *testing.T) {
 		t.Logf("DSN: %s", dsn)
 	}
 
+	dsn, err = BuildDSN("postgresql", "127.0.0.1", 5432, "u", "p", "testdb")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dsn == "" {
+		t.Fatal("expected non-empty postgres DSN")
+	}
+	if !strings.Contains(dsn, "host=127.0.0.1") || !strings.Contains(dsn, "dbname=testdb") {
+		t.Logf("PostgreSQL DSN: %s", dsn)
+	}
+
 	dsn, err = BuildDSN("sqlite", "", 0, "", "", "testdb/realm.db")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if dsn != "testdb/realm.db" {
 		t.Errorf("expected sqlite path testdb/realm.db, got %q", dsn)
+	}
+}
+
+func TestLoadPostgreSQLTestConfig(t *testing.T) {
+	path := testdbPath("postgresql.url")
+	cfg, err := LoadPostgreSQLTestConfig(path)
+	if err != nil {
+		t.Skipf("PostgreSQL config %s not found or unreadable: %v", path, err)
+		return
+	}
+	if cfg.Host != "127.0.0.1" {
+		t.Errorf("expected Host 127.0.0.1, got %q", cfg.Host)
+	}
+	if cfg.Port != 5432 {
+		t.Errorf("expected Port 5432, got %d", cfg.Port)
+	}
+	if cfg.Username != "topology" {
+		t.Errorf("expected Username topology, got %q", cfg.Username)
+	}
+	if cfg.Password != "topology" {
+		t.Errorf("expected Password topology, got %q", cfg.Password)
 	}
 }
 

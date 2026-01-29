@@ -419,8 +419,8 @@ func getOrOpenDB(connID, sessionID string) (*gorm.DB, error) {
 		return nil, fmt.Errorf("connection not found: %s", connID)
 	}
 	driver := conn.Type
-	if driver != "mysql" && driver != "sqlite" {
-		return nil, fmt.Errorf("unsupported driver: %s (mysql/sqlite only)", driver)
+	if driver != "mysql" && driver != "sqlite" && driver != "postgresql" && driver != "postgres" {
+		return nil, fmt.Errorf("unsupported driver: %s (mysql/postgresql/sqlite)", driver)
 	}
 	host, port, err := effectiveHostPort(connID, conn)
 	if err != nil {
@@ -584,7 +584,7 @@ func (a *App) TestConnection(connJSON string) bool {
 		return false
 	}
 	driver := conn.Type
-	if driver != "mysql" && driver != "sqlite" {
+	if driver != "mysql" && driver != "sqlite" && driver != "postgresql" && driver != "postgres" {
 		return false
 	}
 	var dsn string
@@ -1633,6 +1633,22 @@ func getTableColumns(g *gorm.DB, driver, database, tableName string) ([]string, 
 			if err := g.Raw(query, database, tableName).Scan(&columns).Error; err != nil {
 				return nil, err
 			}
+		}
+	} else if driver == "postgresql" || driver == "postgres" {
+		schema := "public"
+		if database != "" {
+			schema = database
+		}
+		query := "SELECT column_name FROM information_schema.columns WHERE table_schema = ? AND table_name = ? ORDER BY ordinal_position"
+		var raw []struct {
+			ColumnName string `gorm:"column:column_name"`
+		}
+		if err := g.Raw(query, schema, tableName).Scan(&raw).Error; err != nil {
+			return nil, err
+		}
+		columns = make([]string, len(raw))
+		for i, r := range raw {
+			columns[i] = r.ColumnName
 		}
 	} else if driver == "sqlite" {
 		query := fmt.Sprintf("PRAGMA table_info(%s)", quoteIdent(driver, tableName))

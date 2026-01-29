@@ -56,11 +56,13 @@
 
 **验收 Checklist**：
 
-- [ ] 能新增 PostgreSQL 连接并执行 `SELECT 1`。
-- [ ] 至少一个后端模块有单元测试且 `go test` 通过。
-- [ ] 文档/README 中补充 PG 连接说明（若对外可见）。
+- [x] 能新增 PostgreSQL 连接并执行 `SELECT 1`。
+- [x] 至少一个后端模块有单元测试且 `go test` 通过。
+- [x] 文档/README 中补充 PG 连接说明（若对外可见）。
 
 **依赖**：无。**被依赖**：1.2、1.3（PG 相关）、后续 PG 特性。
+
+**1.1 完成说明**：已完成 PG 驱动接入（gorm postgres）、BuildDSN/Open/Ping、GetDatabases/GetTables/TableSchema/TableData 等；连接管理器支持 PostgreSQL，测试连接与执行简单 SQL 可用；`internal/db` 单元与集成测试覆盖 MySQL、PostgreSQL、SQLite，`go test ./internal/db/...` 全部通过；README 已更新。
 
 ---
 
@@ -442,7 +444,7 @@
 
 | 迭代 | 主题概要 | 状态 | 完成日期 |
 |------|----------|------|----------|
-| 1.1 | PostgreSQL 基础 + 测试框架 | 待开始 | - |
+| 1.1 | PostgreSQL 基础 + 测试框架 | 已完成 | 见 1.1 完成说明 |
 | 1.2 | PG 查询/计划 + 错误处理 | 待开始 | - |
 | 1.3 | PG 特性 + SQL 智能提示一期 | 待开始 | - |
 | 1.4 | 备份恢复一期 + 日志 | 待开始 | - |

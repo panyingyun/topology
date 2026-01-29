@@ -41,6 +41,20 @@ func sqliteDSN(t *testing.T) (string, bool) {
 	return path, true
 }
 
+func postgresDSN(t *testing.T) (string, bool) {
+	path := itestPath("postgresql.url")
+	cfg, err := LoadPostgreSQLTestConfig(path)
+	if err != nil {
+		t.Skipf("PostgreSQL config %s: %v", path, err)
+		return "", false
+	}
+	dsn, err := BuildDSN("postgresql", cfg.Host, cfg.Port, cfg.Username, cfg.Password, "testdb")
+	if err != nil {
+		t.Fatalf("BuildDSN postgresql: %v", err)
+	}
+	return dsn, true
+}
+
 func TestIntegration_PingMySQL(t *testing.T) {
 	dsn, ok := mysqlDSN(t)
 	if !ok {
@@ -450,6 +464,204 @@ func TestIntegration_CloseAll(t *testing.T) {
 
 // TestIntegration_PostgreSQLPlaceholder: db 层尚未支持 PostgreSQL（见 testdb/postgresql.txt）。
 // 支持后可将此用例改为实际 Ping/Open 等测试并去掉 t.Skip。
-func TestIntegration_PostgreSQLPlaceholder(t *testing.T) {
-	t.Skip("PostgreSQL not yet supported in internal/db; see testdb/postgresql.txt for target config")
+func TestIntegration_PingPostgreSQL(t *testing.T) {
+	dsn, ok := postgresDSN(t)
+	if !ok {
+		return
+	}
+	if err := Ping("postgresql", dsn); err != nil {
+		t.Errorf("Ping PostgreSQL: %v", err)
+	}
+}
+
+func TestIntegration_OpenPostgreSQL(t *testing.T) {
+	dsn, ok := postgresDSN(t)
+	if !ok {
+		return
+	}
+	connID := "itest-pg-open"
+	defer Close(connID, "")
+
+	db, err := Open(connID, "", "postgresql", dsn)
+	if err != nil {
+		t.Fatalf("Open PostgreSQL: %v", err)
+	}
+	if db == nil {
+		t.Fatal("Open returned nil db")
+	}
+}
+
+func TestIntegration_RawSelectPostgreSQL(t *testing.T) {
+	dsn, ok := postgresDSN(t)
+	if !ok {
+		return
+	}
+	connID := "itest-pg-raw"
+	db, err := Open(connID, "", "postgresql", dsn)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer Close(connID, "")
+
+	cols, rows, err := RawSelect(db, "SELECT 1 AS one, 2 AS two")
+	if err != nil {
+		t.Fatalf("RawSelect: %v", err)
+	}
+	if len(cols) != 2 {
+		t.Errorf("expected 2 columns, got %d", len(cols))
+	}
+	if len(rows) != 1 {
+		t.Errorf("expected 1 row, got %d", len(rows))
+	}
+}
+
+func TestIntegration_DatabaseNamesPostgreSQL(t *testing.T) {
+	dsn, ok := postgresDSN(t)
+	if !ok {
+		return
+	}
+	connID := "itest-pg-dbs"
+	db, err := Open(connID, "", "postgresql", dsn)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer Close(connID, "")
+
+	names, err := DatabaseNames(db, "postgresql")
+	if err != nil {
+		t.Fatalf("DatabaseNames: %v", err)
+	}
+	if len(names) == 0 {
+		t.Error("expected at least one database")
+	}
+	found := false
+	for _, n := range names {
+		if n == "testdb" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected testdb in %v", names)
+	}
+}
+
+func TestIntegration_TableNamesPostgreSQL(t *testing.T) {
+	dsn, ok := postgresDSN(t)
+	if !ok {
+		return
+	}
+	connID := "itest-pg-tables"
+	db, err := Open(connID, "", "postgresql", dsn)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer Close(connID, "")
+
+	_, _ = RawExec(db, `CREATE TABLE IF NOT EXISTS _topology_itest (id SERIAL PRIMARY KEY, x INT)`)
+	defer func() { _, _ = RawExec(db, "DROP TABLE IF EXISTS _topology_itest") }()
+
+	names, err := TableNames(db, "postgresql", "public")
+	if err != nil {
+		t.Fatalf("TableNames: %v", err)
+	}
+	found := false
+	for _, n := range names {
+		if n == "_topology_itest" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected _topology_itest in %v", names)
+	}
+}
+
+func TestIntegration_TableSchemaPostgreSQL(t *testing.T) {
+	dsn, ok := postgresDSN(t)
+	if !ok {
+		return
+	}
+	connID := "itest-pg-schema"
+	db, err := Open(connID, "", "postgresql", dsn)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer Close(connID, "")
+
+	_, _ = RawExec(db, `CREATE TABLE IF NOT EXISTS _topology_itest (id SERIAL PRIMARY KEY, x INT)`)
+	defer func() { _, _ = RawExec(db, "DROP TABLE IF EXISTS _topology_itest") }()
+
+	info, err := TableSchema(db, "postgresql", "public", "_topology_itest")
+	if err != nil {
+		t.Fatalf("TableSchema: %v", err)
+	}
+	if info.Name != "_topology_itest" {
+		t.Errorf("Name: expected _topology_itest, got %q", info.Name)
+	}
+	if len(info.Columns) < 2 {
+		t.Errorf("expected at least 2 columns, got %d", len(info.Columns))
+	}
+}
+
+func TestIntegration_TableDataPostgreSQL(t *testing.T) {
+	dsn, ok := postgresDSN(t)
+	if !ok {
+		return
+	}
+	connID := "itest-pg-data"
+	db, err := Open(connID, "", "postgresql", dsn)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer Close(connID, "")
+
+	_, _ = RawExec(db, `CREATE TABLE IF NOT EXISTS _topology_itest (id SERIAL PRIMARY KEY, x INT)`)
+	_, _ = RawExec(db, "INSERT INTO _topology_itest (x) VALUES (10), (20)")
+	defer func() { _, _ = RawExec(db, "DROP TABLE IF EXISTS _topology_itest") }()
+
+	total, err := TableRowCount(db, "postgresql", "public", "_topology_itest")
+	if err != nil {
+		t.Fatalf("TableRowCount: %v", err)
+	}
+	if total != 2 {
+		t.Errorf("TableRowCount: expected 2, got %d", total)
+	}
+
+	cols, rows, total2, err := TableData(db, "postgresql", "public", "_topology_itest", 10, 0)
+	if err != nil {
+		t.Fatalf("TableData: %v", err)
+	}
+	if total2 != 2 {
+		t.Errorf("TableData total: expected 2, got %d", total2)
+	}
+	if len(cols) < 2 {
+		t.Errorf("TableData cols: expected at least 2, got %d", len(cols))
+	}
+	if len(rows) != 2 {
+		t.Errorf("TableData rows: expected 2, got %d", len(rows))
+	}
+}
+
+func TestIntegration_RawExecPostgreSQL(t *testing.T) {
+	dsn, ok := postgresDSN(t)
+	if !ok {
+		return
+	}
+	connID := "itest-pg-exec"
+	db, err := Open(connID, "", "postgresql", dsn)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer Close(connID, "")
+
+	_, _ = RawExec(db, `CREATE TABLE IF NOT EXISTS _topology_itest (id SERIAL PRIMARY KEY)`)
+	n, err := RawExec(db, "INSERT INTO _topology_itest DEFAULT VALUES")
+	if err != nil {
+		t.Fatalf("INSERT: %v", err)
+	}
+	if n != 1 {
+		t.Errorf("INSERT RowsAffected: expected 1, got %d", n)
+	}
+	_, _ = RawExec(db, "DROP TABLE IF EXISTS _topology_itest")
 }

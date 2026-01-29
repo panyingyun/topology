@@ -23,12 +23,14 @@ type TableSchemaInfo struct {
 	Columns []SchemaColumn `json:"columns"`
 }
 
-// TableSchema returns schema (columns) for the given table. database is optional (MySQL: scope by TABLE_SCHEMA).
+// TableSchema returns schema (columns) for the given table. database is optional (MySQL: TABLE_SCHEMA; PostgreSQL: schema, default "public").
 func TableSchema(db *gorm.DB, driver, database, table string) (*TableSchemaInfo, error) {
 	info := &TableSchemaInfo{Name: table}
 	switch driver {
 	case "mysql":
 		return mysqlTableSchema(db, database, table, info)
+	case "postgresql", "postgres":
+		return postgresTableSchema(db, database, table, info)
 	case "sqlite":
 		return sqliteTableSchema(db, table, info)
 	default:
@@ -69,6 +71,55 @@ func mysqlTableSchema(db *gorm.DB, database, table string, info *TableSchemaInfo
 			DefaultValue: def,
 			IsPrimaryKey: strings.ToUpper(r.COLUMN_KEY) == "PRI",
 			IsUnique:     strings.ToUpper(r.COLUMN_KEY) == "UNI",
+		})
+	}
+	return info, nil
+}
+
+func postgresTableSchema(db *gorm.DB, database, table string, info *TableSchemaInfo) (*TableSchemaInfo, error) {
+	schema := "public"
+	if database != "" {
+		schema = database
+	}
+	q := `SELECT column_name, data_type, is_nullable, column_default
+		FROM information_schema.columns
+		WHERE table_schema = ? AND table_name = ?
+		ORDER BY ordinal_position`
+	var raw []struct {
+		ColumnName    string
+		DataType      string
+		IsNullable    string
+		ColumnDefault *string
+	}
+	if err := db.Raw(q, schema, table).Scan(&raw).Error; err != nil {
+		return nil, err
+	}
+	// primary key: check pg_constraint
+	pkCols := make(map[string]bool)
+	var pkCheck []struct {
+		Attname string
+	}
+	_ = db.Raw(`SELECT a.attname FROM pg_index i
+		JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey) AND a.attisdropped = false
+		JOIN pg_class c ON c.oid = i.indrelid
+		JOIN pg_namespace n ON n.oid = c.relnamespace
+		WHERE n.nspname = ? AND c.relname = ? AND i.indisprimary`,
+		schema, table).Scan(&pkCheck)
+	for _, r := range pkCheck {
+		pkCols[r.Attname] = true
+	}
+	for _, r := range raw {
+		def := ""
+		if r.ColumnDefault != nil {
+			def = *r.ColumnDefault
+		}
+		info.Columns = append(info.Columns, SchemaColumn{
+			Name:         r.ColumnName,
+			Type:         r.DataType,
+			Nullable:     strings.ToUpper(r.IsNullable) == "YES",
+			DefaultValue: def,
+			IsPrimaryKey: pkCols[r.ColumnName],
+			IsUnique:     false,
 		})
 	}
 	return info, nil

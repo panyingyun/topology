@@ -92,7 +92,7 @@ func IsSelect(q string) bool {
 		strings.HasPrefix(upper, "EXPLAIN") || strings.HasPrefix(upper, "PRAGMA")
 }
 
-// DatabaseNames returns database names for the given driver. MySQL: SHOW DATABASES; SQLite: ["main"].
+// DatabaseNames returns database names for the given driver. MySQL: SHOW DATABASES; PostgreSQL: pg_database; SQLite: ["main"].
 func DatabaseNames(db *gorm.DB, driver string) ([]string, error) {
 	switch driver {
 	case "mysql":
@@ -111,6 +111,22 @@ func DatabaseNames(db *gorm.DB, driver string) ([]string, error) {
 			}
 		}
 		return names, nil
+	case "postgresql", "postgres":
+		cols, rows, err := RawSelect(db, "SELECT datname FROM pg_database WHERE datistemplate = false ORDER BY datname")
+		if err != nil {
+			return nil, err
+		}
+		col := "datname"
+		if len(cols) > 0 {
+			col = cols[0]
+		}
+		var names []string
+		for _, r := range rows {
+			if v, ok := r[col]; ok && v != nil {
+				names = append(names, fmt.Sprint(v))
+			}
+		}
+		return names, nil
 	case "sqlite":
 		return []string{"main"}, nil
 	default:
@@ -118,17 +134,22 @@ func DatabaseNames(db *gorm.DB, driver string) ([]string, error) {
 	}
 }
 
-// TableNames returns table names for the given driver and database. For SQLite, database is ignored.
+// TableNames returns table names for the given driver and database. For SQLite, database is ignored. For PostgreSQL, database is schema (default "public").
 func TableNames(db *gorm.DB, driver, database string) ([]string, error) {
 	var q string
 	switch driver {
 	case "mysql":
 		if database != "" {
-			// SHOW TABLES FROM `db`
 			q = "SHOW TABLES FROM " + quoteIdent(driver, database)
 		} else {
 			q = "SHOW TABLES"
 		}
+	case "postgresql", "postgres":
+		schema := "public"
+		if database != "" {
+			schema = strings.ReplaceAll(database, "'", "''")
+		}
+		q = "SELECT tablename FROM pg_tables WHERE schemaname = '" + schema + "' ORDER BY tablename"
 	case "sqlite":
 		q = "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
 	default:
@@ -140,8 +161,11 @@ func TableNames(db *gorm.DB, driver, database string) ([]string, error) {
 	}
 	var names []string
 	col := "Tables_in_"
-	if database != "" {
+	if database != "" && (driver == "mysql") {
 		col = "Tables_in_" + database
+	}
+	if driver == "postgresql" || driver == "postgres" {
+		col = "tablename"
 	}
 	if len(cols) > 0 {
 		col = cols[0]
@@ -154,11 +178,18 @@ func TableNames(db *gorm.DB, driver, database string) ([]string, error) {
 	return names, nil
 }
 
-// qualTable returns qualified table for queries: MySQL "`db`.`table`" when database set, else "`table`"; SQLite "table".
+// qualTable returns qualified table for queries: MySQL "`db`.`table`"; PostgreSQL "schema"."table" (default "public"); SQLite "table".
 func qualTable(driver, database, table string) string {
 	tbl := quoteIdent(driver, table)
 	if driver == "mysql" && database != "" {
 		return quoteIdent(driver, database) + "." + tbl
+	}
+	if driver == "postgresql" || driver == "postgres" {
+		schema := database
+		if schema == "" {
+			schema = "public"
+		}
+		return quoteIdent(driver, schema) + "." + tbl
 	}
 	return tbl
 }
@@ -192,7 +223,7 @@ func quoteIdent(driver, name string) string {
 	switch driver {
 	case "mysql":
 		return "`" + strings.ReplaceAll(name, "`", "``") + "`"
-	case "sqlite":
+	case "sqlite", "postgresql", "postgres":
 		return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
 	default:
 		return name
