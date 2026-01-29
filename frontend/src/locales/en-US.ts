@@ -1,4 +1,9 @@
 export default {
+  errorOverlay: {
+    title: 'Something went wrong',
+    copy: 'Copy error',
+    copied: 'Copied',
+  },
   common: {
     appName: 'Topology',
     confirm: 'Confirm',

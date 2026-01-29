@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, computed } from 'vue'
 import MainLayout from './views/MainLayout.vue'
+import GlobalErrorOverlay from './components/GlobalErrorOverlay.vue'
 import { useTheme } from './composables/useTheme'
 import { darkTheme, lightTheme } from 'naive-ui'
 
@@ -25,6 +26,7 @@ onUnmounted(() => {
   <n-config-provider :theme="naiveTheme">
     <n-message-provider>
       <MainLayout />
+      <GlobalErrorOverlay />
     </n-message-provider>
   </n-config-provider>
 </template>

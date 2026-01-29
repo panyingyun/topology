@@ -5,9 +5,20 @@ import 'vxe-table/lib/style.css'
 import App from './App.vue'
 import './style.css'
 import i18n from './locales'
+import { setGlobalError } from './state/globalError'
 
 const app = createApp(App)
 app.use(naive)
 app.use(VXETable)
 app.use(i18n)
+
+app.config.errorHandler = (err: unknown, _instance, _info) => {
+  setGlobalError(err)
+}
+
 app.mount('#app')
+
+window.addEventListener('unhandledrejection', (ev) => {
+  const reason = ev?.reason
+  if (reason != null) setGlobalError(reason)
+})

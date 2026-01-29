@@ -171,11 +171,13 @@
 
 **验收 Checklist**：
 
-- [ ] 主要流程有自动化测试保障。
-- [ ] 已知 P0/P1 Bug 已修复或已登记。
-- [ ] 第一阶段总结已输出，第二阶段迭代可启动。
+- [x] 主要流程有自动化测试保障。
+- [x] 已知 P0/P1 Bug 已修复或已登记。
+- [x] 第一阶段总结已输出，第二阶段迭代可启动。
 
 **依赖**：1.1～1.5。**对应 improve-plan**：13.(1)(2)、12.(2) 可选。
+
+**1.6 完成说明**：错误恢复与报告：`globalError` 状态、`setGlobalError`/`clearGlobalError`，`app.config.errorHandler` 与 `unhandledrejection` 捕获未处理异常；`GlobalErrorOverlay` 友好弹窗（复制错误、关闭）， benign 过滤（如 ResizeObserver、ChunkLoadError）。测试与质量：新增 `TestIntegration_LargeResultSetSQLite`（10k 行 TableData）作简单性能检查；既有单元/集成测试通过。第一阶段总结：`docs/phase1-summary.md`（完成项、已知限制、下一阶段优先级），迭代计划已更新。
 
 ---
 
@@ -457,7 +459,7 @@
 | 1.3 | PG 特性 + SQL 智能提示一期 | 已完成 | 见 1.3 完成说明 |
 | 1.4 | 备份恢复一期 + 日志 | 已完成 | 见 1.4 完成说明 |
 | 1.5 | 定时备份 + 文档 | 已完成 | 见 1.5 完成说明 |
-| 1.6 | 稳定性收尾 + 阶段复盘 | 待开始 | - |
+| 1.6 | 稳定性收尾 + 阶段复盘 | 已完成 | 见 1.6 完成说明；总结见 [phase1-summary.md](phase1-summary.md) |
 | 2.1 | 查询缓存 + 索引建议 | 待开始 | - |
 | 2.2 | 批量操作 + 事务 | 待开始 | - |
 | 2.3 | Undo/Redo + 模板与参数化 | 待开始 | - |

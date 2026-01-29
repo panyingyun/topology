@@ -399,6 +399,46 @@ func TestIntegration_TableDataSQLite(t *testing.T) {
 	}
 }
 
+// TestIntegration_LargeResultSetSQLite performs a simple performance check: 10k rows SELECT.
+func TestIntegration_LargeResultSetSQLite(t *testing.T) {
+	dsn, ok := sqliteDSN(t)
+	if !ok {
+		return
+	}
+	connID := "itest-sqlite-large"
+	db, err := Open(connID, "", "sqlite", dsn)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer Close(connID, "")
+
+	_, _ = RawExec(db, `CREATE TABLE IF NOT EXISTS _topology_itest_large (id INTEGER PRIMARY KEY, x INTEGER)`)
+	_, _ = RawExec(db, `DELETE FROM _topology_itest_large`)
+	defer func() { _, _ = RawExec(db, "DROP TABLE IF EXISTS _topology_itest_large") }()
+
+	// Insert 10k rows via recursive CTE
+	_, err = RawExec(db, `INSERT INTO _topology_itest_large (id, x)
+		WITH RECURSIVE cte(n) AS (SELECT 1 UNION ALL SELECT n+1 FROM cte WHERE n<10000)
+		SELECT n, n*10 FROM cte`)
+	if err != nil {
+		t.Fatalf("bulk insert: %v", err)
+	}
+
+	cols, rows, total, err := TableData(db, "sqlite", "", "_topology_itest_large", 10000, 0)
+	if err != nil {
+		t.Fatalf("TableData: %v", err)
+	}
+	if total != 10000 {
+		t.Errorf("TableData total: expected 10000, got %d", total)
+	}
+	if len(cols) != 2 {
+		t.Errorf("TableData cols: expected 2, got %d", len(cols))
+	}
+	if len(rows) != 10000 {
+		t.Errorf("TableData rows: expected 10000, got %d", len(rows))
+	}
+}
+
 func TestIntegration_RawExecMySQL(t *testing.T) {
 	dsn, ok := mysqlDSN(t)
 	if !ok {

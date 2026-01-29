@@ -371,6 +371,7 @@ npm run build
 
 - [用户指南](docs/user-guide.md)：快速入门、连接配置、查询与执行计划、备份恢复、常见问题  
 - [开发者文档](docs/development.md)：架构概览、本地构建与运行、目录说明、贡献指南  
+- [第一阶段总结](docs/phase1-summary.md)：完成项、已知限制、下一阶段优先级  
 - 开发与迭代计划：[docs/development-plan.md](docs/development-plan.md)、[docs/iteration-plan.md](docs/iteration-plan.md)
 
 ## 🤝 贡献

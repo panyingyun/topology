@@ -1,4 +1,9 @@
 export default {
+  errorOverlay: {
+    title: '发生错误',
+    copy: '复制错误信息',
+    copied: '已复制',
+  },
   common: {
     appName: 'Topology',
     confirm: '确定',
