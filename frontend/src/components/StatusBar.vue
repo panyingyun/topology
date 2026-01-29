@@ -28,6 +28,7 @@ const props = defineProps<{
       <span v-if="queryResult && queryResult.affectedRows !== undefined">
         {{ t('statusBar.rows') }}: {{ queryResult.affectedRows }}
       </span>
+      <span v-if="queryResult?.cached" class="text-emerald-500">{{ t('statusBar.cacheHit') }}</span>
       <span v-if="editorLine !== undefined && editorColumn !== undefined">
         {{ t('statusBar.line') }} {{ editorLine }}, {{ t('statusBar.column') }} {{ editorColumn }}
       </span>

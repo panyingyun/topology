@@ -125,6 +125,8 @@ export default {
     json: 'JSON',
     sql: 'SQL Insert',
     copiedToClipboard: '已复制到粘贴板',
+    cacheHit: '来自缓存',
+    cacheStats: '缓存 H:{h} M:{m}',
   },
   history: {
     title: '查询历史',
@@ -221,6 +223,15 @@ export default {
     mysqlOnly: '仅支持 MySQL',
     unsupportedDriver: '执行计划仅支持 MySQL 与 PostgreSQL',
   },
+  indexSuggestions: {
+    title: '索引建议',
+    viewSuggestions: '索引建议',
+    loading: '正在分析...',
+    noSuggestions: '未发现全表扫描，无需索引建议',
+    copy: '复制',
+    copied: '已复制',
+    unsupportedDriver: '索引建议仅支持 MySQL 与 PostgreSQL',
+  },
   backup: {
     backupNow: '立即备份',
     restoreBackup: '从备份恢复',
@@ -273,6 +284,7 @@ export default {
     rows: '行数',
     line: '行',
     column: '列',
+    cacheHit: '缓存命中',
   },
   tabs: {
     noTabs: '没有打开的标签页',

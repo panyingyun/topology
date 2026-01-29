@@ -201,11 +201,13 @@
 
 **验收 Checklist**：
 
-- [ ] 相同查询可命中缓存，界面有命中提示或统计。
-- [ ] 至少一种数据源可产出索引建议。
-- [ ] 性能测试脚本可复现运行。
+- [x] 相同查询可命中缓存，界面有命中提示或统计。
+- [x] 至少一种数据源可产出索引建议。
+- [x] 性能测试脚本可复现运行。
 
 **对应 improve-plan**：4.(2) 查询缓存、4.(3) 索引建议。
+
+**2.1 完成说明**：查询缓存：backend 按 connectionID + 规范化 SQL 缓存 SELECT 结果，TTL 5 分钟、最多 100 条、FIFO 淘汰；`GetQueryCacheStats` 返回 hits/misses；前端 DataGrid 显示「来自缓存」与 Cache H/M 统计，StatusBar 显示缓存命中。索引建议（一期）：`GetIndexSuggestions` 跑 EXPLAIN，识别全表扫描（MySQL type=ALL/index 且 key 空，PG Seq Scan），结合简单 SQL 解析（FROM/JOIN 表、WHERE/ON 列）生成 `CREATE INDEX` 建议；MySQL 与 PG 均支持；前端「索引建议」弹窗展示列表并支持复制。性能测试：`TestIntegration_LargeResultSetSQLite`、`BenchmarkTableData10k`，`testdb/scripts/perf_query.sh` 可复现运行；testdb README 已补充说明。
 
 ---
 
@@ -460,7 +462,7 @@
 | 1.4 | 备份恢复一期 + 日志 | 已完成 | 见 1.4 完成说明 |
 | 1.5 | 定时备份 + 文档 | 已完成 | 见 1.5 完成说明 |
 | 1.6 | 稳定性收尾 + 阶段复盘 | 已完成 | 见 1.6 完成说明；总结见 [phase1-summary.md](phase1-summary.md) |
-| 2.1 | 查询缓存 + 索引建议 | 待开始 | - |
+| 2.1 | 查询缓存 + 索引建议 | 已完成 | 见 2.1 完成说明 |
 | 2.2 | 批量操作 + 事务 | 待开始 | - |
 | 2.3 | Undo/Redo + 模板与参数化 | 待开始 | - |
 | 2.4 | ER 图 + 执行计划增强 | 待开始 | - |

@@ -80,6 +80,7 @@ export interface QueryResult {
   executionTime?: number;
   affectedRows?: number;
   error?: string;
+  cached?: boolean;
 }
 
 // Table data types
@@ -184,6 +185,13 @@ export interface ExecutionPlanResult {
     warnings?: string[]
   }
   error?: string
+}
+
+export interface IndexSuggestion {
+  table: string
+  columns?: string[]
+  createIndex: string
+  reason: string
 }
 
 // Live monitor (MySQL): real-time stats pushed via "live-stats" event

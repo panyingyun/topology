@@ -31,6 +31,10 @@ export function GetDatabases(arg1:string,arg2:string):Promise<string>;
 
 export function GetExecutionPlan(arg1:string,arg2:string,arg3:string):Promise<string>;
 
+export function GetIndexSuggestions(arg1:string,arg2:string,arg3:string):Promise<string>;
+
+export function GetQueryCacheStats():Promise<string>;
+
 export function GetQueryHistory(arg1:string,arg2:string,arg3:number):Promise<string>;
 
 export function GetSchemaMetadata(arg1:string):Promise<string>;

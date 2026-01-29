@@ -62,6 +62,14 @@ export function GetExecutionPlan(arg1, arg2, arg3) {
   return window['go']['main']['App']['GetExecutionPlan'](arg1, arg2, arg3);
 }
 
+export function GetIndexSuggestions(arg1, arg2, arg3) {
+  return window['go']['main']['App']['GetIndexSuggestions'](arg1, arg2, arg3);
+}
+
+export function GetQueryCacheStats() {
+  return window['go']['main']['App']['GetQueryCacheStats']();
+}
+
 export function GetQueryHistory(arg1, arg2, arg3) {
   return window['go']['main']['App']['GetQueryHistory'](arg1, arg2, arg3);
 }

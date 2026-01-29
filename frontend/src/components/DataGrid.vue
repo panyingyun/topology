@@ -18,6 +18,8 @@ const props = withDefaults(
     readonly?: boolean
     /** When true, use light table theme + border-only selection (for query results). */
     useLightTable?: boolean
+    /** Optional cache stats for query results (hits / misses). */
+    cacheStats?: { hits: number; misses: number }
   }>(),
   { readonly: false, useLightTable: false }
 )
@@ -205,6 +207,8 @@ onUnmounted(() => {
     <div class="h-10 flex items-center justify-between px-4 theme-bg-panel border-b theme-border">
       <div class="flex items-center gap-4 text-xs theme-text-muted">
         <span>{{ t('dataGrid.rows') }}: {{ data.rowCount.toLocaleString() }}</span>
+        <span v-if="data.cached" class="text-emerald-500">{{ t('dataGrid.cacheHit') }}</span>
+        <span v-if="cacheStats" class="opacity-80">{{ t('dataGrid.cacheStats', { h: cacheStats.hits, m: cacheStats.misses }) }}</span>
         <span v-if="!props.readonly && pendingChanges > 0" class="text-yellow-400">
           {{ pendingChanges }} {{ t('dataGrid.pendingChanges') }}
         </span>

@@ -125,6 +125,8 @@ export default {
     json: 'JSON',
     sql: 'SQL Insert',
     copiedToClipboard: 'Copied to clipboard',
+    cacheHit: 'From cache',
+    cacheStats: 'Cache H:{h} M:{m}',
   },
   history: {
     title: 'Query History',
@@ -221,6 +223,15 @@ export default {
     mysqlOnly: 'MySQL only',
     unsupportedDriver: 'Execution plan is supported for MySQL and PostgreSQL only.',
   },
+  indexSuggestions: {
+    title: 'Index Suggestions',
+    viewSuggestions: 'Index Suggestions',
+    loading: 'Analyzing...',
+    noSuggestions: 'No full table scans found; no index suggestions.',
+    copy: 'Copy',
+    copied: 'Copied',
+    unsupportedDriver: 'Index suggestions are supported for MySQL and PostgreSQL only.',
+  },
   backup: {
     backupNow: 'Backup Now',
     restoreBackup: 'Restore from Backup',
@@ -273,6 +284,7 @@ export default {
     rows: 'Rows',
     line: 'Ln',
     column: 'Col',
+    cacheHit: 'Cache hit',
   },
   tabs: {
     noTabs: 'No tabs open',

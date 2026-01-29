@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, shallowRef, watch } from 'vue'
-import { Play, Square, FileCode, Save, History, Sparkles, Bookmark, GitBranch } from 'lucide-vue-next'
+import { Play, Square, FileCode, Save, History, Sparkles, Bookmark, GitBranch, Key } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import * as monaco from 'monaco-editor'
 import { queryService } from '../services/queryService'
@@ -13,6 +13,7 @@ import QueryHistory from '../components/QueryHistory.vue'
 import Snippets from '../components/Snippets.vue'
 import SQLAnalyzer from '../components/SQLAnalyzer.vue'
 import ExecutionPlanViewer from '../components/ExecutionPlanViewer.vue'
+import IndexSuggestionsViewer from '../components/IndexSuggestionsViewer.vue'
 import type { QueryResult, Connection } from '../types'
 import type { ExportFormat } from '../types'
 
@@ -57,6 +58,8 @@ const showSnippets = ref(false)
 const snippetRefreshKey = ref(0)
 const showAnalyzer = ref(false)
 const showExplainPlan = ref(false)
+const showIndexSuggestions = ref(false)
+const cacheStats = ref<{ hits: number; misses: number } | null>(null)
 
 const {
   load: loadSchemaMetadata,
@@ -297,6 +300,8 @@ const runExecute = async () => {
     const result = await queryService.executeQuery(connectionId, props.tabId ?? '', queryToExecute)
     queryResult.value = result
     emit('query-result', result)
+    const stats = await queryService.getQueryCacheStats()
+    cacheStats.value = stats
   } catch (error) {
     console.error('Query execution error:', error)
     const errMsg = error instanceof Error ? error.message : 'Unknown error'
@@ -307,6 +312,8 @@ const runExecute = async () => {
       error: errMsg,
     }
     emit('query-result', queryResult.value)
+    const stats = await queryService.getQueryCacheStats()
+    cacheStats.value = stats
   } finally {
     isRunning.value = false
   }
@@ -563,6 +570,15 @@ const handleExportQueryResult = (format: ExportFormat) => {
           <GitBranch :size="14" class="inline mr-1" />
           {{ t('explainPlan.viewPlan') }}
         </button>
+
+        <button
+          @click="showIndexSuggestions = true"
+          class="px-3 py-1 rounded text-xs theme-bg-input theme-bg-input-hover theme-text transition-colors"
+          :title="t('indexSuggestions.title')"
+        >
+          <Key :size="14" class="inline mr-1" />
+          {{ t('indexSuggestions.viewSuggestions') }}
+        </button>
       </div>
     </div>
 
@@ -592,6 +608,7 @@ const handleExportQueryResult = (format: ExportFormat) => {
           :query-text="sqlQuery"
           :readonly="true"
           :use-light-table="true"
+          :cache-stats="cacheStats ?? undefined"
           @update="(updates) => console.log('Updates:', updates)"
           @export="handleExportQueryResult"
         />
@@ -641,6 +658,16 @@ const handleExportQueryResult = (format: ExportFormat) => {
       :sql="sqlQuery"
       :driver="connection?.type"
       @close="showExplainPlan = false"
+    />
+
+    <!-- Index Suggestions -->
+    <IndexSuggestionsViewer
+      :show="showIndexSuggestions"
+      :connection-id="connectionId ?? ''"
+      :tab-id="tabId ?? ''"
+      :sql="sqlQuery"
+      :driver="connection?.type"
+      @close="showIndexSuggestions = false"
     />
   </div>
 </template>

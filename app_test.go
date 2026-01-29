@@ -106,3 +106,25 @@ func TestExtractPGExplainJSON(t *testing.T) {
 		t.Errorf("extract bytes: got %q", s2)
 	}
 }
+
+func TestExtractIndexHintTablesAndCols(t *testing.T) {
+	tables, cols := ExtractIndexHintTablesAndCols("SELECT a, b FROM t1 JOIN t2 ON t1.id = t2.id WHERE t1.x = 1")
+	if len(tables) < 2 {
+		t.Errorf("expected at least 2 tables, got %d", len(tables))
+	}
+	if len(cols) < 2 {
+		t.Errorf("expected at least 2 cols, got %d", len(cols))
+	}
+	hasID, hasX := false, false
+	for _, c := range cols {
+		if c == "id" {
+			hasID = true
+		}
+		if c == "x" {
+			hasX = true
+		}
+	}
+	if !hasID || !hasX {
+		t.Errorf("expected id and x in cols, got %v", cols)
+	}
+}

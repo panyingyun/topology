@@ -1,6 +1,6 @@
-import type { QueryResult, ExecutionPlanResult } from '../types'
+import type { QueryResult, ExecutionPlanResult, IndexSuggestion } from '../types'
 
-import { ExecuteQuery, FormatSQL, GetExecutionPlan } from '../../wailsjs/go/main/App'
+import { ExecuteQuery, FormatSQL, GetExecutionPlan, GetQueryCacheStats, GetIndexSuggestions } from '../../wailsjs/go/main/App'
 
 const QUERY_TIMEOUT_MS = 120000 // 2 minutes
 
@@ -54,6 +54,33 @@ export const queryService = {
         nodes: [],
         summary: {},
         error: error instanceof Error ? error.message : 'Unknown error',
+      }
+    }
+  },
+
+  async getQueryCacheStats(): Promise<{ hits: number; misses: number }> {
+    try {
+      const raw = await GetQueryCacheStats()
+      const o = JSON.parse(raw) as { hits: number; misses: number }
+      return { hits: o.hits ?? 0, misses: o.misses ?? 0 }
+    } catch {
+      return { hits: 0, misses: 0 }
+    }
+  },
+
+  async getIndexSuggestions(
+    connectionId: string,
+    sessionId: string,
+    sql: string
+  ): Promise<{ suggestions: IndexSuggestion[]; error?: string }> {
+    try {
+      const raw = await GetIndexSuggestions(connectionId, sessionId, sql)
+      const o = JSON.parse(raw) as { suggestions?: IndexSuggestion[]; error?: string }
+      return { suggestions: o.suggestions ?? [], error: o.error }
+    } catch (e) {
+      return {
+        suggestions: [],
+        error: e instanceof Error ? e.message : 'Failed to get index suggestions',
       }
     }
   },

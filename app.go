@@ -14,6 +14,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -154,6 +155,7 @@ type QueryResult struct {
 	ExecutionTime int                      `json:"executionTime,omitempty"`
 	AffectedRows  int                      `json:"affectedRows,omitempty"`
 	Error         string                   `json:"error,omitempty"`
+	Cached        bool                     `json:"cached,omitempty"`
 }
 
 // ExecutionPlanNode represents one step in EXPLAIN result for visualization.
@@ -178,6 +180,14 @@ type ExecutionPlanResult struct {
 		Warnings        []string `json:"warnings,omitempty"`
 	} `json:"summary"`
 	Error string `json:"error,omitempty"`
+}
+
+// IndexSuggestion is one CREATE INDEX suggestion from GetIndexSuggestions.
+type IndexSuggestion struct {
+	Table       string   `json:"table"`
+	Columns     []string `json:"columns,omitempty"`
+	CreateIndex string   `json:"createIndex"`
+	Reason      string   `json:"reason"`
 }
 
 type TableData struct {
@@ -276,6 +286,31 @@ var (
 	scheduleMu          sync.Mutex
 	backupSchedules     []BackupSchedule
 	schedulesFilePath   string
+	queryCacheMu        sync.Mutex
+	queryCache          = make(map[string]queryCacheEntry)
+	queryCacheOrder     []string
+	queryCacheHits      int64
+	queryCacheMisses    int64
+)
+
+type queryCacheEntry struct {
+	cols     []string
+	rows     []map[string]interface{}
+	rowCount int
+	execMs   int
+	at       time.Time
+}
+
+var (
+	wsRegex       = regexp.MustCompile(`\s+`)
+	fromJoinRegex = regexp.MustCompile(`(?i)(?:FROM|JOIN)\s+(?:[\w.]+\.)?(\w+)`)
+	whereColRegex = regexp.MustCompile(`\b(\w+)\s*[=<>]`)
+	indexHintSkip = map[string]bool{"AND": true, "OR": true, "ON": true, "IN": true, "AS": true, "SELECT": true, "WHERE": true, "JOIN": true, "LEFT": true, "RIGHT": true, "INNER": true, "OUTER": true, "NULL": true}
+)
+
+const (
+	queryCacheTTL        = 5 * time.Minute
+	queryCacheMaxEntries = 100
 )
 
 const (
@@ -839,11 +874,22 @@ func (a *App) DeleteConnection(id string) error {
 }
 
 // ExecuteQuery executes a SQL query. sessionID optionally isolates this tab's DB session (e.g. tab id).
+// SELECT results are cached by connectionID + normalized SQL; TTL and size limits apply.
 func (a *App) ExecuteQuery(connectionID, sessionID, sql string) string {
 	conn := getConnByID(connectionID)
 	if conn == nil {
 		return mustMarshalResult(nil, nil, 0, 0, userFacingError(fmt.Errorf("connection not found: %s", connectionID)).Message)
 	}
+
+	if db.IsSelect(sql) {
+		key := queryCacheKey(connectionID, sql)
+		if ent, hit := queryCacheGet(key); hit {
+			queryCacheRecordHit()
+			return marshalQueryResultCached(ent.cols, ent.rows, ent.rowCount, ent.execMs, true)
+		}
+		queryCacheRecordMiss()
+	}
+
 	g, err := getOrOpenDB(connectionID, sessionID)
 	if err != nil {
 		return mustMarshalResult(nil, nil, 0, 0, userFacingError(err).Message)
@@ -864,6 +910,8 @@ func (a *App) ExecuteQuery(connectionID, sessionID, sql string) string {
 			rowCount = len(rows)
 			result = mustMarshalResult(cols, rows, rowCount, elapsed, "")
 			success = true
+			key := queryCacheKey(connectionID, sql)
+			queryCacheSet(key, queryCacheEntry{cols: cols, rows: rows, rowCount: rowCount, execMs: elapsed})
 		}
 	} else {
 		affected, err := db.RawExec(g, sql)
@@ -1340,6 +1388,242 @@ func mustMarshalResult(cols []string, rows []map[string]interface{}, rowCount, e
 	}
 	data, _ := json.Marshal(r)
 	return string(data)
+}
+
+func marshalQueryResultCached(cols []string, rows []map[string]interface{}, rowCount, execMs int, cached bool) string {
+	r := QueryResult{Columns: cols, Rows: rows, RowCount: rowCount, ExecutionTime: execMs, Cached: cached}
+	data, _ := json.Marshal(r)
+	return string(data)
+}
+
+func normalizeSQL(sql string) string {
+	s := strings.TrimSpace(sql)
+	return wsRegex.ReplaceAllString(s, " ")
+}
+
+func queryCacheKey(connID, sql string) string {
+	return connID + "\x00" + normalizeSQL(sql)
+}
+
+func queryCacheGet(key string) (queryCacheEntry, bool) {
+	queryCacheMu.Lock()
+	defer queryCacheMu.Unlock()
+	e, ok := queryCache[key]
+	if !ok {
+		return queryCacheEntry{}, false
+	}
+	if time.Since(e.at) > queryCacheTTL {
+		delete(queryCache, key)
+		for i, k := range queryCacheOrder {
+			if k == key {
+				queryCacheOrder = append(queryCacheOrder[:i], queryCacheOrder[i+1:]...)
+				break
+			}
+		}
+		return queryCacheEntry{}, false
+	}
+	return e, true
+}
+
+func queryCacheSet(key string, e queryCacheEntry) {
+	queryCacheMu.Lock()
+	defer queryCacheMu.Unlock()
+	e.at = time.Now()
+	if _, exists := queryCache[key]; exists {
+		for i, k := range queryCacheOrder {
+			if k == key {
+				queryCacheOrder = append(queryCacheOrder[:i], queryCacheOrder[i+1:]...)
+				break
+			}
+		}
+	}
+	for len(queryCache) >= queryCacheMaxEntries && len(queryCacheOrder) > 0 {
+		evict := queryCacheOrder[0]
+		queryCacheOrder = queryCacheOrder[1:]
+		delete(queryCache, evict)
+	}
+	queryCache[key] = e
+	queryCacheOrder = append(queryCacheOrder, key)
+}
+
+func queryCacheStats() (hits, misses int64) {
+	queryCacheMu.Lock()
+	defer queryCacheMu.Unlock()
+	return queryCacheHits, queryCacheMisses
+}
+
+func queryCacheRecordHit() {
+	queryCacheMu.Lock()
+	queryCacheHits++
+	queryCacheMu.Unlock()
+}
+
+func queryCacheRecordMiss() {
+	queryCacheMu.Lock()
+	queryCacheMisses++
+	queryCacheMu.Unlock()
+}
+
+// GetQueryCacheStats returns JSON { "hits": N, "misses": M } for cache hit-rate visibility.
+func (a *App) GetQueryCacheStats() string {
+	h, m := queryCacheStats()
+	out := struct {
+		Hits   int64 `json:"hits"`
+		Misses int64 `json:"misses"`
+	}{Hits: h, Misses: m}
+	b, _ := json.Marshal(out)
+	return string(b)
+}
+
+// ExtractIndexHintTablesAndCols parses SQL for table (FROM/JOIN) and column (WHERE/ON) hints. Used by index suggestions.
+func ExtractIndexHintTablesAndCols(sql string) (tables []string, cols []string) {
+	norm := wsRegex.ReplaceAllString(strings.TrimSpace(sql), " ")
+	for _, m := range fromJoinRegex.FindAllStringSubmatch(norm, -1) {
+		if len(m) > 1 && m[1] != "" && !indexHintSkip[strings.ToUpper(m[1])] {
+			tables = append(tables, m[1])
+		}
+	}
+	seenCol := make(map[string]bool)
+	for _, m := range whereColRegex.FindAllStringSubmatch(norm, -1) {
+		if len(m) > 1 && m[1] != "" && !indexHintSkip[strings.ToUpper(m[1])] && !seenCol[m[1]] {
+			seenCol[m[1]] = true
+			cols = append(cols, m[1])
+		}
+	}
+	return tables, cols
+}
+
+func extractIndexHintTablesAndCols(sql string) (tables []string, cols []string) {
+	return ExtractIndexHintTablesAndCols(sql)
+}
+
+// GetIndexSuggestions runs EXPLAIN on the given SELECT, detects full-table scans, and returns CREATE INDEX suggestions.
+// MySQL and PostgreSQL supported. Uses simple SQL parsing to infer tables and WHERE/JOIN columns.
+func (a *App) GetIndexSuggestions(connectionID, sessionID, sql string) string {
+	var out struct {
+		Suggestions []IndexSuggestion `json:"suggestions"`
+		Error       string            `json:"error,omitempty"`
+	}
+	conn := getConnByID(connectionID)
+	if conn == nil {
+		out.Error = "connection not found"
+		b, _ := json.Marshal(out)
+		return string(b)
+	}
+	sql = strings.TrimSpace(sql)
+	if !db.IsSelect(sql) || strings.HasPrefix(strings.ToUpper(sql), "EXPLAIN") {
+		out.Error = "only SELECT queries can be analyzed for index suggestions"
+		b, _ := json.Marshal(out)
+		return string(b)
+	}
+	g, err := getOrOpenDB(connectionID, sessionID)
+	if err != nil {
+		out.Error = userFacingError(err).Message
+		b, _ := json.Marshal(out)
+		return string(b)
+	}
+	_, colsFromSQL := extractIndexHintTablesAndCols(sql)
+	driver := conn.Type
+	if driver == "postgres" {
+		driver = "postgresql"
+	}
+	quote := func(s string) string { return quoteIdent(driver, s) }
+
+	var fullScanTables []string
+	switch conn.Type {
+	case "mysql":
+		explainSQL := "EXPLAIN " + sql
+		_, rows, err := db.RawSelect(g, explainSQL)
+		if err != nil {
+			out.Error = userFacingError(err).Message
+			b, _ := json.Marshal(out)
+			return string(b)
+		}
+		getVal := func(row map[string]interface{}, keys ...string) string {
+			for _, k := range keys {
+				for mapK, v := range row {
+					if strings.EqualFold(mapK, k) && v != nil {
+						return strings.TrimSpace(fmt.Sprint(v))
+					}
+				}
+			}
+			return ""
+		}
+		seen := make(map[string]bool)
+		for _, row := range rows {
+			typeVal := getVal(row, "type", "Type")
+			tableVal := getVal(row, "table", "Table")
+			keyVal := getVal(row, "key", "Key")
+			if (typeVal == "ALL" || typeVal == "index") && (keyVal == "" || strings.EqualFold(keyVal, "NULL")) && tableVal != "" && !seen[tableVal] {
+				seen[tableVal] = true
+				fullScanTables = append(fullScanTables, tableVal)
+			}
+		}
+	case "postgresql", "postgres":
+		explainSQL := "EXPLAIN (ANALYZE, VERBOSE, FORMAT JSON) " + sql
+		cols, rows, err := db.RawSelect(g, explainSQL)
+		if err != nil {
+			out.Error = userFacingError(err).Message
+			b, _ := json.Marshal(out)
+			return string(b)
+		}
+		if len(rows) == 0 {
+			b, _ := json.Marshal(out)
+			return string(b)
+		}
+		jsonStr := extractPGExplainJSON(rows[0], cols)
+		if jsonStr == "" {
+			b, _ := json.Marshal(out)
+			return string(b)
+		}
+		nodes, _, parseErr := parsePGExplainJSON(jsonStr)
+		if parseErr != nil {
+			out.Error = userFacingError(parseErr).Message
+			b, _ := json.Marshal(out)
+			return string(b)
+		}
+		seen := make(map[string]bool)
+		for _, n := range nodes {
+			if n.FullTableScan && n.Label != "" && !seen[n.Label] {
+				seen[n.Label] = true
+				fullScanTables = append(fullScanTables, n.Label)
+			}
+		}
+	default:
+		out.Error = "index suggestions are supported for MySQL and PostgreSQL only"
+		b, _ := json.Marshal(out)
+		return string(b)
+	}
+
+	for _, t := range fullScanTables {
+		reason := "Full table scan on '" + t + "'"
+		var cols []string
+		for _, c := range colsFromSQL {
+			cols = append(cols, c)
+		}
+		var createIndex string
+		if len(cols) > 0 {
+			var idxCols []string
+			for _, c := range cols {
+				idxCols = append(idxCols, quote(c))
+			}
+			idxName := "idx_" + t
+			if len(idxName) > 50 {
+				idxName = idxName[:50]
+			}
+			createIndex = fmt.Sprintf("CREATE INDEX %s ON %s (%s);", quote(idxName), quote(t), strings.Join(idxCols, ", "))
+		} else {
+			createIndex = "-- Consider adding an index on table " + quote(t) + ". Add columns from WHERE/JOIN. Example: CREATE INDEX " + quote("idx_"+t) + " ON " + quote(t) + "(col1, col2);"
+		}
+		out.Suggestions = append(out.Suggestions, IndexSuggestion{
+			Table:       t,
+			Columns:     cols,
+			CreateIndex: createIndex,
+			Reason:      reason,
+		})
+	}
+	b, _ := json.Marshal(out)
+	return string(b)
 }
 
 // FormatSQL formats a SQL query (no-op for now)

@@ -439,6 +439,33 @@ func TestIntegration_LargeResultSetSQLite(t *testing.T) {
 	}
 }
 
+// BenchmarkTableData10k measures TableData performance over 10k rows (SQLite). Skips if testdb/realm.db missing.
+func BenchmarkTableData10k(b *testing.B) {
+	path := itestPath("realm.db")
+	if _, err := os.Stat(path); err != nil {
+		b.Skipf("SQLite %s not found", path)
+	}
+	dsn := path
+	connID := "bench-sqlite-large"
+	db, err := Open(connID, "", "sqlite", dsn)
+	if err != nil {
+		b.Fatalf("Open: %v", err)
+	}
+	defer Close(connID, "")
+
+	_, _ = RawExec(db, `CREATE TABLE IF NOT EXISTS _topology_bench_large (id INTEGER PRIMARY KEY, x INTEGER)`)
+	_, _ = RawExec(db, `DELETE FROM _topology_bench_large`)
+	_, _ = RawExec(db, `INSERT INTO _topology_bench_large (id, x)
+		WITH RECURSIVE cte(n) AS (SELECT 1 UNION ALL SELECT n+1 FROM cte WHERE n<10000)
+		SELECT n, n*10 FROM cte`)
+	defer func() { _, _ = RawExec(db, "DROP TABLE IF EXISTS _topology_bench_large") }()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _, _, _ = TableData(db, "sqlite", "", "_topology_bench_large", 10000, 0)
+	}
+}
+
 func TestIntegration_RawExecMySQL(t *testing.T) {
 	dsn, ok := mysqlDSN(t)
 	if !ok {
