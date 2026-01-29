@@ -50,6 +50,7 @@ func (a *App) startup(ctx context.Context) {
 	} else {
 		logger.Info("topology started; log dir %s", logDir)
 	}
+	go runBackupScheduler()
 }
 
 // Connection types
@@ -272,6 +273,9 @@ var (
 	backupMu            sync.Mutex
 	backupRecords       []BackupRecord
 	backupsFilePath     string
+	scheduleMu          sync.Mutex
+	backupSchedules     []BackupSchedule
+	schedulesFilePath   string
 )
 
 const (
@@ -289,6 +293,22 @@ type BackupRecord struct {
 	Path         string `json:"path"`
 	At           string `json:"at"` // ISO8601
 }
+
+// BackupSchedule defines a scheduled backup (daily or weekly).
+type BackupSchedule struct {
+	ConnectionID string `json:"connectionId"`
+	Enabled      bool   `json:"enabled"`
+	Schedule     string `json:"schedule"` // "daily" | "weekly"
+	Time         string `json:"time"`     // "HH:MM" 24h
+	Day          int    `json:"day"`      // 0=Sun..6=Sat for weekly
+	OutputDir    string `json:"outputDir,omitempty"`
+	LastRun      string `json:"lastRun,omitempty"` // RFC3339
+}
+
+const (
+	schedulesFileName = "backup_schedules.json"
+	defaultBackupDir  = "backups"
+)
 
 func getAppDir() string {
 	home, _ := os.UserConfigDir()
@@ -378,6 +398,74 @@ func appendBackupRecord(connID, path string) {
 		backupRecords = backupRecords[len(backupRecords)-maxBackupRecords:]
 	}
 	_ = saveBackupRecords(backupRecords)
+}
+
+func removeBackupRecord(path string) bool {
+	backupMu.Lock()
+	defer backupMu.Unlock()
+	if backupRecords == nil {
+		backupRecords = loadBackupRecords()
+	}
+	for i, r := range backupRecords {
+		if r.Path == path {
+			backupRecords = append(backupRecords[:i], backupRecords[i+1:]...)
+			_ = saveBackupRecords(backupRecords)
+			return true
+		}
+	}
+	return false
+}
+
+func getSchedulesFilePath() string {
+	if schedulesFilePath == "" {
+		schedulesFilePath = filepath.Join(getAppDir(), schedulesFileName)
+	}
+	return schedulesFilePath
+}
+
+func loadBackupSchedules() []BackupSchedule {
+	data, err := os.ReadFile(getSchedulesFilePath())
+	if err != nil {
+		return nil
+	}
+	var s []BackupSchedule
+	_ = json.Unmarshal(data, &s)
+	return s
+}
+
+func saveBackupSchedules(s []BackupSchedule) error {
+	data, err := json.MarshalIndent(s, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(getSchedulesFilePath(), data, 0o644)
+}
+
+// backupToPath runs backup for connectionID to outputPath, appends record. Caller ensures path is absolute.
+func backupToPath(connectionID, outputPath string) error {
+	conn := getConnByID(connectionID)
+	if conn == nil {
+		return fmt.Errorf("connection not found")
+	}
+	ty := conn.Type
+	if ty != "mysql" && ty != "postgresql" && ty != "postgres" && ty != "sqlite" {
+		return fmt.Errorf("backup only supported for MySQL, PostgreSQL, SQLite")
+	}
+	pc := &backup.Conn{
+		Type:     ty,
+		Host:     conn.Host,
+		Port:     conn.Port,
+		Username: conn.Username,
+		Password: conn.Password,
+		Database: conn.Database,
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	if err := backup.RunBackup(ctx, pc, outputPath); err != nil {
+		return err
+	}
+	appendBackupRecord(connectionID, outputPath)
+	return nil
 }
 
 // loadConnectionsFromFile returns (connections, fileExisted). When fileExisted is true, use the result
@@ -1386,23 +1474,11 @@ func (a *App) BackupNow(connectionID string) string {
 		data, _ := json.Marshal(out)
 		return string(data)
 	}
-
-	pc := &backup.Conn{
-		Type:     ty,
-		Host:     conn.Host,
-		Port:     conn.Port,
-		Username: conn.Username,
-		Password: conn.Password,
-		Database: conn.Database,
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer cancel()
-	if err := backup.RunBackup(ctx, pc, path); err != nil {
+	if err := backupToPath(connectionID, path); err != nil {
 		out.Error = userFacingError(err).Message
 		data, _ := json.Marshal(out)
 		return string(data)
 	}
-	appendBackupRecord(connectionID, path)
 	out.Success = true
 	out.Path = path
 	data, _ := json.Marshal(out)
@@ -1489,6 +1565,169 @@ func (a *App) PickBackupFile() string {
 		return ""
 	}
 	return path
+}
+
+func nextRun(s *BackupSchedule, base time.Time) time.Time {
+	parts := strings.SplitN(s.Time, ":", 2)
+	if len(parts) != 2 {
+		return base
+	}
+	h, _ := strconv.Atoi(strings.TrimSpace(parts[0]))
+	m, _ := strconv.Atoi(strings.TrimSpace(parts[1]))
+	if h < 0 || h > 23 || m < 0 || m > 59 {
+		return base
+	}
+	if base.IsZero() {
+		base = time.Now()
+	}
+	candidate := time.Date(base.Year(), base.Month(), base.Day(), h, m, 0, 0, base.Location())
+	if s.Schedule == "daily" {
+		if base.Before(candidate) {
+			return candidate
+		}
+		return candidate.AddDate(0, 0, 1)
+	}
+	if s.Schedule == "weekly" {
+		for i := 0; i < 8; i++ {
+			if int(candidate.Weekday()) == s.Day && !candidate.Before(base) {
+				return candidate
+			}
+			candidate = candidate.AddDate(0, 0, 1)
+		}
+		return candidate
+	}
+	return base
+}
+
+func runBackupScheduler() {
+	tick := time.NewTicker(1 * time.Minute)
+	defer tick.Stop()
+	for range tick.C {
+		scheduleMu.Lock()
+		if backupSchedules == nil {
+			backupSchedules = loadBackupSchedules()
+		}
+		schedules := make([]BackupSchedule, len(backupSchedules))
+		copy(schedules, backupSchedules)
+		scheduleMu.Unlock()
+
+		now := time.Now()
+		for i := range schedules {
+			s := &schedules[i]
+			if !s.Enabled {
+				continue
+			}
+			var lastRun time.Time
+			if s.LastRun != "" {
+				lastRun, _ = time.Parse(time.RFC3339, s.LastRun)
+			}
+			nr := nextRun(s, lastRun)
+			if !now.Before(nr) && (lastRun.IsZero() || now.Sub(lastRun) > 2*time.Minute) {
+				conn := getConnByID(s.ConnectionID)
+				if conn == nil {
+					continue
+				}
+				outDir := s.OutputDir
+				if outDir == "" {
+					outDir = filepath.Join(getAppDir(), defaultBackupDir)
+				}
+				_ = os.MkdirAll(outDir, 0o755)
+				safeName := strings.Map(func(r rune) rune {
+					if r == ' ' || r == '/' || r == '\\' || r == ':' {
+						return '-'
+					}
+					return r
+				}, conn.Name)
+				fname := fmt.Sprintf("%s-%s.sql", safeName, now.Format("20060102-150405"))
+				path := filepath.Join(outDir, fname)
+				if err := backupToPath(s.ConnectionID, path); err != nil {
+					logger.Warn("scheduled backup failed: %v", err)
+				} else {
+					logger.Info("scheduled backup ok: %s", path)
+				}
+				schedules[i].LastRun = now.Format(time.RFC3339)
+				scheduleMu.Lock()
+				backupSchedules = schedules
+				_ = saveBackupSchedules(backupSchedules)
+				scheduleMu.Unlock()
+			}
+		}
+	}
+}
+
+// GetBackupSchedules returns JSON array of backup schedules.
+func (a *App) GetBackupSchedules() string {
+	scheduleMu.Lock()
+	if backupSchedules == nil {
+		backupSchedules = loadBackupSchedules()
+	}
+	out := make([]BackupSchedule, len(backupSchedules))
+	copy(out, backupSchedules)
+	scheduleMu.Unlock()
+	data, _ := json.Marshal(out)
+	return string(data)
+}
+
+// SetBackupSchedules saves backup schedules from JSON array.
+func (a *App) SetBackupSchedules(jsonSchedules string) error {
+	var s []BackupSchedule
+	if err := json.Unmarshal([]byte(jsonSchedules), &s); err != nil {
+		return err
+	}
+	scheduleMu.Lock()
+	backupSchedules = s
+	scheduleMu.Unlock()
+	return saveBackupSchedules(s)
+}
+
+// DeleteBackup removes a backup record and deletes the file. path must match a stored record.
+func (a *App) DeleteBackup(path string) string {
+	if path == "" {
+		out, _ := json.Marshal(map[string]interface{}{"success": false, "error": "path required"})
+		return string(out)
+	}
+	// Check record exists before deleting file
+	backupMu.Lock()
+	if backupRecords == nil {
+		backupRecords = loadBackupRecords()
+	}
+	found := false
+	for _, r := range backupRecords {
+		if r.Path == path {
+			found = true
+			break
+		}
+	}
+	backupMu.Unlock()
+	if !found {
+		out, _ := json.Marshal(map[string]interface{}{"success": false, "error": "backup not found"})
+		return string(out)
+	}
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		out, _ := json.Marshal(map[string]interface{}{"success": false, "error": err.Error()})
+		return string(out)
+	}
+	if !removeBackupRecord(path) {
+		out, _ := json.Marshal(map[string]interface{}{"success": false, "error": "backup not found"})
+		return string(out)
+	}
+	out, _ := json.Marshal(map[string]interface{}{"success": true})
+	return string(out)
+}
+
+// VerifyBackup returns JSON { "exists": bool, "size": int64 } for the given path.
+func (a *App) VerifyBackup(path string) string {
+	if path == "" {
+		data, _ := json.Marshal(map[string]interface{}{"exists": false, "size": int64(0)})
+		return string(data)
+	}
+	fi, err := os.Stat(path)
+	if err != nil {
+		data, _ := json.Marshal(map[string]interface{}{"exists": false, "size": int64(0)})
+		return string(data)
+	}
+	data, _ := json.Marshal(map[string]interface{}{"exists": true, "size": fi.Size()})
+	return string(data)
 }
 
 // GetDatabases returns database names for a connection (MySQL: SHOW DATABASES; PostgreSQL: schema names of current DB; SQLite: ["main"]). sessionID optional for tab isolation.

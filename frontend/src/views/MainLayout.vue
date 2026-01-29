@@ -12,6 +12,7 @@ import ConnectionManager from './ConnectionManager.vue'
 import TableDesigner from '../components/TableDesigner.vue'
 import LiveMonitor from '../components/LiveMonitor.vue'
 import RestoreBackupModal from '../components/RestoreBackupModal.vue'
+import BackupManagerModal from '../components/BackupManagerModal.vue'
 import { ReleaseSession } from '../../wailsjs/go/main/App'
 import { connectionService } from '../services/connectionService'
 import { queryService } from '../services/queryService'
@@ -33,6 +34,7 @@ const showLiveMonitor = ref(false)
 const monitorConnection = ref<Connection | null>(null)
 const showRestoreModal = ref(false)
 const restoreConnectionId = ref('')
+const showBackupManager = ref(false)
 const connections = ref<Connection[]>([])
 const tabs = ref<TabItem[]>([])
 const activeTabId = ref('')
@@ -384,6 +386,7 @@ const showEditorPosition = computed(() => activeTab.value?.type === 'query')
         @open-monitor="handleOpenMonitor"
         @backup="handleBackup"
         @restore="handleRestore"
+        @open-backup-manager="showBackupManager = true"
         @import-navicat="handleImportNavicat"
       />
 
@@ -470,6 +473,12 @@ const showEditorPosition = computed(() => activeTab.value?.type === 'query')
       :show="showRestoreModal"
       :connection-id="restoreConnectionId"
       @close="showRestoreModal = false; restoreConnectionId = ''"
+    />
+
+    <BackupManagerModal
+      :show="showBackupManager"
+      :connections="connections"
+      @close="showBackupManager = false"
     />
 
     <!-- 删除连接确认 -->

@@ -9,6 +9,8 @@ export function ClearQueryHistory():Promise<void>;
 
 export function CreateConnection(arg1:string):Promise<void>;
 
+export function DeleteBackup(arg1:string):Promise<string>;
+
 export function DeleteConnection(arg1:string):Promise<void>;
 
 export function DeleteSnippet(arg1:string):Promise<void>;
@@ -20,6 +22,8 @@ export function ExportData(arg1:string,arg2:string,arg3:string,arg4:string,arg5:
 export function FormatSQL(arg1:string):Promise<string>;
 
 export function GenerateCreateTableSQL(arg1:string,arg2:string):Promise<string>;
+
+export function GetBackupSchedules():Promise<string>;
 
 export function GetConnections():Promise<string>;
 
@@ -61,6 +65,8 @@ export function RestoreBackup(arg1:string,arg2:string):Promise<string>;
 
 export function SaveSnippet(arg1:string,arg2:string):Promise<void>;
 
+export function SetBackupSchedules(arg1:string):Promise<void>;
+
 export function StartMonitor(arg1:string):Promise<string>;
 
 export function StopMonitor(arg1:string):Promise<void>;
@@ -70,3 +76,5 @@ export function TestConnection(arg1:string):Promise<boolean>;
 export function UpdateConnection(arg1:string):Promise<void>;
 
 export function UpdateTableData(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<void>;
+
+export function VerifyBackup(arg1:string):Promise<string>;

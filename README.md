@@ -60,7 +60,8 @@
 - **备份与恢复**（MySQL / PostgreSQL / SQLite）
   - **立即备份**：连接右键「立即备份」，选择保存路径，调用 mysqldump / pg_dump / sqlite3 .dump 生成 SQL 备份文件
   - **从备份恢复**：连接右键「从备份恢复」，从最近备份列表选择或「选择文件」，二次确认后执行恢复
-  - 最近 50 次备份记录保存于用户配置目录
+  - **定时备份**：侧栏「备份管理」→ 定时备份，可配置每日/每周、执行时间与输出目录，后台按周期自动执行
+  - **备份管理**：备份列表查看、验证（文件存在与大小）、删除；最近 50 次备份记录保存于用户配置目录
 
 - **日志**
   - 分级日志（DEBUG / INFO / WARN / ERROR）写入 `用户配置目录/topology/logs/topology.log`
@@ -79,7 +80,6 @@
 - 快捷键系统完善（更多快捷键支持）
 - PostgreSQL 执行计划、特色类型等增强（基础连接与查询已支持）
 - 表结构可视化编辑（编辑现有表结构）
-- 定时备份、备份管理界面（迭代 1.5）
 
 ## 🛠️ 技术栈
 
@@ -367,7 +367,11 @@ npm run build
   - 警告提示（如缺少 WHERE 条件、SELECT * 等）
   - 索引使用建议
 
-详细开发计划请查看 [docs/development-plan.md](docs/development-plan.md)
+## 📚 文档
+
+- [用户指南](docs/user-guide.md)：快速入门、连接配置、查询与执行计划、备份恢复、常见问题  
+- [开发者文档](docs/development.md)：架构概览、本地构建与运行、目录说明、贡献指南  
+- 开发与迭代计划：[docs/development-plan.md](docs/development-plan.md)、[docs/iteration-plan.md](docs/iteration-plan.md)
 
 ## 🤝 贡献
 

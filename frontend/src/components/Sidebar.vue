@@ -27,6 +27,7 @@ const emit = defineEmits<{
   (e: 'backup', connectionId: string): void
   (e: 'restore', connectionId: string): void
   (e: 'import-navicat'): void
+  (e: 'open-backup-manager'): void
 }>()
 
 const searchQuery = ref('')
@@ -72,6 +73,12 @@ const startResize = (e: MouseEvent) => {
       >
         <FileDown :size="14" />
         {{ t('sidebar.importNavicat') }}
+      </button>
+      <button
+        @click="emit('open-backup-manager')"
+        class="w-full border theme-border text-xs py-2 rounded-md font-medium transition-all active:scale-[0.98] flex items-center justify-center gap-2 theme-text theme-bg-hover"
+      >
+        {{ t('backup.manage') }}
       </button>
       <div class="relative">
         <Search :size="14" class="absolute left-2 top-1/2 -translate-y-1/2 theme-text-muted" />

@@ -18,6 +18,10 @@ export function CreateConnection(arg1) {
   return window['go']['main']['App']['CreateConnection'](arg1);
 }
 
+export function DeleteBackup(arg1) {
+  return window['go']['main']['App']['DeleteBackup'](arg1);
+}
+
 export function DeleteConnection(arg1) {
   return window['go']['main']['App']['DeleteConnection'](arg1);
 }
@@ -40,6 +44,10 @@ export function FormatSQL(arg1) {
 
 export function GenerateCreateTableSQL(arg1, arg2) {
   return window['go']['main']['App']['GenerateCreateTableSQL'](arg1, arg2);
+}
+
+export function GetBackupSchedules() {
+  return window['go']['main']['App']['GetBackupSchedules']();
 }
 
 export function GetConnections() {
@@ -122,6 +130,10 @@ export function SaveSnippet(arg1, arg2) {
   return window['go']['main']['App']['SaveSnippet'](arg1, arg2);
 }
 
+export function SetBackupSchedules(arg1) {
+  return window['go']['main']['App']['SetBackupSchedules'](arg1);
+}
+
 export function StartMonitor(arg1) {
   return window['go']['main']['App']['StartMonitor'](arg1);
 }
@@ -140,4 +152,8 @@ export function UpdateConnection(arg1) {
 
 export function UpdateTableData(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['main']['App']['UpdateTableData'](arg1, arg2, arg3, arg4, arg5);
+}
+
+export function VerifyBackup(arg1) {
+  return window['go']['main']['App']['VerifyBackup'](arg1);
 }

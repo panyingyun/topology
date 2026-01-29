@@ -3,12 +3,26 @@ import {
   ListBackups,
   RestoreBackup,
   PickBackupFile,
+  GetBackupSchedules,
+  SetBackupSchedules,
+  DeleteBackup,
+  VerifyBackup,
 } from '../../wailsjs/go/main/App'
 
 export interface BackupRecord {
   connectionId: string
   path: string
   at: string
+}
+
+export interface BackupSchedule {
+  connectionId: string
+  enabled: boolean
+  schedule: 'daily' | 'weekly'
+  time: string
+  day: number
+  outputDir?: string
+  lastRun?: string
 }
 
 export interface BackupResult {
@@ -20,6 +34,11 @@ export interface BackupResult {
 export interface RestoreResult {
   success: boolean
   error?: string
+}
+
+export interface VerifyResult {
+  exists: boolean
+  size: number
 }
 
 export const backupService = {
@@ -61,6 +80,37 @@ export const backupService = {
       return await PickBackupFile()
     } catch {
       return ''
+    }
+  },
+
+  async getSchedules(): Promise<BackupSchedule[]> {
+    try {
+      const json = await GetBackupSchedules()
+      return JSON.parse(json) as BackupSchedule[]
+    } catch {
+      return []
+    }
+  },
+
+  async setSchedules(schedules: BackupSchedule[]): Promise<void> {
+    await SetBackupSchedules(JSON.stringify(schedules))
+  },
+
+  async deleteBackup(path: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const json = await DeleteBackup(path)
+      return JSON.parse(json) as { success: boolean; error?: string }
+    } catch (e) {
+      return { success: false, error: e instanceof Error ? e.message : 'Delete failed' }
+    }
+  },
+
+  async verifyBackup(path: string): Promise<VerifyResult> {
+    try {
+      const json = await VerifyBackup(path)
+      return JSON.parse(json) as VerifyResult
+    } catch {
+      return { exists: false, size: 0 }
     }
   },
 }
