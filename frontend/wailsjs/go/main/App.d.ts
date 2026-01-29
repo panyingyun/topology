@@ -15,6 +15,8 @@ export function DeleteConnection(arg1:string):Promise<void>;
 
 export function DeleteSnippet(arg1:string):Promise<void>;
 
+export function DeleteTableRows(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<void>;
+
 export function ExecuteQuery(arg1:string,arg2:string,arg3:string):Promise<string>;
 
 export function ExportData(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<string>;
@@ -54,6 +56,8 @@ export function ImportDataPreview(arg1:string,arg2:string):Promise<string>;
 export function ImportNavicatConnections(arg1:string):Promise<string>;
 
 export function ImportNavicatConnectionsFromDialog():Promise<string>;
+
+export function InsertTableRows(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<void>;
 
 export function ListBackups(arg1:string):Promise<string>;
 

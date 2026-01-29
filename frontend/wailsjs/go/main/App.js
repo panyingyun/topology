@@ -30,6 +30,10 @@ export function DeleteSnippet(arg1) {
   return window['go']['main']['App']['DeleteSnippet'](arg1);
 }
 
+export function DeleteTableRows(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['DeleteTableRows'](arg1, arg2, arg3, arg4, arg5);
+}
+
 export function ExecuteQuery(arg1, arg2, arg3) {
   return window['go']['main']['App']['ExecuteQuery'](arg1, arg2, arg3);
 }
@@ -108,6 +112,10 @@ export function ImportNavicatConnections(arg1) {
 
 export function ImportNavicatConnectionsFromDialog() {
   return window['go']['main']['App']['ImportNavicatConnectionsFromDialog']();
+}
+
+export function InsertTableRows(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['InsertTableRows'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function ListBackups(arg1) {

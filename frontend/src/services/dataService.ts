@@ -7,6 +7,8 @@ import {
   UpdateTableData,
   GetTableSchema,
   ExportData,
+  DeleteTableRows,
+  InsertTableRows,
 } from '../../wailsjs/go/main/App'
 
 /** Optional sessionId for per-tab DB session isolation; pass '' for shared connection. */
@@ -109,5 +111,27 @@ export const dataService = {
         error: error instanceof Error ? error.message : 'Unknown error',
       }
     }
+  },
+
+  async deleteTableRows(
+    connectionId: string,
+    database: string,
+    tableName: string,
+    rows: Record<string, unknown>[],
+    sessionId: string = defaultSession
+  ): Promise<void> {
+    const rowsJSON = JSON.stringify(rows)
+    await DeleteTableRows(connectionId, database, tableName, rowsJSON, sessionId)
+  },
+
+  async insertTableRows(
+    connectionId: string,
+    database: string,
+    tableName: string,
+    rows: Record<string, unknown>[],
+    sessionId: string = defaultSession
+  ): Promise<void> {
+    const rowsJSON = JSON.stringify(rows)
+    await InsertTableRows(connectionId, database, tableName, rowsJSON, sessionId)
   },
 }

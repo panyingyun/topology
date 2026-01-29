@@ -2113,6 +2113,120 @@ func (a *App) UpdateTableData(connectionID, database, tableName, updatesJSON, se
 	})
 }
 
+// DeleteTableRows deletes rows by primary key. rowsJSON is JSON array of row objects (must include PK columns).
+// If no PK, uses all columns for WHERE. sessionID optional for tab isolation.
+func (a *App) DeleteTableRows(connectionID, database, tableName, rowsJSON, sessionID string) error {
+	var rows []map[string]interface{}
+	if err := json.Unmarshal([]byte(rowsJSON), &rows); err != nil {
+		return err
+	}
+	if len(rows) == 0 {
+		return nil
+	}
+	g, err := getOrOpenDB(connectionID, sessionID)
+	if err != nil {
+		return err
+	}
+	conn := getConnByID(connectionID)
+	if conn == nil {
+		return fmt.Errorf("connection not found")
+	}
+	info, err := db.TableSchema(g, conn.Type, database, tableName)
+	if err != nil {
+		return err
+	}
+	var pkCols []string
+	for _, c := range info.Columns {
+		if c.IsPrimaryKey {
+			pkCols = append(pkCols, c.Name)
+		}
+	}
+	if len(pkCols) == 0 {
+		for _, c := range info.Columns {
+			pkCols = append(pkCols, c.Name)
+		}
+	}
+	if len(pkCols) == 0 {
+		return fmt.Errorf("table has no columns")
+	}
+	tbl := db.QualTable(conn.Type, database, tableName)
+	return g.Transaction(func(tx *gorm.DB) error {
+		for _, r := range rows {
+			conds := make([]string, 0, len(pkCols))
+			args := make([]interface{}, 0, len(pkCols))
+			for _, col := range pkCols {
+				v, ok := r[col]
+				if !ok {
+					return fmt.Errorf("row missing PK column %q", col)
+				}
+				conds = append(conds, quoteIdent(conn.Type, col)+" = ?")
+				args = append(args, v)
+			}
+			q := fmt.Sprintf("DELETE FROM %s WHERE %s", tbl, strings.Join(conds, " AND "))
+			if res := tx.Exec(q, args...); res.Error != nil {
+				return res.Error
+			}
+		}
+		return nil
+	})
+}
+
+// InsertTableRows inserts rows. rowsJSON is JSON array of row objects (keys = column names).
+// Columns not in a row are omitted; optionally use schema for order. sessionID optional for tab isolation.
+func (a *App) InsertTableRows(connectionID, database, tableName, rowsJSON, sessionID string) error {
+	var rows []map[string]interface{}
+	if err := json.Unmarshal([]byte(rowsJSON), &rows); err != nil {
+		return err
+	}
+	if len(rows) == 0 {
+		return nil
+	}
+	g, err := getOrOpenDB(connectionID, sessionID)
+	if err != nil {
+		return err
+	}
+	conn := getConnByID(connectionID)
+	if conn == nil {
+		return fmt.Errorf("connection not found")
+	}
+	info, err := db.TableSchema(g, conn.Type, database, tableName)
+	if err != nil {
+		return err
+	}
+	allCols := make([]string, 0, len(info.Columns))
+	for _, c := range info.Columns {
+		allCols = append(allCols, c.Name)
+	}
+	if len(allCols) == 0 {
+		return fmt.Errorf("table has no columns")
+	}
+	tbl := db.QualTable(conn.Type, database, tableName)
+	return g.Transaction(func(tx *gorm.DB) error {
+		for _, r := range rows {
+			cols := make([]string, 0)
+			vals := make([]interface{}, 0)
+			for _, col := range allCols {
+				v, ok := r[col]
+				if !ok {
+					continue
+				}
+				cols = append(cols, quoteIdent(conn.Type, col))
+				vals = append(vals, v)
+			}
+			if len(cols) == 0 {
+				continue
+			}
+			placeholders := strings.Repeat("?,", len(cols))
+			placeholders = placeholders[:len(placeholders)-1]
+			q := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", tbl, strings.Join(cols, ", "), placeholders)
+			if res := tx.Exec(q, vals...); res.Error != nil {
+				return res.Error
+			}
+		}
+		return nil
+	})
+}
+
 func quoteIdent(driver, name string) string {
 	if driver == "mysql" {
 		return "`" + strings.ReplaceAll(name, "`", "``") + "`"

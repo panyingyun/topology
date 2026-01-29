@@ -430,7 +430,6 @@ const showEditorPosition = computed(() => activeTab.value?.type === 'query')
             :database="activeTab.database"
             :table-name="activeTab.tableName"
             :import-trigger="tableImportTrigger"
-            @update="(updates) => console.log('Table updates:', updates)"
             @clear-import-trigger="clearTableImportTrigger"
           />
           <div v-else class="h-full flex flex-col items-center justify-center theme-text-muted">

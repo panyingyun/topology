@@ -22,7 +22,6 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'update', updates: UpdateRecord[]): void
   (e: 'clear-import-trigger'): void
 }>()
 
@@ -98,8 +97,22 @@ const handlePageSizeChange = (size: number) => {
   loadTableData(1)
 }
 
-const handleUpdate = (updates: UpdateRecord[]) => {
-  emit('update', updates)
+const handleUpdate = async (updates: UpdateRecord[]) => {
+  if (!updates.length) return
+  try {
+    await dataService.updateTableData(
+      props.connectionId,
+      props.database,
+      props.tableName,
+      updates,
+      props.tabId ?? ''
+    )
+    await loadTableData(currentPage.value)
+    message.success(t('common.success'))
+  } catch (e) {
+    console.error('Failed to update table data:', e)
+    message.error(t('common.error') + ': ' + (e instanceof Error ? e.message : 'Update failed'))
+  }
 }
 
 const handleExport = async (format: ExportFormat) => {

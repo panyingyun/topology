@@ -27,12 +27,18 @@ const props = withDefaults(
 const emit = defineEmits<{
   (e: 'update', updates: UpdateRecord[]): void
   (e: 'export', format: ExportFormat): void
+  (e: 'batch-delete', rows: Record<string, unknown>[]): void
+  (e: 'paste-add', rows: Record<string, unknown>[]): void
 }>()
 
 const showExportMenu = ref(false)
+const showBatchUpdatePopover = ref(false)
+const batchUpdateCol = ref('')
+const batchUpdateVal = ref('')
 const pendingChanges = ref(0)
 const gridRef = ref<any>()
 const exportMenuRef = ref<HTMLElement | null>(null)
+const batchUpdateRef = ref<HTMLElement | null>(null)
 
 const gridOptions = ref<VxeGridProps>({
   border: true,
@@ -55,7 +61,7 @@ watch(
     gridOptions.value.editConfig = isReadonly
       ? { enabled: false }
       : { trigger: 'dblclick', mode: 'cell' }
-    gridOptions.value.columns = data.columns.map((col: string) => {
+    const cols = data.columns.map((col: string) => {
       const colDef: Record<string, unknown> = {
         field: col,
         title: col,
@@ -72,6 +78,13 @@ watch(
       if (!isReadonly) (colDef as any).editRender = { name: 'input' }
       return colDef
     })
+    if (!isReadonly) {
+      gridOptions.value.checkboxConfig = { reserve: false }
+      gridOptions.value.columns = [{ type: 'checkbox', width: 48 }, ...cols]
+    } else {
+      ;(gridOptions.value as any).checkboxConfig = undefined
+      gridOptions.value.columns = cols
+    }
     gridOptions.value.data = data.rows
     pendingChanges.value = 0
   },
@@ -146,11 +159,7 @@ const commitChanges = () => {
     const recordset = gridRef.value.getRecordset()
     if (recordset?.updateRecords?.length) {
       const updates = buildUpdatesFromRecordset(recordset, props.data.columns)
-      if (updates.length) {
-        emit('update', updates)
-      }
-      pendingChanges.value = 0
-      gridRef.value.reloadRow(recordset.updateRecords, null)
+      if (updates.length) emit('update', updates)
     }
   } catch (error) {
     console.error('Error committing changes:', error)
