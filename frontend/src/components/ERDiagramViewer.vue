@@ -2,7 +2,7 @@
 import { ref, watch, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useMessage } from 'naive-ui'
-import { GitBranch, X, Download, Image } from 'lucide-vue-next'
+import { GitBranch, X, Download, Image as ImageIcon } from 'lucide-vue-next'
 import { dataService } from '../services/dataService'
 import type { TableSchema } from '../types'
 
@@ -123,7 +123,7 @@ function exportPNG() {
   if (!el) return
   const { w, h } = svgSize.value
   const s = new XMLSerializer().serializeToString(el)
-  const img = new Image()
+  const img = new window.Image()
   const blob = new Blob([s], { type: 'image/svg+xml;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   img.onload = () => {
@@ -137,17 +137,20 @@ function exportPNG() {
     }
     ctx.fillStyle = '#fff'
     ctx.fillRect(0, 0, w, h)
-    ctx.drawImage(img, 0, 0)
-    canvas.toBlob((b) => {
-      URL.revokeObjectURL(url)
-      if (!b) return
-      const a = document.createElement('a')
-      a.href = URL.createObjectURL(b)
-      a.download = `er-${props.database || 'schema'}.png`
-      a.click()
-      URL.revokeObjectURL(a.href)
-      message.success(t('erDiagram.exported') + ' PNG')
-    }, 'image/png')
+    ctx.drawImage(img as CanvasImageSource, 0, 0)
+    canvas.toBlob(
+      (b) => {
+        URL.revokeObjectURL(url)
+        if (!b) return
+        const a = document.createElement('a')
+        a.href = URL.createObjectURL(b)
+        a.download = `er-${props.database || 'schema'}.png`
+        a.click()
+        URL.revokeObjectURL(a.href)
+        message.success(t('erDiagram.exported') + ' PNG')
+      },
+      'image/png'
+    )
   }
   img.onerror = () => URL.revokeObjectURL(url)
   img.src = url
@@ -181,7 +184,7 @@ function exportPNG() {
               class="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs theme-bg-input theme-bg-input-hover theme-text"
               @click="exportPNG"
             >
-              <Image :size="14" />
+              <ImageIcon :size="14" />
               {{ t('erDiagram.exportPng') }}
             </button>
             <button class="p-1.5 theme-text-muted-hover rounded" @click="emit('close')">

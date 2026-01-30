@@ -217,7 +217,7 @@ function nodeTypeColor(node: ExecutionPlanNode): string {
                     <div v-if="index > 0" class="w-0.5 h-4 bg-[var(--border-strong)] flex-shrink-0" />
                     <div :class="['w-full rounded-lg border-2 px-3 py-2 text-xs transition-colors', nodeTypeColor(node)]">
                       <span class="font-mono theme-text">{{ node.label }}</span>
-                      <span v-if="node.rows > 0" class="theme-text-muted"> ~{{ node.rows.toLocaleString() }}</span>
+                      <span v-if="(node.rows ?? 0) > 0" class="theme-text-muted"> ~{{ (node.rows ?? 0).toLocaleString() }}</span>
                     </div>
                   </div>
                 </div>
@@ -239,7 +239,7 @@ function nodeTypeColor(node: ExecutionPlanNode): string {
                     <div v-if="index > 0" class="w-0.5 h-4 bg-[var(--border-strong)] flex-shrink-0" />
                     <div :class="['w-full rounded-lg border-2 px-3 py-2 text-xs transition-colors', nodeTypeColor(node)]">
                       <span class="font-mono theme-text">{{ node.label }}</span>
-                      <span v-if="node.rows > 0" class="theme-text-muted"> ~{{ node.rows.toLocaleString() }}</span>
+                      <span v-if="(node.rows ?? 0) > 0" class="theme-text-muted"> ~{{ (node.rows ?? 0).toLocaleString() }}</span>
                     </div>
                   </div>
                 </div>
