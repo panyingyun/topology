@@ -29,6 +29,8 @@ export function FormatSQL(arg1:string):Promise<string>;
 
 export function GenerateCreateTableSQL(arg1:string,arg2:string):Promise<string>;
 
+export function GenerateSchemaSyncScript(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string):Promise<string>;
+
 export function GetBackupSchedules():Promise<string>;
 
 export function GetConnections():Promise<string>;

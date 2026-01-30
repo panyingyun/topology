@@ -19,6 +19,7 @@ import {
   RollbackTx,
   GetTransactionStatus,
   GetERMetadata,
+  GenerateSchemaSyncScript,
 } from '../../wailsjs/go/main/App'
 
 /** Optional sessionId for per-tab DB session isolation; pass '' for shared connection. */
@@ -175,5 +176,17 @@ export const dataService = {
     const raw = await GetERMetadata(connectionId, database, sessionId, tablesJSON)
     const o = JSON.parse(raw) as ERMetadataResult
     return o
+  },
+
+  async getSchemaSyncScript(
+    connA: string,
+    dbA: string,
+    tableA: string,
+    connB: string,
+    dbB: string,
+    tableB: string,
+    direction: 'a_to_b' | 'b_to_a'
+  ): Promise<string> {
+    return GenerateSchemaSyncScript(connA, dbA, tableA, connB, dbB, tableB, direction)
   },
 }

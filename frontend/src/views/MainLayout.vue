@@ -14,6 +14,8 @@ import LiveMonitor from '../components/LiveMonitor.vue'
 import RestoreBackupModal from '../components/RestoreBackupModal.vue'
 import BackupManagerModal from '../components/BackupManagerModal.vue'
 import ERDiagramViewer from '../components/ERDiagramViewer.vue'
+import DataCompareModal from '../components/DataCompareModal.vue'
+import SchemaSyncModal from '../components/SchemaSyncModal.vue'
 import { ReleaseSession } from '../../wailsjs/go/main/App'
 import { connectionService } from '../services/connectionService'
 import { queryService } from '../services/queryService'
@@ -39,6 +41,8 @@ const showBackupManager = ref(false)
 const showERDiagram = ref(false)
 const erDiagramConnectionId = ref('')
 const erDiagramDatabase = ref('')
+const showDataCompare = ref(false)
+const showSchemaSync = ref(false)
 const connections = ref<Connection[]>([])
 /** When set, ConnectionTree clears cache for this connection and refetches if expanded. */
 const connectionInvalidation = ref<{ id: string; at: number } | null>(null)
@@ -403,6 +407,8 @@ const showEditorPosition = computed(() => activeTab.value?.type === 'query')
         @restore="handleRestore"
         @er-diagram="handleERDiagram"
         @open-backup-manager="showBackupManager = true"
+        @open-data-compare="showDataCompare = true"
+        @open-schema-sync="showSchemaSync = true"
         @import-navicat="handleImportNavicat"
       />
 
@@ -502,6 +508,18 @@ const showEditorPosition = computed(() => activeTab.value?.type === 'query')
       :connection-id="erDiagramConnectionId"
       :database="erDiagramDatabase"
       @close="showERDiagram = false"
+    />
+
+    <DataCompareModal
+      :show="showDataCompare"
+      :connections="connections"
+      @close="showDataCompare = false"
+    />
+
+    <SchemaSyncModal
+      :show="showSchemaSync"
+      :connections="connections"
+      @close="showSchemaSync = false"
     />
 
     <!-- 删除连接确认 -->

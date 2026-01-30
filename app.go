@@ -3108,6 +3108,110 @@ func (a *App) GetTableSchema(connectionID, database, tableName, sessionID string
 	return string(data)
 }
 
+// GenerateSchemaSyncScript generates ALTER/CREATE SQL to sync target table to match source.
+// direction: "a_to_b" (change B to match A) or "b_to_a" (change A to match B).
+// Returns SQL string; supports MySQL and PostgreSQL. SQLite returns a comment (limited ALTER support).
+func (a *App) GenerateSchemaSyncScript(connA, dbA, tableA, connB, dbB, tableB, direction string) string {
+	var sourceConn, sourceDB, sourceTbl, targetConn, targetDB, targetTbl string
+	if direction == "b_to_a" {
+		sourceConn, sourceDB, sourceTbl = connB, dbB, tableB
+		targetConn, targetDB, targetTbl = connA, dbA, tableA
+	} else {
+		sourceConn, sourceDB, sourceTbl = connA, dbA, tableA
+		targetConn, targetDB, targetTbl = connB, dbB, tableB
+	}
+	schemaSrc := a.GetTableSchema(sourceConn, sourceDB, sourceTbl, "")
+	schemaTgt := a.GetTableSchema(targetConn, targetDB, targetTbl, "")
+	var src, tgt TableSchema
+	if err := json.Unmarshal([]byte(schemaSrc), &src); err != nil || src.Name == "" {
+		return "-- Error: could not load source table schema"
+	}
+	if err := json.Unmarshal([]byte(schemaTgt), &tgt); err != nil {
+		return "-- Error: could not load target table schema"
+	}
+	conn := getConnByID(targetConn)
+	if conn == nil {
+		return "-- Error: target connection not found"
+	}
+	driver := conn.Type
+	if driver != "mysql" && driver != "postgresql" && driver != "postgres" {
+		return "-- Schema sync script is supported for MySQL and PostgreSQL only."
+	}
+
+	tgtByName := make(map[string]Column)
+	for _, c := range tgt.Columns {
+		tgtByName[c.Name] = c
+	}
+	remaining := make(map[string]Column)
+	for k, v := range tgtByName {
+		remaining[k] = v
+	}
+	var add, drop, modify []Column
+	for _, c := range src.Columns {
+		ex, ok := remaining[c.Name]
+		if !ok {
+			add = append(add, c)
+			continue
+		}
+		if ex.Type != c.Type || ex.Nullable != c.Nullable || ex.DefaultValue != c.DefaultValue {
+			modify = append(modify, c)
+		}
+		delete(remaining, c.Name)
+	}
+	for _, c := range remaining {
+		drop = append(drop, c)
+	}
+
+	qt := quoteIdent(driver, targetTbl)
+	var b strings.Builder
+	b.WriteString("-- Schema sync: make target table match source\n")
+	b.WriteString("-- Target: " + targetTbl + " (driver: " + driver + ")\n\n")
+
+	if len(add)+len(modify)+len(drop) == 0 {
+		b.WriteString("-- No differences.\n")
+		return b.String()
+	}
+
+	for _, c := range add {
+		colDef := quoteIdent(driver, c.Name) + " " + c.Type
+		if !c.Nullable {
+			colDef += " NOT NULL"
+		}
+		if c.DefaultValue != "" {
+			colDef += " DEFAULT " + c.DefaultValue
+		}
+		if driver == "mysql" || driver == "postgresql" || driver == "postgres" {
+			b.WriteString(fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s;\n", qt, colDef))
+		}
+	}
+	for _, c := range modify {
+		ex := tgtByName[c.Name]
+		if driver == "mysql" {
+			colDef := quoteIdent(driver, c.Name) + " " + c.Type
+			if !c.Nullable {
+				colDef += " NOT NULL"
+			}
+			if c.DefaultValue != "" {
+				colDef += " DEFAULT " + c.DefaultValue
+			}
+			b.WriteString(fmt.Sprintf("ALTER TABLE %s MODIFY COLUMN %s;\n", qt, colDef))
+		} else {
+			b.WriteString(fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s TYPE %s;\n", qt, quoteIdent(driver, c.Name), c.Type))
+			if ex.Nullable != c.Nullable {
+				if !c.Nullable {
+					b.WriteString(fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s SET NOT NULL;\n", qt, quoteIdent(driver, c.Name)))
+				} else {
+					b.WriteString(fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s DROP NOT NULL;\n", qt, quoteIdent(driver, c.Name)))
+				}
+			}
+		}
+	}
+	for _, c := range drop {
+		b.WriteString(fmt.Sprintf("-- ALTER TABLE %s DROP COLUMN %s;  -- review before uncommenting\n", qt, quoteIdent(driver, c.Name)))
+	}
+	return b.String()
+}
+
 // ExportData exports data from a table. database is optional (MySQL: qualify db.table). sessionID optional for tab isolation.
 func (a *App) ExportData(connectionID, database, tableName, format, sessionID string) string {
 	g, err := getOrOpenDB(connectionID, sessionID)

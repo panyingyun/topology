@@ -58,6 +58,10 @@ export function GenerateCreateTableSQL(arg1, arg2) {
   return window['go']['main']['App']['GenerateCreateTableSQL'](arg1, arg2);
 }
 
+export function GenerateSchemaSyncScript(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
+  return window['go']['main']['App']['GenerateSchemaSyncScript'](arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+}
+
 export function GetBackupSchedules() {
   return window['go']['main']['App']['GetBackupSchedules']();
 }
