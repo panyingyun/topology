@@ -6,3 +6,5 @@ build/export/realm_export.sql
 dist
 testdb/
 frontend/package.json.md5
+rsrc_windows_386.syso
+rsrc_windows_amd64.syso
