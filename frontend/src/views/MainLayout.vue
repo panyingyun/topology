@@ -13,6 +13,7 @@ import TableDesigner from '../components/TableDesigner.vue'
 import LiveMonitor from '../components/LiveMonitor.vue'
 import RestoreBackupModal from '../components/RestoreBackupModal.vue'
 import BackupManagerModal from '../components/BackupManagerModal.vue'
+import ERDiagramViewer from '../components/ERDiagramViewer.vue'
 import { ReleaseSession } from '../../wailsjs/go/main/App'
 import { connectionService } from '../services/connectionService'
 import { queryService } from '../services/queryService'
@@ -35,6 +36,9 @@ const monitorConnection = ref<Connection | null>(null)
 const showRestoreModal = ref(false)
 const restoreConnectionId = ref('')
 const showBackupManager = ref(false)
+const showERDiagram = ref(false)
+const erDiagramConnectionId = ref('')
+const erDiagramDatabase = ref('')
 const connections = ref<Connection[]>([])
 /** When set, ConnectionTree clears cache for this connection and refetches if expanded. */
 const connectionInvalidation = ref<{ id: string; at: number } | null>(null)
@@ -279,6 +283,12 @@ const handleOpenMonitor = (connection: Connection) => {
   showLiveMonitor.value = true
 }
 
+const handleERDiagram = (connectionId: string, database: string) => {
+  erDiagramConnectionId.value = connectionId
+  erDiagramDatabase.value = database
+  showERDiagram.value = true
+}
+
 const handleCloseLiveMonitor = () => {
   showLiveMonitor.value = false
   monitorConnection.value = null
@@ -391,6 +401,7 @@ const showEditorPosition = computed(() => activeTab.value?.type === 'query')
         @open-monitor="handleOpenMonitor"
         @backup="handleBackup"
         @restore="handleRestore"
+        @er-diagram="handleERDiagram"
         @open-backup-manager="showBackupManager = true"
         @import-navicat="handleImportNavicat"
       />
@@ -484,6 +495,13 @@ const showEditorPosition = computed(() => activeTab.value?.type === 'query')
       :show="showBackupManager"
       :connections="connections"
       @close="showBackupManager = false"
+    />
+
+    <ERDiagramViewer
+      :show="showERDiagram"
+      :connection-id="erDiagramConnectionId"
+      :database="erDiagramDatabase"
+      @close="showERDiagram = false"
     />
 
     <!-- 删除连接确认 -->

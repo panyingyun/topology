@@ -27,6 +27,7 @@ const emit = defineEmits<{
   (e: 'open-monitor', connection: import('../types').Connection): void
   (e: 'backup', connectionId: string): void
   (e: 'restore', connectionId: string): void
+  (e: 'er-diagram', connectionId: string, database: string): void
   (e: 'import-navicat'): void
   (e: 'open-backup-manager'): void
 }>()
@@ -108,6 +109,7 @@ const startResize = (e: MouseEvent) => {
         @open-monitor="(conn) => emit('open-monitor', conn)"
         @backup="(id) => emit('backup', id)"
         @restore="(id) => emit('restore', id)"
+        @er-diagram="(connId, db) => emit('er-diagram', connId, db)"
       />
     </div>
 

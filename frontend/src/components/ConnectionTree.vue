@@ -25,6 +25,7 @@ const emit = defineEmits<{
   (e: 'open-monitor', connection: Connection): void
   (e: 'backup', connectionId: string): void
   (e: 'restore', connectionId: string): void
+  (e: 'er-diagram', connectionId: string, database: string): void
 }>()
 
 const connections = ref<Connection[]>([])
@@ -223,6 +224,13 @@ const handleNewTable = () => {
   closeContextMenu()
 }
 
+function handleERDiagram() {
+  if (contextMenu.value.type === 'database' && contextMenu.value.connectionId && contextMenu.value.database) {
+    emit('er-diagram', contextMenu.value.connectionId, contextMenu.value.database)
+  }
+  closeContextMenu()
+}
+
 const handleTableQuery = () => {
   if (contextMenu.value.type === 'table' && contextMenu.value.connectionId && contextMenu.value.database && contextMenu.value.tableName) {
     emit('table-query', contextMenu.value.connectionId, contextMenu.value.database, contextMenu.value.tableName)
@@ -379,6 +387,12 @@ onUnmounted(() => {
           </template>
           <!-- 数据库右键菜单 -->
           <template v-else-if="contextMenu.type === 'database'">
+            <button
+              @click="handleERDiagram"
+              class="w-full px-4 py-2 text-left text-xs theme-text theme-bg-hover transition-colors"
+            >
+              {{ t('erDiagram.title') }}
+            </button>
             <button
               @click="handleNewTable"
               class="w-full px-4 py-2 text-left text-xs theme-text theme-bg-hover transition-colors flex items-center gap-2"

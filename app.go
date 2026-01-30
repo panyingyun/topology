@@ -2150,6 +2150,44 @@ func (a *App) GetTables(connectionID, database, sessionID string) string {
 	return string(data)
 }
 
+// GetERMetadata returns table schemas (with FKs) for ER diagram. tablesJSON: optional "[\"t1\",\"t2\"]"; if empty, all tables.
+func (a *App) GetERMetadata(connectionID, database, sessionID, tablesJSON string) string {
+	out := struct {
+		Tables []TableSchema `json:"tables"`
+		Error  string        `json:"error,omitempty"`
+	}{}
+	tablesList := []string(nil)
+	if tablesJSON != "" {
+		if err := json.Unmarshal([]byte(tablesJSON), &tablesList); err != nil {
+			out.Error = "invalid tablesJSON"
+			data, _ := json.Marshal(out)
+			return string(data)
+		}
+	}
+	if len(tablesList) == 0 {
+		raw := a.GetTables(connectionID, database, sessionID)
+		var tbls []Table
+		if err := json.Unmarshal([]byte(raw), &tbls); err != nil {
+			out.Error = "failed to list tables"
+			data, _ := json.Marshal(out)
+			return string(data)
+		}
+		for _, t := range tbls {
+			tablesList = append(tablesList, t.Name)
+		}
+	}
+	for _, name := range tablesList {
+		schemaRaw := a.GetTableSchema(connectionID, database, name, sessionID)
+		var s TableSchema
+		if err := json.Unmarshal([]byte(schemaRaw), &s); err != nil || s.Name == "" {
+			continue
+		}
+		out.Tables = append(out.Tables, s)
+	}
+	data, _ := json.Marshal(out)
+	return string(data)
+}
+
 // GetTableData returns table data with pagination. database is optional (MySQL: qualify db.table). sessionID optional for tab isolation.
 func (a *App) GetTableData(connectionID, database, tableName string, limit, offset int, sessionID string) string {
 	g, err := getOrOpenDB(connectionID, sessionID)
@@ -3044,7 +3082,7 @@ func (a *App) GetTableSchema(connectionID, database, tableName, sessionID string
 		Name:        info.Name,
 		Columns:     make([]Column, 0, len(info.Columns)),
 		Indexes:     nil,
-		ForeignKeys: nil,
+		ForeignKeys: make([]ForeignKey, 0, len(info.ForeignKeys)),
 	}
 	for _, c := range info.Columns {
 		schema.Columns = append(schema.Columns, Column{
@@ -3054,6 +3092,16 @@ func (a *App) GetTableSchema(connectionID, database, tableName, sessionID string
 			DefaultValue: c.DefaultValue,
 			IsPrimaryKey: c.IsPrimaryKey,
 			IsUnique:     c.IsUnique,
+		})
+	}
+	for _, f := range info.ForeignKeys {
+		schema.ForeignKeys = append(schema.ForeignKeys, ForeignKey{
+			Name:              f.Name,
+			Columns:           f.Columns,
+			ReferencedTable:   f.ReferencedTable,
+			ReferencedColumns: f.ReferencedColumns,
+			OnDelete:          f.OnDelete,
+			OnUpdate:          f.OnUpdate,
 		})
 	}
 	data, _ := json.Marshal(schema)

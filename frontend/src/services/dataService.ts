@@ -1,5 +1,10 @@
 import type { Table, TableData, TableSchema, UpdateRecord } from '../types'
 
+export interface ERMetadataResult {
+  tables: TableSchema[]
+  error?: string
+}
+
 import {
   GetDatabases,
   GetTables,
@@ -13,6 +18,7 @@ import {
   CommitTx,
   RollbackTx,
   GetTransactionStatus,
+  GetERMetadata,
 } from '../../wailsjs/go/main/App'
 
 /** Optional sessionId for per-tab DB session isolation; pass '' for shared connection. */
@@ -158,5 +164,16 @@ export const dataService = {
     const raw = await GetTransactionStatus(connectionId, sessionId)
     const o = JSON.parse(raw) as { active?: boolean }
     return { active: o.active ?? false }
+  },
+
+  async getERMetadata(
+    connectionId: string,
+    database: string,
+    sessionId: string = defaultSession,
+    tablesJSON: string = '[]'
+  ): Promise<ERMetadataResult> {
+    const raw = await GetERMetadata(connectionId, database, sessionId, tablesJSON)
+    const o = JSON.parse(raw) as ERMetadataResult
+    return o
   },
 }

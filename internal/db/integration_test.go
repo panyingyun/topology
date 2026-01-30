@@ -321,6 +321,48 @@ func TestIntegration_TableSchemaSQLite(t *testing.T) {
 	}
 }
 
+func TestIntegration_TableSchemaSQLiteFK(t *testing.T) {
+	dsn, ok := sqliteDSN(t)
+	if !ok {
+		return
+	}
+	connID := "itest-sqlite-fk"
+	db, err := Open(connID, "", "sqlite", dsn)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer Close(connID, "")
+
+	_, _ = RawExec(db, `CREATE TABLE IF NOT EXISTS _topology_parent (id INTEGER PRIMARY KEY)`)
+	_, _ = RawExec(db, `CREATE TABLE IF NOT EXISTS _topology_child (
+		id INTEGER PRIMARY KEY,
+		parent_id INTEGER REFERENCES _topology_parent(id)
+	)`)
+	defer func() {
+		_, _ = RawExec(db, "DROP TABLE IF EXISTS _topology_child")
+		_, _ = RawExec(db, "DROP TABLE IF EXISTS _topology_parent")
+	}()
+
+	info, err := TableSchema(db, "sqlite", "", "_topology_child")
+	if err != nil {
+		t.Fatalf("TableSchema: %v", err)
+	}
+	if len(info.ForeignKeys) < 1 {
+		t.Errorf("expected at least 1 FK, got %d", len(info.ForeignKeys))
+		return
+	}
+	fk := info.ForeignKeys[0]
+	if fk.ReferencedTable != "_topology_parent" {
+		t.Errorf("ReferencedTable: expected _topology_parent, got %q", fk.ReferencedTable)
+	}
+	if len(fk.Columns) < 1 || fk.Columns[0] != "parent_id" {
+		t.Errorf("FK columns: expected [parent_id], got %v", fk.Columns)
+	}
+	if len(fk.ReferencedColumns) < 1 || fk.ReferencedColumns[0] != "id" {
+		t.Errorf("FK ref columns: expected [id], got %v", fk.ReferencedColumns)
+	}
+}
+
 func TestIntegration_TableDataMySQL(t *testing.T) {
 	dsn, ok := mysqlDSN(t)
 	if !ok {

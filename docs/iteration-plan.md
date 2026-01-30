@@ -267,10 +267,12 @@
 
 **验收 Checklist**：
 
-- [ ] 可选库/表生成 ER 图并导出。
-- [ ] 支持两次执行计划对比与简单优化建议。
+- [x] 可选库/表生成 ER 图并导出。
+- [x] 支持两次执行计划对比与简单优化建议。
 
 **对应 improve-plan**：5.(1)(2)。
+
+**2.4 完成说明**：ER 图（一期）：schema 层为 MySQL/PG/SQLite 拉取 FK；`GetERMetadata` 按库拉取全表及 schema；库右键「ER 图」打开 ERDiagramViewer，SVG 网格布局、表框+列、FK 连线、导出 SVG/PNG。执行计划增强：ExecutionPlanViewer 支持「保存为 A」/「运行 B」/「清除对比」、双栏对比 Plan A vs Plan B；展示总耗时与预估行数、按行占比进度条；同 SQL 拉取索引建议并展示，可复制 CREATE INDEX。测试：`TestIntegration_TableSchemaSQLiteFK` 覆盖 SQLite FK schema。
 
 ---
 
@@ -469,7 +471,7 @@
 | 2.1 | 查询缓存 + 索引建议 | 已完成 | 见 2.1 完成说明 |
 | 2.2 | 批量操作 + 事务 | 已完成 | 见 2.2 完成说明 |
 | 2.3 | Undo/Redo + 模板与参数化 | 已完成 | 见 2.3 完成说明 |
-| 2.4 | ER 图 + 执行计划增强 | 待开始 | - |
+| 2.4 | ER 图 + 执行计划增强 | 已完成 | 见 2.4 完成说明 |
 | 2.5 | 数据对比 + Schema 同步 | 待开始 | - |
 | 2.6 | 权限与审计 + 阶段复盘 | 待开始 | - |
 | 3.1～3.12 | 插件、多库、协作、AI、血缘等 | 待开始 | - |

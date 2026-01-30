@@ -252,6 +252,14 @@ export default {
     warnings: '优化建议',
     mysqlOnly: '仅支持 MySQL',
     unsupportedDriver: '执行计划仅支持 MySQL 与 PostgreSQL',
+    saveAsA: '保存为 A',
+    runB: '运行 B',
+    clearCompare: '清除对比',
+    planA: '计划 A',
+    planB: '计划 B',
+    totalDuration: '总耗时',
+    estRows: '预估行数',
+    suggestions: '索引建议',
   },
   indexSuggestions: {
     title: '索引建议',
@@ -261,6 +269,13 @@ export default {
     copy: '复制',
     copied: '已复制',
     unsupportedDriver: '索引建议仅支持 MySQL 与 PostgreSQL',
+  },
+  erDiagram: {
+    title: 'ER 图',
+    exportSvg: '导出 SVG',
+    exportPng: '导出 PNG',
+    exported: '已导出',
+    noTables: '当前库无表',
   },
   backup: {
     backupNow: '立即备份',

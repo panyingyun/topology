@@ -35,6 +35,8 @@ export function GetConnections():Promise<string>;
 
 export function GetDatabases(arg1:string,arg2:string):Promise<string>;
 
+export function GetERMetadata(arg1:string,arg2:string,arg3:string,arg4:string):Promise<string>;
+
 export function GetExecutionPlan(arg1:string,arg2:string,arg3:string):Promise<string>;
 
 export function GetIndexSuggestions(arg1:string,arg2:string,arg3:string):Promise<string>;

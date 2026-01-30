@@ -252,6 +252,14 @@ export default {
     warnings: 'Suggestions',
     mysqlOnly: 'MySQL only',
     unsupportedDriver: 'Execution plan is supported for MySQL and PostgreSQL only.',
+    saveAsA: 'Save as A',
+    runB: 'Run B',
+    clearCompare: 'Clear compare',
+    planA: 'Plan A',
+    planB: 'Plan B',
+    totalDuration: 'Total duration',
+    estRows: 'Est. rows',
+    suggestions: 'Index suggestions',
   },
   indexSuggestions: {
     title: 'Index Suggestions',
@@ -261,6 +269,13 @@ export default {
     copy: 'Copy',
     copied: 'Copied',
     unsupportedDriver: 'Index suggestions are supported for MySQL and PostgreSQL only.',
+  },
+  erDiagram: {
+    title: 'ER Diagram',
+    exportSvg: 'Export SVG',
+    exportPng: 'Export PNG',
+    exported: 'Exported',
+    noTables: 'No tables in this database',
   },
   backup: {
     backupNow: 'Backup Now',
