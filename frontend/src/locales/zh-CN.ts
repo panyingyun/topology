@@ -96,6 +96,11 @@ export default {
     noResults: '暂无结果',
     executeQuery: '执行查询以查看结果',
   },
+  paramModal: {
+    title: '参数化查询',
+    hint: '输入参数值后执行。支持 :name 与 ? 占位符。',
+    value: '值',
+  },
   tableContext: {
     query: '查询',
     import: '导入',
@@ -148,6 +153,8 @@ export default {
     pasteHint: '从 Excel 等复制 Tab 分隔的数据，按列顺序映射到当前表（第 1 列→第 1 列…）。',
     pastePlaceholder: '粘贴 Tab 分隔数据…',
     insert: '插入',
+    undo: '撤销',
+    redo: '重做',
   },
   history: {
     title: '查询历史',
@@ -164,6 +171,8 @@ export default {
   },
   snippets: {
     title: 'SQL 片段',
+    builtin: '内置模板',
+    mySnippets: '我的片段',
     search: '搜索别名...',
     noSnippets: '暂无保存的片段',
     alias: '别名',

@@ -14,6 +14,7 @@ import Snippets from '../components/Snippets.vue'
 import SQLAnalyzer from '../components/SQLAnalyzer.vue'
 import ExecutionPlanViewer from '../components/ExecutionPlanViewer.vue'
 import IndexSuggestionsViewer from '../components/IndexSuggestionsViewer.vue'
+import ParamModal from '../components/ParamModal.vue'
 import type { QueryResult, Connection } from '../types'
 import type { ExportFormat } from '../types'
 
@@ -60,6 +61,66 @@ const showAnalyzer = ref(false)
 const showExplainPlan = ref(false)
 const showIndexSuggestions = ref(false)
 const cacheStats = ref<{ hits: number; misses: number } | null>(null)
+const showParamModal = ref(false)
+const pendingSqlToExecute = ref('')
+const paramPlaceholders = ref<{ named: string[]; positional: number }>({ named: [], positional: 0 })
+const paramHistory = ref<Record<string, string[]>>({})
+
+const PARAM_HISTORY_KEY = 'topology-param-history'
+const PARAM_HISTORY_MAX = 10
+
+function getParamHistory(): Record<string, string[]> {
+  try {
+    const raw = localStorage.getItem(PARAM_HISTORY_KEY)
+    if (!raw) return {}
+    return JSON.parse(raw) as Record<string, string[]>
+  } catch {
+    return {}
+  }
+}
+
+function appendParamHistory(key: string, value: string) {
+  if (!value.trim()) return
+  const hist = getParamHistory()
+  const arr = hist[key] ?? []
+  const filtered = arr.filter((v) => v !== value)
+  filtered.unshift(value)
+  hist[key] = filtered.slice(0, PARAM_HISTORY_MAX)
+  try {
+    localStorage.setItem(PARAM_HISTORY_KEY, JSON.stringify(hist))
+  } catch {}
+  paramHistory.value = hist
+}
+
+function extractPlaceholders(sql: string): { named: string[]; positional: number } {
+  const named = [...new Set((sql.match(/:\w+/g) ?? []).map((s) => s.slice(1)).filter(Boolean))]
+  const positional = (sql.match(/\?/g) ?? []).length
+  return { named: named.map((n) => ':' + n), positional }
+}
+
+function escapeParamValue(val: string): string {
+  return "'" + String(val).replace(/\\/g, '\\\\').replace(/'/g, "''") + "'"
+}
+
+function substituteParams(
+  sql: string,
+  values: Record<string, string>,
+  placeholders: { named: string[]; positional: number }
+): string {
+  let out = sql
+  for (const name of placeholders.named) {
+    const v = values[name] ?? ''
+    const escaped = escapeParamValue(v)
+    out = out.replace(new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), escaped)
+  }
+  const posVals: string[] = []
+  for (let i = 0; i < placeholders.positional; i++) {
+    posVals.push(escapeParamValue(values[`?${i + 1}`] ?? ''))
+  }
+  let idx = 0
+  out = out.replace(/\?/g, () => posVals[idx++] ?? 'NULL')
+  return out
+}
 
 const {
   load: loadSchemaMetadata,
@@ -273,6 +334,41 @@ onUnmounted(() => {
   }
 })
 
+async function executeQueryDirect(sql: string) {
+  const connectionId = props.connectionId
+  if (!connectionId) {
+    queryResult.value = {
+      columns: [],
+      rows: [],
+      rowCount: 0,
+      error: 'No connection selected',
+    }
+    return
+  }
+  isRunning.value = true
+  try {
+    const result = await queryService.executeQuery(connectionId, props.tabId ?? '', sql)
+    queryResult.value = result
+    emit('query-result', result)
+    const stats = await queryService.getQueryCacheStats()
+    cacheStats.value = stats
+  } catch (error) {
+    console.error('Query execution error:', error)
+    const errMsg = error instanceof Error ? error.message : 'Unknown error'
+    queryResult.value = {
+      columns: [],
+      rows: [],
+      rowCount: 0,
+      error: errMsg,
+    }
+    emit('query-result', queryResult.value)
+    const stats = await queryService.getQueryCacheStats()
+    cacheStats.value = stats
+  } finally {
+    isRunning.value = false
+  }
+}
+
 const runExecute = async () => {
   if (!sqlQuery.value.trim() || isRunning.value) return
 
@@ -295,28 +391,25 @@ const runExecute = async () => {
     }
   }
 
-  isRunning.value = true
-  try {
-    const result = await queryService.executeQuery(connectionId, props.tabId ?? '', queryToExecute)
-    queryResult.value = result
-    emit('query-result', result)
-    const stats = await queryService.getQueryCacheStats()
-    cacheStats.value = stats
-  } catch (error) {
-    console.error('Query execution error:', error)
-    const errMsg = error instanceof Error ? error.message : 'Unknown error'
-    queryResult.value = {
-      columns: [],
-      rows: [],
-      rowCount: 0,
-      error: errMsg,
-    }
-    emit('query-result', queryResult.value)
-    const stats = await queryService.getQueryCacheStats()
-    cacheStats.value = stats
-  } finally {
-    isRunning.value = false
+  const ph = extractPlaceholders(queryToExecute)
+  if (ph.named.length > 0 || ph.positional > 0) {
+    pendingSqlToExecute.value = queryToExecute
+    paramPlaceholders.value = ph
+    paramHistory.value = getParamHistory()
+    showParamModal.value = true
+    return
   }
+
+  await executeQueryDirect(queryToExecute)
+}
+
+const handleParamExecute = async (values: Record<string, string>) => {
+  const sql = substituteParams(pendingSqlToExecute.value, values, paramPlaceholders.value)
+  showParamModal.value = false
+  for (const k of Object.keys(values)) {
+    if (values[k]?.trim()) appendParamHistory(k, values[k].trim())
+  }
+  await executeQueryDirect(sql)
 }
 
 const stopQuery = () => {
@@ -668,6 +761,16 @@ const handleExportQueryResult = (format: ExportFormat) => {
       :sql="sqlQuery"
       :driver="connection?.type"
       @close="showIndexSuggestions = false"
+    />
+
+    <!-- Parameterized query modal -->
+    <ParamModal
+      :show="showParamModal"
+      :named="paramPlaceholders.named"
+      :positional="paramPlaceholders.positional"
+      :history="paramHistory"
+      @execute="handleParamExecute"
+      @close="showParamModal = false"
     />
   </div>
 </template>

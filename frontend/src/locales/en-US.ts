@@ -96,6 +96,11 @@ export default {
     noResults: 'No results yet',
     executeQuery: 'Execute a query to see results',
   },
+  paramModal: {
+    title: 'Parameterized query',
+    hint: 'Enter parameter values, then execute. Supports :name and ? placeholders.',
+    value: 'Value',
+  },
   tableContext: {
     query: 'Query',
     import: 'Import',
@@ -148,6 +153,8 @@ export default {
     pasteHint: 'Paste Tab-separated data (e.g. from Excel). Columns map by order (1st→1st, …).',
     pastePlaceholder: 'Paste Tab-separated data…',
     insert: 'Insert',
+    undo: 'Undo',
+    redo: 'Redo',
   },
   history: {
     title: 'Query History',
@@ -164,6 +171,8 @@ export default {
   },
   snippets: {
     title: 'SQL Snippets',
+    builtin: 'Built-in templates',
+    mySnippets: 'My snippets',
     search: 'Search by alias...',
     noSnippets: 'No snippets saved',
     alias: 'Alias',

@@ -245,11 +245,13 @@
 
 **验收 Checklist**：
 
-- [ ] 表格编辑支持 Undo/Redo 及快捷键。
-- [ ] 可管理内置与自定义模板。
-- [ ] 参数化 SQL 可输入参数并执行。
+- [x] 表格编辑支持 Undo/Redo 及快捷键。
+- [x] 可管理内置与自定义模板。
+- [x] 参数化 SQL 可输入参数并执行。
 
 **对应 improve-plan**：2.(3)(4)、3.(4)。
+
+**2.3 完成说明**：Undo/Redo：DataGrid 维护 baseRows/localRows 与 base↔local  diff 计算 pending；操作栈 undoStack/redoStack，edit-closed 时按 lastPushedKey 去重入栈；Ctrl+Z / Ctrl+Y（及 Ctrl+Shift+Z）全局快捷键，跳过 input/textarea/contenteditable；Undo/Redo 按钮；commit/rollback 清空栈。查询模板库：Snippets 增加 BUILTIN_TEMPLATES（SELECT LIMIT、COUNT、WHERE、JOIN、INSERT、UPDATE、DELETE、DESCRIBE、EXPLAIN、CREATE TABLE），「内置模板」与「我的片段」分栏展示，内置仅可选、自定义可删；搜索同时过滤二者。参数化查询：解析 SQL 中 :name 与 ?；执行前若存在占位符则弹出 ParamModal，输入参数后执行；substituteParams 按名/序替换并转义；参数历史存 localStorage（topology-param-history），弹窗内可点历史值填充。
 
 ---
 
@@ -466,7 +468,7 @@
 | 1.6 | 稳定性收尾 + 阶段复盘 | 已完成 | 见 1.6 完成说明；总结见 [phase1-summary.md](phase1-summary.md) |
 | 2.1 | 查询缓存 + 索引建议 | 已完成 | 见 2.1 完成说明 |
 | 2.2 | 批量操作 + 事务 | 已完成 | 见 2.2 完成说明 |
-| 2.3 | Undo/Redo + 模板与参数化 | 待开始 | - |
+| 2.3 | Undo/Redo + 模板与参数化 | 已完成 | 见 2.3 完成说明 |
 | 2.4 | ER 图 + 执行计划增强 | 待开始 | - |
 | 2.5 | 数据对比 + Schema 同步 | 待开始 | - |
 | 2.6 | 权限与审计 + 阶段复盘 | 待开始 | - |

@@ -58,6 +58,51 @@ const batchEditRef = ref<HTMLElement | null>(null)
 
 const hasTableContext = computed(() => !!props.tableContext && !props.readonly)
 
+interface UndoOp {
+  rowIndex: number
+  column: string
+  oldValue: unknown
+  newValue: unknown
+}
+const undoStack = ref<UndoOp[]>([])
+const redoStack = ref<UndoOp[]>([])
+const localRows = ref<Record<string, unknown>[]>([])
+const baseRows = ref<Record<string, unknown>[]>([])
+const lastPushedKey = ref<Map<string, unknown>>(new Map())
+
+function clearUndoRedo() {
+  undoStack.value = []
+  redoStack.value = []
+  lastPushedKey.value = new Map()
+}
+
+function buildUpdatesFromBaseAndLocal(
+  base: Record<string, unknown>[],
+  local: Record<string, unknown>[],
+  columns: string[]
+): UpdateRecord[] {
+  const updates: UpdateRecord[] = []
+  for (let i = 0; i < local.length; i++) {
+    const row = local[i]
+    const orig = base[i]
+    if (!orig) continue
+    for (const col of columns) {
+      const oldVal = orig[col]
+      const newVal = row[col]
+      if (oldVal !== newVal && JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
+        updates.push({ rowIndex: i, column: col, oldValue: oldVal, newValue: newVal })
+      }
+    }
+  }
+  return updates
+}
+
+function updatePendingFromDiff() {
+  if (!props.data?.columns) return
+  const updates = buildUpdatesFromBaseAndLocal(baseRows.value, localRows.value, props.data.columns)
+  pendingChanges.value = updates.length
+}
+
 watch(
   () => [props.data, props.readonly, props.tableContext] as const,
   (tuple) => {
@@ -89,22 +134,52 @@ watch(
     gridOptions.value.columns = withCheckbox
       ? ([{ type: 'checkbox', width: 48 } as Record<string, unknown>, ...dataCols] as any)
       : dataCols
-    gridOptions.value.data = data.rows
-    pendingChanges.value = 0
+    baseRows.value = (data.rows ?? []).map((r: Record<string, unknown>) => ({ ...r }))
+    localRows.value = (data.rows ?? []).map((r: Record<string, unknown>) => ({ ...r }))
+    gridOptions.value.data = localRows.value
+    clearUndoRedo()
+    updatePendingFromDiff()
   },
   { immediate: true }
 )
 
 const handleEditClosed = () => {
-  if (gridRef.value) {
-    try {
-      const recordset = gridRef.value.getRecordset()
-      if (recordset && recordset.updateRecords) {
-        pendingChanges.value = recordset.updateRecords.length
+  if (!gridRef.value) return
+  try {
+    const recordset = gridRef.value.getRecordset()
+    if (recordset?.updateRecords?.length) {
+      if (!props.readonly && props.data?.columns) {
+        const data = gridOptions.value.data as Record<string, unknown>[]
+        const list = recordset.updateRecords as any[]
+        redoStack.value = []
+        const m = new Map(lastPushedKey.value)
+        for (const record of list) {
+          const origin = record._X_ORIGIN_DATA as Record<string, unknown> | undefined
+          if (!origin) continue
+          const idx = data.findIndex((r) => r === record)
+          if (idx < 0) continue
+          for (const col of props.data!.columns) {
+            const oldVal = origin[col]
+            const newVal = record[col]
+            if (oldVal === newVal && JSON.stringify(oldVal) === JSON.stringify(newVal)) continue
+            const key = `${idx}:${col}`
+            const prev = m.get(key)
+            if (prev !== undefined && JSON.stringify(prev) === JSON.stringify(newVal)) continue
+            m.set(key, newVal)
+            undoStack.value.push({
+              rowIndex: idx,
+              column: col,
+              oldValue: oldVal,
+              newValue: newVal,
+            })
+          }
+        }
+        lastPushedKey.value = m
       }
-    } catch (error) {
-      console.error('Error getting recordset:', error)
+      updatePendingFromDiff()
     }
+  } catch (error) {
+    console.error('Error getting recordset:', error)
   }
 }
 
@@ -135,59 +210,86 @@ async function handleCellDblclick({ row, column }: { row?: Record<string, unknow
   }
 }
 
-function buildUpdatesFromRecordset(recordset: { updateRecords?: any[] }, columns: string[]): UpdateRecord[] {
-  const updates: UpdateRecord[] = []
-  const list = recordset.updateRecords || []
-  for (const record of list) {
-    const origin = record._X_ORIGIN_DATA as Record<string, unknown> | undefined
-    if (!origin) continue
-    for (const col of columns) {
-      const oldVal = origin[col]
-      const newVal = record[col]
-      if (oldVal !== newVal && JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
-        updates.push({
-          rowIndex: record._X_ROW_KEY ?? 0,
-          column: col,
-          oldValue: oldVal,
-          newValue: newVal,
-        })
-      }
-    }
-  }
-  return updates
-}
-
 const commitChanges = () => {
   if (!gridRef.value || !props.data?.columns) return
   try {
-    const recordset = gridRef.value.getRecordset()
-    if (recordset?.updateRecords?.length) {
-      const updates = buildUpdatesFromRecordset(recordset, props.data.columns)
-      if (updates.length) {
-        emit('update', updates)
-      }
-      pendingChanges.value = 0
-      gridRef.value.reloadRow(recordset.updateRecords, null)
+    const updates = buildUpdatesFromBaseAndLocal(
+      baseRows.value,
+      localRows.value,
+      props.data.columns
+    )
+    if (updates.length) {
+      emit('update', updates)
     }
+    clearUndoRedo()
+    updatePendingFromDiff()
   } catch (error) {
     console.error('Error committing changes:', error)
   }
 }
 
 const rollbackChanges = () => {
-  if (!gridRef.value || !props.data?.rows) return
+  if (!gridRef.value || !props.data?.columns) return
   try {
-    const recordset = gridRef.value.getRecordset()
-    if (recordset?.updateRecords?.length) {
-      const rows = props.data.rows.map((r: Record<string, unknown>) => ({ ...r }))
-      gridOptions.value.data = rows
-      if (typeof gridRef.value.reloadData === 'function') {
-        gridRef.value.reloadData(rows)
-      }
-      pendingChanges.value = 0
+    localRows.value = baseRows.value.map((r) => ({ ...r }))
+    gridOptions.value.data = localRows.value
+    if (typeof gridRef.value.reloadData === 'function') {
+      gridRef.value.reloadData(localRows.value)
     }
+    clearUndoRedo()
+    updatePendingFromDiff()
   } catch (error) {
     console.error('Error rolling back:', error)
+  }
+}
+
+function doUndo() {
+  if (props.readonly || !undoStack.value.length) return
+  const op = undoStack.value.pop()!
+  localRows.value[op.rowIndex][op.column] = op.oldValue
+  const key = `${op.rowIndex}:${op.column}`
+  const m = new Map(lastPushedKey.value)
+  m.delete(key)
+  lastPushedKey.value = m
+  redoStack.value.push(op)
+  gridOptions.value.data = [...localRows.value]
+  if (gridRef.value && typeof gridRef.value.reloadData === 'function') {
+    gridRef.value.reloadData(localRows.value)
+  }
+  updatePendingFromDiff()
+}
+
+function doRedo() {
+  if (props.readonly || !redoStack.value.length) return
+  const op = redoStack.value.pop()!
+  localRows.value[op.rowIndex][op.column] = op.newValue
+  const key = `${op.rowIndex}:${op.column}`
+  const m = new Map(lastPushedKey.value)
+  m.set(key, op.newValue)
+  lastPushedKey.value = m
+  undoStack.value.push(op)
+  gridOptions.value.data = [...localRows.value]
+  if (gridRef.value && typeof gridRef.value.reloadData === 'function') {
+    gridRef.value.reloadData(localRows.value)
+  }
+  updatePendingFromDiff()
+}
+
+function onKeydown(e: KeyboardEvent) {
+  if (props.readonly) return
+  const el = document.activeElement as HTMLElement
+  if (el?.tagName === 'INPUT' || el?.tagName === 'TEXTAREA' || el?.isContentEditable) return
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+    if (e.shiftKey) {
+      e.preventDefault()
+      doRedo()
+    } else {
+      e.preventDefault()
+      doUndo()
+    }
+  } else if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+    e.preventDefault()
+    doRedo()
   }
 }
 
@@ -276,10 +378,12 @@ const handleClickOutside = (e: MouseEvent) => {
 
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
+  document.addEventListener('keydown', onKeydown)
 })
 
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
+  document.removeEventListener('keydown', onKeydown)
 })
 </script>
 
@@ -358,6 +462,22 @@ onUnmounted(() => {
             {{ t('dataGrid.addFromPaste') }}
           </button>
         </template>
+        <button
+          v-if="!props.readonly && undoStack.length > 0"
+          @click="doUndo"
+          class="px-2 py-1 theme-bg-input theme-bg-input-hover theme-text text-xs rounded transition-colors"
+          :title="t('dataGrid.undo') + ' (Ctrl+Z)'"
+        >
+          {{ t('dataGrid.undo') }}
+        </button>
+        <button
+          v-if="!props.readonly && redoStack.length > 0"
+          @click="doRedo"
+          class="px-2 py-1 theme-bg-input theme-bg-input-hover theme-text text-xs rounded transition-colors"
+          :title="t('dataGrid.redo') + ' (Ctrl+Y)'"
+        >
+          {{ t('dataGrid.redo') }}
+        </button>
         <button
           v-if="!props.readonly && pendingChanges > 0"
           @click="commitChanges"
