@@ -46,6 +46,10 @@ export function ExecuteQuery(arg1, arg2, arg3) {
   return window['go']['main']['App']['ExecuteQuery'](arg1, arg2, arg3);
 }
 
+export function ExportAuditLog(arg1) {
+  return window['go']['main']['App']['ExportAuditLog'](arg1);
+}
+
 export function ExportData(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['main']['App']['ExportData'](arg1, arg2, arg3, arg4, arg5);
 }
@@ -148,6 +152,10 @@ export function LoadSchemaMetadata(arg1) {
 
 export function PickBackupFile() {
   return window['go']['main']['App']['PickBackupFile']();
+}
+
+export function QueryAuditLog(arg1, arg2, arg3) {
+  return window['go']['main']['App']['QueryAuditLog'](arg1, arg2, arg3);
 }
 
 export function ReconnectConnection(arg1) {

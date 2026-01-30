@@ -23,6 +23,8 @@ export function DeleteTableRows(arg1:string,arg2:string,arg3:string,arg4:string,
 
 export function ExecuteQuery(arg1:string,arg2:string,arg3:string):Promise<string>;
 
+export function ExportAuditLog(arg1:string):Promise<string>;
+
 export function ExportData(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<string>;
 
 export function FormatSQL(arg1:string):Promise<string>;
@@ -74,6 +76,8 @@ export function ListBackups(arg1:string):Promise<string>;
 export function LoadSchemaMetadata(arg1:string):Promise<void>;
 
 export function PickBackupFile():Promise<string>;
+
+export function QueryAuditLog(arg1:number,arg2:string,arg3:string):Promise<string>;
 
 export function ReconnectConnection(arg1:string):Promise<void>;
 

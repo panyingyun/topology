@@ -55,6 +55,11 @@ function dbKey(connId: string, db: string) {
   return `${connId}:${db}`
 }
 
+const contextMenuConnection = computed(() => {
+  if (contextMenu.value.type !== 'table' || !contextMenu.value.connectionId) return null
+  return props.connections.find((c) => c.id === contextMenu.value.connectionId) ?? null
+})
+
 watch(() => props.connections, (newConns) => {
   if (newConns && newConns.length > 0 && expandedConnections.value.size === 0) {
     expandedConnections.value.add(newConns[0].id)
@@ -411,6 +416,7 @@ onUnmounted(() => {
               {{ t('tableContext.query') }}
             </button>
             <button
+              v-if="!contextMenuConnection?.readOnly"
               @click="handleTableImport"
               class="w-full px-4 py-2 text-left text-xs theme-text theme-bg-hover transition-colors flex items-center gap-2"
             >

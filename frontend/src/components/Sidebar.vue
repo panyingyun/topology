@@ -32,6 +32,7 @@ const emit = defineEmits<{
   (e: 'open-backup-manager'): void
   (e: 'open-data-compare'): void
   (e: 'open-schema-sync'): void
+  (e: 'open-audit-log'): void
 }>()
 
 const searchQuery = ref('')
@@ -95,6 +96,12 @@ const startResize = (e: MouseEvent) => {
         class="w-full border theme-border text-xs py-2 rounded-md font-medium transition-all active:scale-[0.98] flex items-center justify-center gap-2 theme-text theme-bg-hover"
       >
         {{ t('schemaSync.title') }}
+      </button>
+      <button
+        @click="emit('open-audit-log')"
+        class="w-full border theme-border text-xs py-2 rounded-md font-medium transition-all active:scale-[0.98] flex items-center justify-center gap-2 theme-text theme-bg-hover"
+      >
+        {{ t('audit.title') }}
       </button>
       <div class="relative">
         <Search :size="14" class="absolute left-2 top-1/2 -translate-y-1/2 theme-text-muted" />

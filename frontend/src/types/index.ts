@@ -12,6 +12,7 @@ export interface Connection {
   sshTunnel?: SSHTunnel;
   status: ConnectionStatus;
   createdAt?: string;
+  readOnly?: boolean;
 }
 
 export type DatabaseType = 'mysql' | 'postgresql' | 'sqlite';

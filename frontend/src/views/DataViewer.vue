@@ -17,6 +17,8 @@ const props = defineProps<{
   connectionId: string
   database: string
   tableName: string
+  /** 连接为只读时禁止编辑、导入、事务等 */
+  readOnly?: boolean
   /** 由父组件设置以打开导入弹窗（如从表名右键菜单选择「导入」） */
   importTrigger?: { connectionId: string; database: string; tableName: string } | null
 }>()
@@ -184,7 +186,7 @@ const queryResult = computed<QueryResult>(() => ({
 }))
 
 const tableContext = computed(() =>
-  props.connectionId && props.database && props.tableName
+  props.connectionId && props.database && props.tableName && !props.readOnly
     ? {
         connectionId: props.connectionId,
         database: props.database,
@@ -355,35 +357,38 @@ watch(
       </div>
 
       <div class="flex items-center gap-2 flex-wrap">
-        <template v-if="txActive">
-          <span class="text-xs text-amber-400">{{ t('table.inTransaction') }}</span>
+        <template v-if="!readOnly">
+          <template v-if="txActive">
+            <span class="text-xs text-amber-400">{{ t('table.inTransaction') }}</span>
+            <button
+              @click="handleCommitTx"
+              class="px-2 py-1 bg-green-600 hover:bg-green-500 text-white text-xs rounded"
+            >
+              {{ t('table.commitTx') }}
+            </button>
+            <button
+              @click="handleRollbackTx"
+              class="px-2 py-1 theme-bg-input theme-bg-input-hover theme-text text-xs rounded"
+            >
+              {{ t('table.rollbackTx') }}
+            </button>
+          </template>
           <button
-            @click="handleCommitTx"
-            class="px-2 py-1 bg-green-600 hover:bg-green-500 text-white text-xs rounded"
-          >
-            {{ t('table.commitTx') }}
-          </button>
-          <button
-            @click="handleRollbackTx"
+            v-else
+            @click="handleBeginTx"
             class="px-2 py-1 theme-bg-input theme-bg-input-hover theme-text text-xs rounded"
           >
-            {{ t('table.rollbackTx') }}
+            {{ t('table.beginTx') }}
+          </button>
+          <button
+            @click="showImporter = true"
+            class="flex items-center gap-1.5 px-3 py-1 bg-[#1677ff] hover:bg-[#4096ff] text-white text-xs rounded transition-colors font-semibold"
+          >
+            <Upload :size="12" />
+            {{ t('table.importData') }}
           </button>
         </template>
-        <button
-          v-else
-          @click="handleBeginTx"
-          class="px-2 py-1 theme-bg-input theme-bg-input-hover theme-text text-xs rounded"
-        >
-          {{ t('table.beginTx') }}
-        </button>
-        <button
-          @click="showImporter = true"
-          class="flex items-center gap-1.5 px-3 py-1 bg-[#1677ff] hover:bg-[#4096ff] text-white text-xs rounded transition-colors font-semibold"
-        >
-          <Upload :size="12" />
-          {{ t('table.importData') }}
-        </button>
+        <span v-else class="text-xs theme-text-muted">{{ t('connection.readOnly') }}</span>
         <button
           v-if="currentPage * pageSize < tableData.totalRows"
           @click="handleLoadMore"
@@ -415,6 +420,7 @@ watch(
         :data="queryResult"
         :table-context="tableContext"
         :schema="schema ?? undefined"
+        :readonly="props.readOnly ?? false"
         @update="handleUpdate"
         @export="handleExport"
         @batch-delete="handleBatchDelete"

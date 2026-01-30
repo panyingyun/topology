@@ -309,10 +309,12 @@
 
 **验收 Checklist**：
 
-- [ ] 可配置角色与库表权限并生效。
-- [ ] 关键操作有审计记录并可查询。
+- [x] 可配置角色与库表权限并生效。
+- [x] 关键操作有审计记录并可查询。
 
 **对应 improve-plan**：7.(1)(2)。
+
+**2.6 完成说明**：权限管理（一期）：连接增加「只读」选项；只读连接下 DataViewer 禁用编辑、事务、导入、批量操作，表右键「导入」隐藏；后端 UpdateTableData / DeleteTableRows / InsertTableRows / ImportData / BeginTx 校验只读并拒绝。审计日志（一期）：appendAuditLog 记录 query、table_update、table_delete、table_insert、table_import、export、backup、restore；audit.jsonl 追加存储；QueryAuditLog(limit,since,op)、ExportAuditLog(json|csv)；侧栏「审计日志」弹窗可查询、按 op 筛选、导出 CSV/JSON。第二阶段总结见 [phase2-summary.md](phase2-summary.md)。
 
 ---
 
@@ -475,7 +477,7 @@
 | 2.3 | Undo/Redo + 模板与参数化 | 已完成 | 见 2.3 完成说明 |
 | 2.4 | ER 图 + 执行计划增强 | 已完成 | 见 2.4 完成说明 |
 | 2.5 | 数据对比 + Schema 同步 | 已完成 | 见 2.5 完成说明 |
-| 2.6 | 权限与审计 + 阶段复盘 | 待开始 | - |
+| 2.6 | 权限与审计 + 阶段复盘 | 已完成 | 见 2.6 完成说明；总结见 [phase2-summary.md](phase2-summary.md) |
 | 3.1～3.12 | 插件、多库、协作、AI、血缘等 | 待开始 | - |
 
 **状态**：待开始 / 进行中 / 已完成。

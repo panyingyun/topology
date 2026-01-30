@@ -34,6 +34,7 @@ const form = reactive({
   password: '',
   database: '',
   useSSL: false,
+  readOnly: false,
   sshTunnel: {
     enabled: false,
     host: '',
@@ -67,6 +68,7 @@ function loadFormFrom(conn: Connection | null) {
     form.password = ''
     form.database = ''
     form.useSSL = false
+    form.readOnly = false
     form.sshTunnel = { enabled: false, host: '', port: 22, username: '', password: '', privateKey: '' }
     return
   }
@@ -78,6 +80,7 @@ function loadFormFrom(conn: Connection | null) {
   form.password = conn.password || ''
   form.database = conn.database || ''
   form.useSSL = conn.useSSL || false
+  form.readOnly = conn.readOnly ?? false
   const st = conn.sshTunnel
   form.sshTunnel = {
     enabled: st?.enabled ?? false,
@@ -162,6 +165,7 @@ const buildConnectionPayload = () => ({
   password: form.password,
   database: form.database || undefined,
   useSSL: form.useSSL,
+  readOnly: form.readOnly,
   sshTunnel:
     form.sshTunnel.enabled &&
     (activeDbType.value === 'mysql' || activeDbType.value === 'postgresql')
@@ -224,6 +228,7 @@ const handleUpdate = async () => {
       password: payload.password,
       database: payload.database,
       useSSL: payload.useSSL,
+      readOnly: payload.readOnly,
       sshTunnel: payload.sshTunnel,
     }
     await connectionService.updateConnection(updated)
@@ -400,14 +405,25 @@ const dbTypes: Array<{ type: DatabaseType; label: string; icon: string; color: s
               />
             </div>
 
-            <div class="flex items-center gap-2">
-              <input
-                v-model="form.useSSL"
-                type="checkbox"
-                id="useSSL"
-                class="w-4 h-4 rounded theme-border-strong theme-bg-input text-[#1677ff] focus:ring-[#1677ff]"
-              />
-              <label for="useSSL" class="text-xs theme-text-muted">{{ t('connection.useSSL') }}</label>
+            <div class="flex flex-wrap items-center gap-4">
+              <div class="flex items-center gap-2">
+                <input
+                  v-model="form.useSSL"
+                  type="checkbox"
+                  id="useSSL"
+                  class="w-4 h-4 rounded theme-border-strong theme-bg-input text-[#1677ff] focus:ring-[#1677ff]"
+                />
+                <label for="useSSL" class="text-xs theme-text-muted">{{ t('connection.useSSL') }}</label>
+              </div>
+              <div class="flex items-center gap-2">
+                <input
+                  v-model="form.readOnly"
+                  type="checkbox"
+                  id="readOnly"
+                  class="w-4 h-4 rounded theme-border-strong theme-bg-input text-[#1677ff] focus:ring-[#1677ff]"
+                />
+                <label for="readOnly" class="text-xs theme-text-muted">{{ t('connection.readOnly') }}</label>
+              </div>
             </div>
 
             <!-- SSH Tunnel (MySQL only in backend) -->

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
@@ -68,6 +69,7 @@ type Connection struct {
 	SSHTunnel *SSHTunnel `json:"sshTunnel,omitempty"`
 	Status    string     `json:"status"`
 	CreatedAt string     `json:"createdAt,omitempty"`
+	ReadOnly  bool       `json:"readOnly,omitempty"`
 }
 
 type SSHTunnel struct {
@@ -345,7 +347,121 @@ type BackupSchedule struct {
 const (
 	schedulesFileName = "backup_schedules.json"
 	defaultBackupDir  = "backups"
+	auditFileName     = "audit.jsonl"
+	auditMaxEntries   = 10000
+	auditDetailMaxLen = 2000
 )
+
+// AuditEntry is one audit log record.
+type AuditEntry struct {
+	At           string `json:"at"`
+	Op           string `json:"op"`
+	Detail       string `json:"detail"`
+	ConnectionID string `json:"connectionId,omitempty"`
+	Database     string `json:"database,omitempty"`
+	Table        string `json:"table,omitempty"`
+}
+
+var (
+	auditMu     sync.Mutex
+	auditPath   string
+	auditPathDo sync.Once
+)
+
+func getAuditFilePath() string {
+	auditPathDo.Do(func() {
+		auditPath = filepath.Join(getAppDir(), auditFileName)
+	})
+	return auditPath
+}
+
+func appendAuditLog(op, detail, connectionID, database, table string) {
+	if len(detail) > auditDetailMaxLen {
+		detail = detail[:auditDetailMaxLen] + "..."
+	}
+	entry := AuditEntry{
+		At:           time.Now().UTC().Format(time.RFC3339),
+		Op:           op,
+		Detail:       detail,
+		ConnectionID: connectionID,
+		Database:     database,
+		Table:        table,
+	}
+	line, _ := json.Marshal(entry)
+	auditMu.Lock()
+	defer auditMu.Unlock()
+	f, err := os.OpenFile(getAuditFilePath(), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		return
+	}
+	_, _ = f.Write(append(line, '\n'))
+	_ = f.Close()
+}
+
+// QueryAuditLog returns recent audit entries. limit cap 1000; since ISO8601 (optional); op filter (optional).
+func (a *App) QueryAuditLog(limit int, since, opFilter string) string {
+	if limit <= 0 || limit > 10000 {
+		limit = 100
+	}
+	auditMu.Lock()
+	defer auditMu.Unlock()
+	f, err := os.Open(getAuditFilePath())
+	if err != nil {
+		out, _ := json.Marshal([]AuditEntry{})
+		return string(out)
+	}
+	defer f.Close()
+	var entries []AuditEntry
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		if line == "" {
+			continue
+		}
+		var e AuditEntry
+		if json.Unmarshal([]byte(line), &e) != nil {
+			continue
+		}
+		if since != "" && e.At < since {
+			continue
+		}
+		if opFilter != "" && e.Op != opFilter {
+			continue
+		}
+		entries = append(entries, e)
+	}
+	// newest first
+	for i, j := 0, len(entries)-1; i < j; i, j = i+1, j-1 {
+		entries[i], entries[j] = entries[j], entries[i]
+	}
+	if len(entries) > limit {
+		entries = entries[:limit]
+	}
+	out, _ := json.Marshal(entries)
+	return string(out)
+}
+
+// ExportAuditLog returns audit log as JSON or CSV string. format: "json" | "csv".
+func (a *App) ExportAuditLog(format string) string {
+	raw := a.QueryAuditLog(auditMaxEntries, "", "")
+	var entries []AuditEntry
+	if json.Unmarshal([]byte(raw), &entries) != nil {
+		return ""
+	}
+	switch strings.ToLower(format) {
+	case "csv":
+		var b strings.Builder
+		b.WriteString("at,op,detail,connectionId,database,table\n")
+		for _, e := range entries {
+			b.WriteString(fmt.Sprintf("%q,%q,%q,%q,%q,%q\n",
+				e.At, e.Op, e.Detail, e.ConnectionID, e.Database, e.Table))
+		}
+		return b.String()
+	default:
+		out, _ := json.MarshalIndent(entries, "", "  ")
+		return string(out)
+	}
+}
 
 func getAppDir() string {
 	home, _ := os.UserConfigDir()
@@ -573,6 +689,17 @@ func getConnByID(id string) *Connection {
 	return nil
 }
 
+func requireWritableConnection(connectionID string) error {
+	conn := getConnByID(connectionID)
+	if conn == nil {
+		return fmt.Errorf("connection not found")
+	}
+	if conn.ReadOnly {
+		return fmt.Errorf("connection is read-only")
+	}
+	return nil
+}
+
 func buildDSN(c *Connection) (string, error) {
 	return db.BuildDSN(c.Type, c.Host, c.Port, c.Username, c.Password, c.Database)
 }
@@ -652,6 +779,9 @@ func getOrOpenDB(connID, sessionID string) (*gorm.DB, error) {
 
 // BeginTx starts a transaction for the given connection and session. Fails if one is already active.
 func (a *App) BeginTx(connectionID, sessionID string) error {
+	if err := requireWritableConnection(connectionID); err != nil {
+		return err
+	}
 	g, err := getOrOpenDB(connectionID, sessionID)
 	if err != nil {
 		return err
@@ -1016,7 +1146,7 @@ func (a *App) ExecuteQuery(connectionID, sessionID, sql string) string {
 		}
 	}
 
-	// Save to history
+	appendAuditLog("query", sql, connectionID, "", "")
 	saveQueryHistory(connectionID, sql, success, elapsed, rowCount)
 
 	return result
@@ -1854,6 +1984,7 @@ func (a *App) BackupNow(connectionID string) string {
 		data, _ := json.Marshal(out)
 		return string(data)
 	}
+	appendAuditLog("backup", path, connectionID, "", "")
 	out.Success = true
 	out.Path = path
 	data, _ := json.Marshal(out)
@@ -1895,6 +2026,7 @@ func (a *App) RestoreBackup(connectionID, backupPath string) string {
 		data, _ := json.Marshal(out)
 		return string(data)
 	}
+	appendAuditLog("restore", backupPath, connectionID, "", "")
 	out.Success = true
 	data, _ := json.Marshal(out)
 	return string(data)
@@ -2214,6 +2346,9 @@ func (a *App) GetTableData(connectionID, database, tableName string, limit, offs
 // UpdateTableData updates table data in a single transaction. database is optional (MySQL: qualify db.table).
 // On any failure, the whole transaction is rolled back. sessionID optional for tab isolation.
 func (a *App) UpdateTableData(connectionID, database, tableName, updatesJSON, sessionID string) error {
+	if err := requireWritableConnection(connectionID); err != nil {
+		return err
+	}
 	var updates []UpdateRecord
 	if err := json.Unmarshal([]byte(updatesJSON), &updates); err != nil {
 		return err
@@ -2230,7 +2365,7 @@ func (a *App) UpdateTableData(connectionID, database, tableName, updatesJSON, se
 		return fmt.Errorf("connection not found")
 	}
 	tbl := db.QualTable(conn.Type, database, tableName)
-	return g.Transaction(func(tx *gorm.DB) error {
+	err = g.Transaction(func(tx *gorm.DB) error {
 		for _, u := range updates {
 			col := quoteIdent(conn.Type, u.Column)
 			q := fmt.Sprintf("UPDATE %s SET %s = ? WHERE %s = ? LIMIT 1", tbl, col, col)
@@ -2240,10 +2375,18 @@ func (a *App) UpdateTableData(connectionID, database, tableName, updatesJSON, se
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+	appendAuditLog("table_update", fmt.Sprintf("%d updates", len(updates)), connectionID, database, tableName)
+	return nil
 }
 
 // DeleteTableRows deletes rows by matching all columns (or PK columns when available). rowsJSON: []map[string]interface{}.
 func (a *App) DeleteTableRows(connectionID, database, tableName, rowsJSON, sessionID string) error {
+	if err := requireWritableConnection(connectionID); err != nil {
+		return err
+	}
 	var rows []map[string]interface{}
 	if err := json.Unmarshal([]byte(rowsJSON), &rows); err != nil {
 		return err
@@ -2275,7 +2418,7 @@ func (a *App) DeleteTableRows(connectionID, database, tableName, rowsJSON, sessi
 		}
 	}
 	tbl := db.QualTable(conn.Type, database, tableName)
-	return g.Transaction(func(tx *gorm.DB) error {
+	err = g.Transaction(func(tx *gorm.DB) error {
 		for _, row := range rows {
 			var args []interface{}
 			var preds []string
@@ -2295,10 +2438,18 @@ func (a *App) DeleteTableRows(connectionID, database, tableName, rowsJSON, sessi
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+	appendAuditLog("table_delete", fmt.Sprintf("%d rows", len(rows)), connectionID, database, tableName)
+	return nil
 }
 
 // InsertTableRows inserts rows. rowsJSON: []map[string]interface{}. Uses table columns to build INSERT.
 func (a *App) InsertTableRows(connectionID, database, tableName, rowsJSON, sessionID string) error {
+	if err := requireWritableConnection(connectionID); err != nil {
+		return err
+	}
 	var rows []map[string]interface{}
 	if err := json.Unmarshal([]byte(rowsJSON), &rows); err != nil {
 		return err
@@ -2320,7 +2471,7 @@ func (a *App) InsertTableRows(connectionID, database, tableName, rowsJSON, sessi
 	}
 	tbl := db.QualTable(conn.Type, database, tableName)
 	batchSize := 100
-	return g.Transaction(func(tx *gorm.DB) error {
+	err = g.Transaction(func(tx *gorm.DB) error {
 		for i := 0; i < len(rows); i += batchSize {
 			end := i + batchSize
 			if end > len(rows) {
@@ -2357,12 +2508,17 @@ func (a *App) InsertTableRows(connectionID, database, tableName, rowsJSON, sessi
 				quoted[j] = quoteIdent(conn.Type, c)
 			}
 			sql := fmt.Sprintf("INSERT INTO %s (%s) VALUES %s", tbl, strings.Join(quoted, ", "), strings.Join(values, ", "))
-			if err := tx.Exec(sql).Error; err != nil {
-				return err
+			if e := tx.Exec(sql).Error; e != nil {
+				return e
 			}
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+	appendAuditLog("table_insert", fmt.Sprintf("%d rows", len(rows)), connectionID, database, tableName)
+	return nil
 }
 
 func quoteIdent(driver, name string) string {
@@ -2690,6 +2846,9 @@ func parseCSV(data []byte) ([]string, [][]string, error) {
 
 // ImportData imports data into a table. sessionID optional for tab isolation.
 func (a *App) ImportData(connectionID, database, tableName, filePath, format string, columnMappingJSON, sessionID string) string {
+	if err := requireWritableConnection(connectionID); err != nil {
+		return importError(err.Error())
+	}
 	g, err := getOrOpenDB(connectionID, sessionID)
 	if err != nil {
 		return importError(err.Error())
@@ -2835,6 +2994,7 @@ func (a *App) ImportData(connectionID, database, tableName, filePath, format str
 		inserted += len(batch)
 	}
 
+	appendAuditLog("table_import", fmt.Sprintf("file=%s format=%s rows=%d", filePath, format, len(rows)), connectionID, database, tableName)
 	result := map[string]interface{}{
 		"success":   true,
 		"inserted":  inserted,
@@ -3297,6 +3457,7 @@ func (a *App) ExportData(connectionID, database, tableName, format, sessionID st
 	default:
 		return exportError("unsupported format: " + format)
 	}
+	appendAuditLog("export", fmt.Sprintf("format=%s path=%s", format, path), connectionID, database, tableName)
 	data, _ := json.Marshal(map[string]interface{}{
 		"success":  true,
 		"format":   format,
