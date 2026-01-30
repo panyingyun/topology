@@ -28,6 +28,7 @@ const { t } = useI18n()
 const message = useMessage()
 
 const sidebarWidth = ref(260)
+const sidebarCollapsed = ref(false)
 const showConnectionManager = ref(false)
 const connectionManagerMode = ref<'create' | 'edit'>('create')
 const editingConnection = ref<Connection | null>(null)
@@ -391,10 +392,12 @@ const showEditorPosition = computed(() => activeTab.value?.type === 'query')
 
     <div class="flex flex-1 overflow-hidden min-h-0">
       <Sidebar
-        :width="sidebarWidth"
+        :width="sidebarCollapsed ? 48 : sidebarWidth"
+        :collapsed="sidebarCollapsed"
         :connections="connections"
         :connection-invalidation="connectionInvalidation"
         @update:width="sidebarWidth = $event"
+        @update:collapsed="sidebarCollapsed = $event"
         @new-connection="handleNewConnection"
         @table-selected="handleTableSelected"
         @table-query="handleTableQuery"

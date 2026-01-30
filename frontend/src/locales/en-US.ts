@@ -78,6 +78,9 @@ export default {
     importNavicat: 'Import Navicat',
     newTable: 'NEW TABLE',
     filter: 'Filter...',
+    more: 'More',
+    expand: 'Expand sidebar',
+    collapse: 'Collapse sidebar',
   },
   navicatImport: {
     result: 'Imported {imported} connection(s), skipped {skipped}',

@@ -78,6 +78,9 @@ export default {
     importNavicat: '导入 Navicat',
     newTable: '新建表',
     filter: '筛选...',
+    more: '更多',
+    expand: '展开侧边栏',
+    collapse: '收起侧边栏',
   },
   navicatImport: {
     result: '已导入 {imported} 个连接，跳过 {skipped} 个',

@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@monaco-editor/loader": "^1.4.0",
+    "@tanstack/vue-virtual": "^3.13.18",
     "lucide-vue-next": "^0.294.0",
     "monaco-editor": "^0.45.0",
     "naive-ui": "^2.38.1",

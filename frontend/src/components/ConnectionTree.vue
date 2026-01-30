@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { useVirtualizer } from '@tanstack/vue-virtual'
 import { ChevronRight, ChevronDown, Database, Table as TableIcon, Circle, FolderOpen } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { dataService } from '../services/dataService'
 import type { Connection, Table } from '../types'
 
 const { t } = useI18n()
+
+const ROW_HEIGHT = 28
 
 const props = defineProps<{
   searchQuery: string
@@ -61,10 +64,7 @@ const contextMenuConnection = computed(() => {
 })
 
 watch(() => props.connections, (newConns) => {
-  if (newConns && newConns.length > 0 && expandedConnections.value.size === 0) {
-    expandedConnections.value.add(newConns[0].id)
-    loadDatabases(newConns[0].id)
-  }
+  // 连接默认折叠，用户点击再展开（不再自动展开第一个连接）
   // Clear caches for deleted connections
   const connIds = new Set(newConns?.map(c => c.id) || [])
   Object.keys(databasesCache.value).forEach(id => {
@@ -266,6 +266,50 @@ const filteredConnections = computed(() => {
   )
 })
 
+// 扁平化树用于虚拟滚动
+type FlatItem =
+  | { type: 'connection'; conn: Connection }
+  | { type: 'database'; conn: Connection; db: string }
+  | { type: 'table'; conn: Connection; db: string; table: Table }
+
+const flatTreeItems = computed<FlatItem[]>(() => {
+  const out: FlatItem[] = []
+  for (const conn of filteredConnections.value) {
+    out.push({ type: 'connection', conn })
+    if (expandedConnections.value.has(conn.id)) {
+      const dbs = databasesCache.value[conn.id] || []
+      for (const db of dbs) {
+        out.push({ type: 'database', conn, db })
+        if (expandedDatabases.value.has(dbKey(conn.id, db))) {
+          const tables = tablesCache.value[dbKey(conn.id, db)] || []
+          for (const table of tables) {
+            out.push({ type: 'table', conn, db, table })
+          }
+        }
+      }
+    }
+  }
+  return out
+})
+
+const scrollRef = ref<HTMLElement | null>(null)
+const virtualizer = useVirtualizer(
+  computed(() => ({
+    count: flatTreeItems.value.length,
+    getScrollElement: () => scrollRef.value,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 5,
+  }))
+)
+
+const virtualItemsWithData = computed(() => {
+  const items = flatTreeItems.value
+  return virtualizer.value.getVirtualItems().map((v) => ({
+    vitem: v,
+    item: items[v.index],
+  }))
+})
+
 onMounted(() => {
   document.addEventListener('click', closeContextMenu)
 })
@@ -276,65 +320,66 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="space-y-1">
-    <div v-for="conn in filteredConnections" :key="conn.id" class="select-none">
-      <!-- Level 0: Connection -->
+  <div
+    ref="scrollRef"
+    class="flex-1 min-h-0 overflow-y-auto custom-scrollbar"
+  >
+    <div
+      :style="{ height: virtualizer.getTotalSize() + 'px', position: 'relative' }"
+      class="w-full"
+    >
       <div
-        @click="toggleConnection(conn.id)"
-        @contextmenu="handleConnectionContextMenu($event, conn)"
-        class="flex items-center gap-2 px-2 py-1.5 rounded theme-bg-hover cursor-pointer group transition-colors"
+        v-for="({ vitem, item }) in virtualItemsWithData"
+        :key="String(vitem.key)"
+        :data-index="vitem.index"
+        class="absolute left-0 right-0 px-2 select-none"
+        :style="{ transform: 'translateY(' + vitem.start + 'px)' }"
       >
-        <component
-          :is="expandedConnections.has(conn.id) ? ChevronDown : ChevronRight"
-          :size="14"
-          class="theme-text-muted shrink-0"
-        />
-        <Database :size="14" class="theme-text-muted shrink-0" />
-        <span class="text-xs theme-text flex-1 truncate">{{ conn.name }}</span>
-        <Circle
-          :size="6"
-          :class="conn.status === 'connected' ? 'text-green-500' : 'theme-text-muted'"
-          :fill="conn.status === 'connected' ? 'currentColor' : 'none'"
-          class="shrink-0"
-        />
-      </div>
-
-      <!-- Level 1: Databases -->
-      <div v-if="expandedConnections.has(conn.id)" class="ml-4 space-y-0.5 mt-1">
-        <div v-for="dbName in databasesCache[conn.id] || []" :key="dbKey(conn.id, dbName)" class="select-none">
-          <div
-            @click="toggleDatabase(conn.id, dbName)"
-            @contextmenu="handleDatabaseContextMenu($event, conn, dbName)"
-            class="flex items-center gap-2 px-2 py-1 rounded theme-bg-hover cursor-pointer group transition-colors"
-          >
-            <component
-              :is="expandedDatabases.has(dbKey(conn.id, dbName)) ? ChevronDown : ChevronRight"
-              :size="12"
-              class="theme-text-muted shrink-0"
-            />
-            <FolderOpen :size="12" class="theme-text-muted group-hover:text-[#1677ff] shrink-0" />
-            <span class="text-xs theme-text-muted group-hover:theme-text truncate">{{ dbName }}</span>
-          </div>
-
-          <!-- Level 2: Tables -->
-          <div
-            v-if="expandedDatabases.has(dbKey(conn.id, dbName))"
-            class="ml-4 space-y-0.5 mt-0.5"
-          >
-            <div
-              v-for="table in tablesCache[dbKey(conn.id, dbName)] || []"
-              :key="table.name"
-              @click="handleTableClick(conn.id, dbName, table.name)"
-              @contextmenu="handleTableContextMenu($event, conn, dbName, table.name)"
-              class="flex items-center gap-2 px-2 py-1 rounded theme-bg-hover cursor-pointer group transition-colors"
-            >
-              <TableIcon :size="12" class="theme-text-muted group-hover:text-[#1677ff] shrink-0" />
-              <span class="text-xs theme-text-muted group-hover:theme-text truncate">{{ table.name }}</span>
-              <span v-if="table.rowCount" class="text-[10px] theme-text-muted opacity-80 ml-auto">
-                {{ table.rowCount.toLocaleString() }}
-              </span>
-            </div>
-          </div>
+        <div
+          v-if="item?.type === 'connection'"
+          @click="toggleConnection(item.conn.id)"
+          @contextmenu="handleConnectionContextMenu($event, item.conn)"
+          class="flex items-center gap-2 px-2 py-1.5 rounded theme-bg-hover cursor-pointer group transition-colors"
+        >
+          <component
+            :is="expandedConnections.has(item.conn.id) ? ChevronDown : ChevronRight"
+            :size="14"
+            class="theme-text-muted shrink-0"
+          />
+          <Database :size="14" class="theme-text-muted shrink-0" />
+          <span class="text-xs theme-text flex-1 truncate">{{ item.conn.name }}</span>
+          <Circle
+            :size="6"
+            :class="item.conn.status === 'connected' ? 'text-green-500' : 'theme-text-muted'"
+            :fill="item.conn.status === 'connected' ? 'currentColor' : 'none'"
+            class="shrink-0"
+          />
+        </div>
+        <div
+          v-else-if="item?.type === 'database'"
+          @click="toggleDatabase(item.conn.id, item.db)"
+          @contextmenu="handleDatabaseContextMenu($event, item.conn, item.db)"
+          class="flex items-center gap-2 ml-4 px-2 py-1 rounded theme-bg-hover cursor-pointer group transition-colors"
+        >
+          <component
+            :is="expandedDatabases.has(dbKey(item.conn.id, item.db)) ? ChevronDown : ChevronRight"
+            :size="12"
+            class="theme-text-muted shrink-0"
+          />
+          <FolderOpen :size="12" class="theme-text-muted group-hover:text-[#1677ff] shrink-0" />
+          <span class="text-xs theme-text-muted group-hover:theme-text truncate">{{ item.db }}</span>
+        </div>
+        <div
+          v-else-if="item?.type === 'table'"
+          @click="handleTableClick(item.conn.id, item.db, item.table.name)"
+          @contextmenu="handleTableContextMenu($event, item.conn, item.db, item.table.name)"
+          class="flex items-center gap-2 ml-8 px-2 py-1 rounded theme-bg-hover cursor-pointer group transition-colors"
+        >
+          <TableIcon :size="12" class="theme-text-muted group-hover:text-[#1677ff] shrink-0" />
+          <span class="text-xs theme-text-muted group-hover:theme-text truncate">{{ item.table.name }}</span>
+          <span v-if="item.table.rowCount" class="text-[10px] theme-text-muted opacity-80 ml-auto">
+            {{ item.table.rowCount.toLocaleString() }}
+          </span>
         </div>
       </div>
     </div>
