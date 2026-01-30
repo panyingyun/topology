@@ -5,7 +5,7 @@ import { useMessage } from 'naive-ui'
 import { VxeGrid } from 'vxe-table'
 import type { VxeGridProps } from 'vxe-table'
 import { Download, ChevronDown, Filter } from 'lucide-vue-next'
-import type { QueryResult, UpdateRecord, ExportFormat } from '../types'
+import type { QueryResult, UpdateRecord, ExportFormat, TableSchema } from '../types'
 
 const { t } = useI18n()
 const message = useMessage()
@@ -14,12 +14,12 @@ const props = withDefaults(
   defineProps<{
     data: QueryResult
     queryText?: string
-    /** When true, disable cell editing (e.g. for query results). Table DataViewer keeps editable. */
     readonly?: boolean
-    /** When true, use light table theme + border-only selection (for query results). */
     useLightTable?: boolean
-    /** Optional cache stats for query results (hits / misses). */
     cacheStats?: { hits: number; misses: number }
+    /** When set (table view), enables batch delete, batch edit, paste-insert. */
+    tableContext?: { connectionId: string; database: string; tableName: string; sessionId: string } | null
+    schema?: TableSchema
   }>(),
   { readonly: false, useLightTable: false }
 )
@@ -28,17 +28,14 @@ const emit = defineEmits<{
   (e: 'update', updates: UpdateRecord[]): void
   (e: 'export', format: ExportFormat): void
   (e: 'batch-delete', rows: Record<string, unknown>[]): void
-  (e: 'paste-add', rows: Record<string, unknown>[]): void
+  (e: 'batch-edit', payload: { column: string; value: unknown; selectedRows: Record<string, unknown>[] }): void
+  (e: 'paste-insert', rows: Record<string, unknown>[]): void
 }>()
 
 const showExportMenu = ref(false)
-const showBatchUpdatePopover = ref(false)
-const batchUpdateCol = ref('')
-const batchUpdateVal = ref('')
 const pendingChanges = ref(0)
 const gridRef = ref<any>()
 const exportMenuRef = ref<HTMLElement | null>(null)
-const batchUpdateRef = ref<HTMLElement | null>(null)
 
 const gridOptions = ref<VxeGridProps>({
   border: true,
@@ -52,16 +49,27 @@ const gridOptions = ref<VxeGridProps>({
   data: [],
 })
 
+const batchEditColumn = ref('')
+const batchEditValue = ref('')
+const showBatchEditPopover = ref(false)
+const showPasteModal = ref(false)
+const pasteText = ref('')
+const batchEditRef = ref<HTMLElement | null>(null)
+
+const hasTableContext = computed(() => !!props.tableContext && !props.readonly)
+
 watch(
-  () => [props.data, props.readonly] as const,
+  () => [props.data, props.readonly, props.tableContext] as const,
   (tuple) => {
-    const [data, ro] = tuple
+    const [data, ro, ctx] = tuple
     if (!data?.columns) return
     const isReadonly = !!ro
+    const withCheckbox = !!ctx && !isReadonly
     gridOptions.value.editConfig = isReadonly
       ? { enabled: false }
       : { trigger: 'dblclick', mode: 'cell' }
-    const cols = data.columns.map((col: string) => {
+    gridOptions.value.checkboxConfig = withCheckbox ? { reserve: false } : undefined
+    const dataCols = data.columns.map((col: string) => {
       const colDef: Record<string, unknown> = {
         field: col,
         title: col,
@@ -78,13 +86,9 @@ watch(
       if (!isReadonly) (colDef as any).editRender = { name: 'input' }
       return colDef
     })
-    if (!isReadonly) {
-      gridOptions.value.checkboxConfig = { reserve: false }
-      gridOptions.value.columns = [{ type: 'checkbox', width: 48 }, ...cols]
-    } else {
-      ;(gridOptions.value as any).checkboxConfig = undefined
-      gridOptions.value.columns = cols
-    }
+    gridOptions.value.columns = withCheckbox
+      ? ([{ type: 'checkbox', width: 48 } as Record<string, unknown>, ...dataCols] as any)
+      : dataCols
     gridOptions.value.data = data.rows
     pendingChanges.value = 0
   },
@@ -159,7 +163,11 @@ const commitChanges = () => {
     const recordset = gridRef.value.getRecordset()
     if (recordset?.updateRecords?.length) {
       const updates = buildUpdatesFromRecordset(recordset, props.data.columns)
-      if (updates.length) emit('update', updates)
+      if (updates.length) {
+        emit('update', updates)
+      }
+      pendingChanges.value = 0
+      gridRef.value.reloadRow(recordset.updateRecords, null)
     }
   } catch (error) {
     console.error('Error committing changes:', error)
@@ -188,18 +196,82 @@ const handleExport = (format: ExportFormat) => {
   showExportMenu.value = false
 }
 
+function getSelectedRows(): Record<string, unknown>[] {
+  if (!gridRef.value) return []
+  try {
+    const recs = (gridRef.value as any).getCheckboxRecords?.() ?? []
+    return recs.map((r: Record<string, unknown>) => ({ ...r }))
+  } catch {
+    return []
+  }
+}
+
+const handleBatchDelete = () => {
+  const rows = getSelectedRows()
+  if (!rows.length) {
+    message.warning(t('dataGrid.selectRowsFirst'))
+    return
+  }
+  emit('batch-delete', rows)
+}
+
+const handleBatchEditApply = () => {
+  const col = batchEditColumn.value
+  if (!col) {
+    message.warning(t('dataGrid.selectColumnFirst'))
+    return
+  }
+  const rows = getSelectedRows()
+  if (!rows.length) {
+    message.warning(t('dataGrid.selectRowsFirst'))
+    return
+  }
+  let val: unknown = batchEditValue.value
+  if (/^-?\d+$/.test(String(val))) val = Number(val)
+  else if (/^-?\d*\.\d+$/.test(String(val))) val = parseFloat(String(val))
+  emit('batch-edit', { column: col, value: val, selectedRows: rows })
+  showBatchEditPopover.value = false
+  batchEditColumn.value = ''
+  batchEditValue.value = ''
+}
+
+const handlePasteInsert = () => {
+  const text = pasteText.value.trim()
+  if (!text) {
+    message.warning(t('dataGrid.pasteNotEmpty'))
+    return
+  }
+  const cols = props.data?.columns ?? []
+  if (!cols.length) return
+  const lines = text.split(/\r?\n/).filter((s) => s.trim())
+  const rows: Record<string, unknown>[] = []
+  for (const line of lines) {
+    const cells = line.split(/\t/).map((c) => c.trim())
+    const row: Record<string, unknown> = {}
+    cols.forEach((c, i) => {
+      row[c] = cells[i] !== undefined && cells[i] !== '' ? cells[i] : null
+    })
+    rows.push(row)
+  }
+  if (!rows.length) {
+    message.warning(t('dataGrid.pasteNotEmpty'))
+    return
+  }
+  emit('paste-insert', rows)
+  showPasteModal.value = false
+  pasteText.value = ''
+}
+
 const exportFormats = computed(() => [
   { label: t('dataGrid.csv'), value: 'csv' as ExportFormat },
   { label: t('dataGrid.json'), value: 'json' as ExportFormat },
   { label: t('dataGrid.sql'), value: 'sql' as ExportFormat },
 ])
 
-// Close export menu when clicking outside
 const handleClickOutside = (e: MouseEvent) => {
   const target = e.target as HTMLElement
-  if (exportMenuRef.value && !exportMenuRef.value.contains(target)) {
-    showExportMenu.value = false
-  }
+  if (exportMenuRef.value && !exportMenuRef.value.contains(target)) showExportMenu.value = false
+  if (batchEditRef.value && !batchEditRef.value.contains(target)) showBatchEditPopover.value = false
 }
 
 onMounted(() => {
@@ -223,6 +295,69 @@ onUnmounted(() => {
         </span>
       </div>
       <div class="flex items-center gap-2">
+        <template v-if="hasTableContext">
+          <button
+            @click="handleBatchDelete"
+            class="px-3 py-1 theme-bg-input theme-bg-input-hover theme-text text-xs rounded transition-colors"
+          >
+            {{ t('dataGrid.batchDelete') }}
+          </button>
+          <div class="relative" ref="batchEditRef">
+            <button
+              @click.stop="showBatchEditPopover = !showBatchEditPopover"
+              class="px-3 py-1 theme-bg-input theme-bg-input-hover theme-text text-xs rounded transition-colors"
+            >
+              {{ t('dataGrid.batchEdit') }}
+            </button>
+            <Transition name="fade">
+              <div
+                v-if="showBatchEditPopover"
+                class="absolute left-0 top-full mt-1 theme-bg-panel border theme-border rounded shadow-lg p-3 min-w-[200px] z-50 space-y-2"
+                @click.stop
+              >
+                <div>
+                  <label class="block text-xs theme-text-muted mb-1">{{ t('dataGrid.column') }}</label>
+                  <select
+                    v-model="batchEditColumn"
+                    class="w-full theme-bg-input theme-text rounded px-2 py-1 text-xs border theme-border"
+                  >
+                    <option value="">{{ t('dataGrid.selectColumn') }}</option>
+                    <option v-for="c in data?.columns" :key="c" :value="c">{{ c }}</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs theme-text-muted mb-1">{{ t('dataGrid.value') }}</label>
+                  <input
+                    v-model="batchEditValue"
+                    type="text"
+                    class="w-full theme-bg-input theme-text rounded px-2 py-1 text-xs border theme-border"
+                    :placeholder="t('dataGrid.value')"
+                  />
+                </div>
+                <div class="flex gap-2">
+                  <button
+                    @click="handleBatchEditApply"
+                    class="px-3 py-1 bg-[#1677ff] hover:bg-[#4096ff] text-white text-xs rounded"
+                  >
+                    {{ t('dataGrid.applyToSelected') }}
+                  </button>
+                  <button
+                    @click="showBatchEditPopover = false"
+                    class="px-3 py-1 theme-bg-input theme-bg-input-hover theme-text text-xs rounded"
+                  >
+                    {{ t('common.cancel') }}
+                  </button>
+                </div>
+              </div>
+            </Transition>
+          </div>
+          <button
+            @click="showPasteModal = true"
+            class="px-3 py-1 theme-bg-input theme-bg-input-hover theme-text text-xs rounded transition-colors"
+          >
+            {{ t('dataGrid.addFromPaste') }}
+          </button>
+        </template>
         <button
           v-if="!props.readonly && pendingChanges > 0"
           @click="commitChanges"
@@ -265,6 +400,41 @@ onUnmounted(() => {
         </div>
       </div>
     </div>
+    <!-- Paste-insert modal -->
+    <Teleport to="body">
+      <Transition name="fade">
+        <div
+          v-if="showPasteModal"
+          class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50"
+          @click.self="showPasteModal = false"
+        >
+          <div class="theme-bg-panel rounded-lg border theme-border shadow-xl w-full max-w-lg p-4" @click.stop>
+            <h3 class="text-sm font-semibold theme-text mb-2">{{ t('dataGrid.addFromPaste') }}</h3>
+            <p class="text-xs theme-text-muted mb-2">{{ t('dataGrid.pasteHint') }}</p>
+            <textarea
+              v-model="pasteText"
+              class="w-full theme-bg-input theme-text rounded border theme-border p-2 text-xs font-mono h-32 resize-y"
+              :placeholder="t('dataGrid.pastePlaceholder')"
+            />
+            <div class="flex justify-end gap-2 mt-3">
+              <button
+                @click="showPasteModal = false"
+                class="px-3 py-1 theme-bg-input theme-bg-input-hover theme-text text-xs rounded"
+              >
+                {{ t('common.cancel') }}
+              </button>
+              <button
+                @click="handlePasteInsert"
+                class="px-3 py-1 bg-[#1677ff] hover:bg-[#4096ff] text-white text-xs rounded"
+              >
+                {{ t('dataGrid.insert') }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
     <div
       class="flex-1 overflow-hidden"
       :class="{ 'data-grid-light': props.useLightTable }"

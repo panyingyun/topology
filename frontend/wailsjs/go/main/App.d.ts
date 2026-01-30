@@ -5,7 +5,11 @@ export function AnalyzeSQL(arg1:string,arg2:string):Promise<string>;
 
 export function BackupNow(arg1:string):Promise<string>;
 
+export function BeginTx(arg1:string,arg2:string):Promise<void>;
+
 export function ClearQueryHistory():Promise<void>;
+
+export function CommitTx(arg1:string,arg2:string):Promise<void>;
 
 export function CreateConnection(arg1:string):Promise<void>;
 
@@ -49,6 +53,8 @@ export function GetTableSchema(arg1:string,arg2:string,arg3:string,arg4:string):
 
 export function GetTables(arg1:string,arg2:string,arg3:string):Promise<string>;
 
+export function GetTransactionStatus(arg1:string,arg2:string):Promise<string>;
+
 export function ImportData(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string):Promise<string>;
 
 export function ImportDataPreview(arg1:string,arg2:string):Promise<string>;
@@ -70,6 +76,8 @@ export function ReconnectConnection(arg1:string):Promise<void>;
 export function ReleaseSession(arg1:string,arg2:string):Promise<void>;
 
 export function RestoreBackup(arg1:string,arg2:string):Promise<string>;
+
+export function RollbackTx(arg1:string,arg2:string):Promise<void>;
 
 export function SaveSnippet(arg1:string,arg2:string):Promise<void>;
 

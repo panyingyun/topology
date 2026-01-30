@@ -9,6 +9,10 @@ import {
   ExportData,
   DeleteTableRows,
   InsertTableRows,
+  BeginTx,
+  CommitTx,
+  RollbackTx,
+  GetTransactionStatus,
 } from '../../wailsjs/go/main/App'
 
 /** Optional sessionId for per-tab DB session isolation; pass '' for shared connection. */
@@ -133,5 +137,26 @@ export const dataService = {
   ): Promise<void> {
     const rowsJSON = JSON.stringify(rows)
     await InsertTableRows(connectionId, database, tableName, rowsJSON, sessionId)
+  },
+
+  async beginTx(connectionId: string, sessionId: string = defaultSession): Promise<void> {
+    await BeginTx(connectionId, sessionId)
+  },
+
+  async commitTx(connectionId: string, sessionId: string = defaultSession): Promise<void> {
+    await CommitTx(connectionId, sessionId)
+  },
+
+  async rollbackTx(connectionId: string, sessionId: string = defaultSession): Promise<void> {
+    await RollbackTx(connectionId, sessionId)
+  },
+
+  async getTransactionStatus(
+    connectionId: string,
+    sessionId: string = defaultSession
+  ): Promise<{ active: boolean }> {
+    const raw = await GetTransactionStatus(connectionId, sessionId)
+    const o = JSON.parse(raw) as { active?: boolean }
+    return { active: o.active ?? false }
   },
 }

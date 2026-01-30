@@ -291,6 +291,8 @@ var (
 	queryCacheOrder     []string
 	queryCacheHits      int64
 	queryCacheMisses    int64
+	txMu                sync.Mutex
+	activeTx            = make(map[string]*gorm.DB) // key = txKey(connID, sessionID)
 )
 
 type queryCacheEntry struct {
@@ -603,10 +605,25 @@ func effectiveHostPort(connID string, c *Connection) (host string, port int, err
 	return "127.0.0.1", localPort, nil
 }
 
+func txKey(connID, sessionID string) string {
+	if sessionID == "" {
+		return connID
+	}
+	return connID + "\x00" + sessionID
+}
+
 // getOrOpenDB returns a working DB for the connection (and optional session). Uses cache if ping succeeds, otherwise reconnects.
+// When an active transaction exists for conn+session, returns that tx instead.
 // Empty sessionID uses shared connection per connID; non-empty isolates per tab/session.
 // When SSH tunnel is enabled (MySQL only), DB traffic goes through the tunnel.
 func getOrOpenDB(connID, sessionID string) (*gorm.DB, error) {
+	txMu.Lock()
+	if tx := activeTx[txKey(connID, sessionID)]; tx != nil {
+		txMu.Unlock()
+		return tx, nil
+	}
+	txMu.Unlock()
+
 	conn := getConnByID(connID)
 	if conn == nil {
 		return nil, fmt.Errorf("connection not found: %s", connID)
@@ -631,6 +648,77 @@ func getOrOpenDB(connID, sessionID string) (*gorm.DB, error) {
 		db.Close(connID, sessionID)
 	}
 	return db.Open(connID, sessionID, driver, dsn)
+}
+
+// BeginTx starts a transaction for the given connection and session. Fails if one is already active.
+func (a *App) BeginTx(connectionID, sessionID string) error {
+	g, err := getOrOpenDB(connectionID, sessionID)
+	if err != nil {
+		return err
+	}
+	txMu.Lock()
+	defer txMu.Unlock()
+	key := txKey(connectionID, sessionID)
+	if activeTx[key] != nil {
+		return fmt.Errorf("transaction already active")
+	}
+	tx := g.Begin()
+	if tx.Error != nil {
+		return tx.Error
+	}
+	activeTx[key] = tx
+	return nil
+}
+
+// CommitTx commits the active transaction for the connection+session.
+func (a *App) CommitTx(connectionID, sessionID string) error {
+	txMu.Lock()
+	tx := activeTx[txKey(connectionID, sessionID)]
+	delete(activeTx, txKey(connectionID, sessionID))
+	txMu.Unlock()
+	if tx == nil {
+		return fmt.Errorf("no active transaction")
+	}
+	return tx.Commit().Error
+}
+
+// RollbackTx rolls back the active transaction for the connection+session.
+func (a *App) RollbackTx(connectionID, sessionID string) error {
+	txMu.Lock()
+	tx := activeTx[txKey(connectionID, sessionID)]
+	delete(activeTx, txKey(connectionID, sessionID))
+	txMu.Unlock()
+	if tx == nil {
+		return fmt.Errorf("no active transaction")
+	}
+	return tx.Rollback().Error
+}
+
+// GetTransactionStatus returns JSON {"active": true|false} for the connection+session.
+func (a *App) GetTransactionStatus(connectionID, sessionID string) string {
+	txMu.Lock()
+	active := activeTx[txKey(connectionID, sessionID)] != nil
+	txMu.Unlock()
+	out := struct {
+		Active bool `json:"active"`
+	}{Active: active}
+	b, _ := json.Marshal(out)
+	return string(b)
+}
+
+func clearActiveTxForConnection(connID string) {
+	txMu.Lock()
+	defer txMu.Unlock()
+	prefix := connID + "\x00"
+	for k := range activeTx {
+		if k == connID || strings.HasPrefix(k, prefix) {
+			tx := activeTx[k]
+			delete(activeTx, k)
+			if tx != nil {
+				_ = tx.Rollback().Error
+			}
+		}
+	}
 }
 
 // GetConnections returns all database connections
@@ -824,6 +912,7 @@ func (a *App) UpdateConnection(connJSON string) error {
 	if conn.ID == "" {
 		return fmt.Errorf("connection ID required")
 	}
+	clearActiveTxForConnection(conn.ID)
 	db.CloseConnection(conn.ID)
 	sshtunnel.Stop(conn.ID)
 	schemaMetaMu.Lock()
@@ -846,6 +935,7 @@ func (a *App) UpdateConnection(connJSON string) error {
 
 // ReconnectConnection closes cached DB and SSH tunnel for the connection so it reconnects on next use.
 func (a *App) ReconnectConnection(id string) error {
+	clearActiveTxForConnection(id)
 	db.CloseConnection(id)
 	sshtunnel.Stop(id)
 	schemaMetaMu.Lock()
@@ -857,6 +947,7 @@ func (a *App) ReconnectConnection(id string) error {
 // DeleteConnection deletes a connection by ID
 func (a *App) DeleteConnection(id string) error {
 	ensureConnectionsLoaded()
+	clearActiveTxForConnection(id)
 	db.CloseConnection(id)
 	sshtunnel.Stop(id)
 	schemaMetaMu.Lock()
@@ -2113,8 +2204,7 @@ func (a *App) UpdateTableData(connectionID, database, tableName, updatesJSON, se
 	})
 }
 
-// DeleteTableRows deletes rows by primary key. rowsJSON is JSON array of row objects (must include PK columns).
-// If no PK, uses all columns for WHERE. sessionID optional for tab isolation.
+// DeleteTableRows deletes rows by matching all columns (or PK columns when available). rowsJSON: []map[string]interface{}.
 func (a *App) DeleteTableRows(connectionID, database, tableName, rowsJSON, sessionID string) error {
 	var rows []map[string]interface{}
 	if err := json.Unmarshal([]byte(rowsJSON), &rows); err != nil {
@@ -2135,34 +2225,32 @@ func (a *App) DeleteTableRows(connectionID, database, tableName, rowsJSON, sessi
 	if err != nil {
 		return err
 	}
-	var pkCols []string
+	var keyCols []string
 	for _, c := range info.Columns {
 		if c.IsPrimaryKey {
-			pkCols = append(pkCols, c.Name)
+			keyCols = append(keyCols, c.Name)
 		}
 	}
-	if len(pkCols) == 0 {
+	if len(keyCols) == 0 {
 		for _, c := range info.Columns {
-			pkCols = append(pkCols, c.Name)
+			keyCols = append(keyCols, c.Name)
 		}
-	}
-	if len(pkCols) == 0 {
-		return fmt.Errorf("table has no columns")
 	}
 	tbl := db.QualTable(conn.Type, database, tableName)
 	return g.Transaction(func(tx *gorm.DB) error {
-		for _, r := range rows {
-			conds := make([]string, 0, len(pkCols))
-			args := make([]interface{}, 0, len(pkCols))
-			for _, col := range pkCols {
-				v, ok := r[col]
+		for _, row := range rows {
+			var args []interface{}
+			var preds []string
+			for _, col := range keyCols {
+				v, ok := row[col]
 				if !ok {
-					return fmt.Errorf("row missing PK column %q", col)
+					return fmt.Errorf("row missing key column %q", col)
 				}
-				conds = append(conds, quoteIdent(conn.Type, col)+" = ?")
+				qc := quoteIdent(conn.Type, col)
+				preds = append(preds, qc+" = ?")
 				args = append(args, v)
 			}
-			q := fmt.Sprintf("DELETE FROM %s WHERE %s", tbl, strings.Join(conds, " AND "))
+			q := fmt.Sprintf("DELETE FROM %s WHERE %s", tbl, strings.Join(preds, " AND "))
 			if res := tx.Exec(q, args...); res.Error != nil {
 				return res.Error
 			}
@@ -2171,8 +2259,7 @@ func (a *App) DeleteTableRows(connectionID, database, tableName, rowsJSON, sessi
 	})
 }
 
-// InsertTableRows inserts rows. rowsJSON is JSON array of row objects (keys = column names).
-// Columns not in a row are omitted; optionally use schema for order. sessionID optional for tab isolation.
+// InsertTableRows inserts rows. rowsJSON: []map[string]interface{}. Uses table columns to build INSERT.
 func (a *App) InsertTableRows(connectionID, database, tableName, rowsJSON, sessionID string) error {
 	var rows []map[string]interface{}
 	if err := json.Unmarshal([]byte(rowsJSON), &rows); err != nil {
@@ -2189,38 +2276,51 @@ func (a *App) InsertTableRows(connectionID, database, tableName, rowsJSON, sessi
 	if conn == nil {
 		return fmt.Errorf("connection not found")
 	}
-	info, err := db.TableSchema(g, conn.Type, database, tableName)
+	tableCols, err := getTableColumns(g, conn.Type, database, tableName)
 	if err != nil {
 		return err
 	}
-	allCols := make([]string, 0, len(info.Columns))
-	for _, c := range info.Columns {
-		allCols = append(allCols, c.Name)
-	}
-	if len(allCols) == 0 {
-		return fmt.Errorf("table has no columns")
-	}
 	tbl := db.QualTable(conn.Type, database, tableName)
+	batchSize := 100
 	return g.Transaction(func(tx *gorm.DB) error {
-		for _, r := range rows {
-			cols := make([]string, 0)
-			vals := make([]interface{}, 0)
-			for _, col := range allCols {
-				v, ok := r[col]
-				if !ok {
-					continue
-				}
-				cols = append(cols, quoteIdent(conn.Type, col))
-				vals = append(vals, v)
+		for i := 0; i < len(rows); i += batchSize {
+			end := i + batchSize
+			if end > len(rows) {
+				end = len(rows)
 			}
-			if len(cols) == 0 {
+			batch := rows[i:end]
+			var insertCols []string
+			for _, col := range tableCols {
+				for _, row := range batch {
+					if _, ok := row[col]; ok {
+						insertCols = append(insertCols, col)
+						break
+					}
+				}
+			}
+			if len(insertCols) == 0 {
 				continue
 			}
-			placeholders := strings.Repeat("?,", len(cols))
-			placeholders = placeholders[:len(placeholders)-1]
-			q := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", tbl, strings.Join(cols, ", "), placeholders)
-			if res := tx.Exec(q, vals...); res.Error != nil {
-				return res.Error
+			var values []string
+			for _, row := range batch {
+				var parts []string
+				for _, col := range insertCols {
+					v := row[col]
+					if v == nil {
+						parts = append(parts, "NULL")
+					} else {
+						parts = append(parts, escapeSQLValue(fmt.Sprint(v), conn.Type))
+					}
+				}
+				values = append(values, "("+strings.Join(parts, ", ")+")")
+			}
+			quoted := make([]string, len(insertCols))
+			for j, c := range insertCols {
+				quoted[j] = quoteIdent(conn.Type, c)
+			}
+			sql := fmt.Sprintf("INSERT INTO %s (%s) VALUES %s", tbl, strings.Join(quoted, ", "), strings.Join(values, ", "))
+			if err := tx.Exec(sql).Error; err != nil {
+				return err
 			}
 		}
 		return nil

@@ -223,11 +223,13 @@
 
 **验收 Checklist**：
 
-- [ ] 支持多选后批量删除、批量修改。
-- [ ] 支持从剪贴板粘贴多行并插入。
-- [ ] 可开启/提交/回滚事务，状态可见。
+- [x] 支持多选后批量删除、批量修改。
+- [x] 支持从剪贴板粘贴多行并插入。
+- [x] 可开启/提交/回滚事务，状态可见。
 
 **对应 improve-plan**：3.(1)(2)(3)。
+
+**2.2 完成说明**：批量操作：DataGrid 表视图下增加 checkbox 多选；批量删除（DeleteTableRows，按 PK 或全列匹配）、批量修改（同列同值，选列+填值+应用到选中）、粘贴新增（弹窗粘贴 Tab 分隔数据→InsertTableRows，按列顺序映射）。表更新已接后端（updateTableData + 重载），DataViewer 拉取 schema 用于校验与批量删除。事务支持：后端 BeginTx/CommitTx/RollbackTx/GetTransactionStatus，getOrOpenDB 优先返回 activeTx；DataViewer 工具栏「开启事务」/「提交」/「回滚」与「事务中」状态。数据验证：提交前校验非空（validateUpdates、validateInsertRows），违反则 message 提示不提交。
 
 ---
 
@@ -463,7 +465,7 @@
 | 1.5 | 定时备份 + 文档 | 已完成 | 见 1.5 完成说明 |
 | 1.6 | 稳定性收尾 + 阶段复盘 | 已完成 | 见 1.6 完成说明；总结见 [phase1-summary.md](phase1-summary.md) |
 | 2.1 | 查询缓存 + 索引建议 | 已完成 | 见 2.1 完成说明 |
-| 2.2 | 批量操作 + 事务 | 待开始 | - |
+| 2.2 | 批量操作 + 事务 | 已完成 | 见 2.2 完成说明 |
 | 2.3 | Undo/Redo + 模板与参数化 | 待开始 | - |
 | 2.4 | ER 图 + 执行计划增强 | 待开始 | - |
 | 2.5 | 数据对比 + Schema 同步 | 待开始 | - |

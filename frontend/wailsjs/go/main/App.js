@@ -10,8 +10,16 @@ export function BackupNow(arg1) {
   return window['go']['main']['App']['BackupNow'](arg1);
 }
 
+export function BeginTx(arg1, arg2) {
+  return window['go']['main']['App']['BeginTx'](arg1, arg2);
+}
+
 export function ClearQueryHistory() {
   return window['go']['main']['App']['ClearQueryHistory']();
+}
+
+export function CommitTx(arg1, arg2) {
+  return window['go']['main']['App']['CommitTx'](arg1, arg2);
 }
 
 export function CreateConnection(arg1) {
@@ -98,6 +106,10 @@ export function GetTables(arg1, arg2, arg3) {
   return window['go']['main']['App']['GetTables'](arg1, arg2, arg3);
 }
 
+export function GetTransactionStatus(arg1, arg2) {
+  return window['go']['main']['App']['GetTransactionStatus'](arg1, arg2);
+}
+
 export function ImportData(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
   return window['go']['main']['App']['ImportData'](arg1, arg2, arg3, arg4, arg5, arg6, arg7);
 }
@@ -140,6 +152,10 @@ export function ReleaseSession(arg1, arg2) {
 
 export function RestoreBackup(arg1, arg2) {
   return window['go']['main']['App']['RestoreBackup'](arg1, arg2);
+}
+
+export function RollbackTx(arg1, arg2) {
+  return window['go']['main']['App']['RollbackTx'](arg1, arg2);
 }
 
 export function SaveSnippet(arg1, arg2) {

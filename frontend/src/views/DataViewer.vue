@@ -6,7 +6,7 @@ import { useMessage } from 'naive-ui'
 import DataGrid from '../components/DataGrid.vue'
 import DataImporter from '../components/DataImporter.vue'
 import { dataService } from '../services/dataService'
-import type { TableData, UpdateRecord, ExportFormat, QueryResult, ImportResult } from '../types'
+import type { TableData, UpdateRecord, ExportFormat, QueryResult, ImportResult, TableSchema } from '../types'
 
 const { t } = useI18n()
 const message = useMessage()
@@ -22,6 +22,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
+  (e: 'update', updates: UpdateRecord[]): void
   (e: 'clear-import-trigger'): void
 }>()
 
@@ -35,6 +36,7 @@ const tableData = ref<TableData>({
   pageSize: 100,
 })
 
+const schema = ref<TableSchema | null>(null)
 const isLoading = ref(false)
 const currentPage = ref(1)
 const pageSize = ref(100)
@@ -52,7 +54,8 @@ const loadTableData = async (page: number = 1) => {
       props.database,
       props.tableName,
       pageSize.value,
-      offset
+      offset,
+      props.tabId ?? ''
     )
     const timeoutPromise = new Promise<TableData>((_, reject) =>
       setTimeout(() => reject(new Error('timeout')), LOAD_TIMEOUT_MS)
@@ -66,8 +69,26 @@ const loadTableData = async (page: number = 1) => {
       pageSize: data?.pageSize ?? pageSize.value,
     }
     currentPage.value = page
+    try {
+      const sch = await dataService.getTableSchema(
+        props.connectionId,
+        props.database,
+        props.tableName,
+        props.tabId ?? ''
+      )
+      schema.value = sch?.columns?.length ? sch : null
+    } catch {
+      schema.value = null
+    }
+    try {
+      await fetchTxStatus()
+    } catch {
+      txActive.value = false
+    }
   } catch (error) {
     console.error('Failed to load table data:', error)
+    schema.value = null
+    txActive.value = false
     tableData.value = {
       columns: [],
       rows: [],
@@ -97,8 +118,22 @@ const handlePageSizeChange = (size: number) => {
   loadTableData(1)
 }
 
+function validateUpdates(updates: UpdateRecord[]): boolean {
+  const cols = schema.value?.columns ?? []
+  const byName = Object.fromEntries(cols.map((c) => [c.name, c]))
+  for (const u of updates) {
+    const col = byName[u.column]
+    if (col && !col.nullable && (u.newValue == null || u.newValue === '')) {
+      message.error(t('table.validationNonNull', { column: u.column }))
+      return false
+    }
+  }
+  return true
+}
+
 const handleUpdate = async (updates: UpdateRecord[]) => {
   if (!updates.length) return
+  if (!validateUpdates(updates)) return
   try {
     await dataService.updateTableData(
       props.connectionId,
@@ -109,9 +144,9 @@ const handleUpdate = async (updates: UpdateRecord[]) => {
     )
     await loadTableData(currentPage.value)
     message.success(t('common.success'))
-  } catch (e) {
-    console.error('Failed to update table data:', e)
-    message.error(t('common.error') + ': ' + (e instanceof Error ? e.message : 'Update failed'))
+    emit('update', updates)
+  } catch (error) {
+    message.error(t('common.error') + ': ' + (error instanceof Error ? error.message : 'Update failed'))
   }
 }
 
@@ -147,6 +182,130 @@ const queryResult = computed<QueryResult>(() => ({
   rowCount: tableData.value.rows.length,
   totalRows: tableData.value.totalRows,
 }))
+
+const tableContext = computed(() =>
+  props.connectionId && props.database && props.tableName
+    ? {
+        connectionId: props.connectionId,
+        database: props.database,
+        tableName: props.tableName,
+        sessionId: props.tabId ?? '',
+      }
+    : null
+)
+
+const handleBatchDelete = async (rows: Record<string, unknown>[]) => {
+  if (!rows.length) return
+  try {
+    await dataService.deleteTableRows(
+      props.connectionId,
+      props.database,
+      props.tableName,
+      rows,
+      props.tabId ?? ''
+    )
+    await loadTableData(currentPage.value)
+    message.success(t('common.success'))
+  } catch (error) {
+    message.error(t('common.error') + ': ' + (error instanceof Error ? error.message : 'Delete failed'))
+  }
+}
+
+const handleBatchEdit = async (payload: {
+  column: string
+  value: unknown
+  selectedRows: Record<string, unknown>[]
+}) => {
+  const { column, value, selectedRows } = payload
+  const updates: UpdateRecord[] = []
+  for (const row of selectedRows) {
+    const oldVal = row[column]
+    if (oldVal === value && JSON.stringify(oldVal) === JSON.stringify(value)) continue
+    updates.push({
+      rowIndex: 0,
+      column,
+      oldValue: oldVal,
+      newValue: value,
+    })
+  }
+  if (!updates.length) return
+  await handleUpdate(updates)
+}
+
+function validateInsertRows(rows: Record<string, unknown>[]): boolean {
+  const cols = schema.value?.columns ?? []
+  const nonNullable = new Set(cols.filter((c) => !c.nullable).map((c) => c.name))
+  for (const row of rows) {
+    for (const col of nonNullable) {
+      const v = row[col]
+      if (v == null || v === '') {
+        message.error(t('table.validationNonNull', { column: col }))
+        return false
+      }
+    }
+  }
+  return true
+}
+
+const handlePasteInsert = async (rows: Record<string, unknown>[]) => {
+  if (!rows.length) return
+  if (!validateInsertRows(rows)) return
+  try {
+    await dataService.insertTableRows(
+      props.connectionId,
+      props.database,
+      props.tableName,
+      rows,
+      props.tabId ?? ''
+    )
+    await loadTableData(currentPage.value)
+    message.success(t('common.success'))
+  } catch (error) {
+    message.error(t('common.error') + ': ' + (error instanceof Error ? error.message : 'Insert failed'))
+  }
+}
+
+const txActive = ref(false)
+const fetchTxStatus = async () => {
+  try {
+    const s = await dataService.getTransactionStatus(props.connectionId, props.tabId ?? '')
+    txActive.value = s.active
+  } catch {
+    txActive.value = false
+  }
+}
+
+const handleBeginTx = async () => {
+  try {
+    await dataService.beginTx(props.connectionId, props.tabId ?? '')
+    await fetchTxStatus()
+    message.success(t('table.txBegun'))
+  } catch (error) {
+    message.error(t('common.error') + ': ' + (error instanceof Error ? error.message : 'Begin failed'))
+  }
+}
+
+const handleCommitTx = async () => {
+  try {
+    await dataService.commitTx(props.connectionId, props.tabId ?? '')
+    await fetchTxStatus()
+    await loadTableData(currentPage.value)
+    message.success(t('table.txCommitted'))
+  } catch (error) {
+    message.error(t('common.error') + ': ' + (error instanceof Error ? error.message : 'Commit failed'))
+  }
+}
+
+const handleRollbackTx = async () => {
+  try {
+    await dataService.rollbackTx(props.connectionId, props.tabId ?? '')
+    await fetchTxStatus()
+    await loadTableData(currentPage.value)
+    message.success(t('table.txRolledBack'))
+  } catch (error) {
+    message.error(t('common.error') + ': ' + (error instanceof Error ? error.message : 'Rollback failed'))
+  }
+}
 
 onMounted(() => {
   loadTableData(1)
@@ -195,7 +354,29 @@ watch(
         </span>
       </div>
 
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-2 flex-wrap">
+        <template v-if="txActive">
+          <span class="text-xs text-amber-400">{{ t('table.inTransaction') }}</span>
+          <button
+            @click="handleCommitTx"
+            class="px-2 py-1 bg-green-600 hover:bg-green-500 text-white text-xs rounded"
+          >
+            {{ t('table.commitTx') }}
+          </button>
+          <button
+            @click="handleRollbackTx"
+            class="px-2 py-1 theme-bg-input theme-bg-input-hover theme-text text-xs rounded"
+          >
+            {{ t('table.rollbackTx') }}
+          </button>
+        </template>
+        <button
+          v-else
+          @click="handleBeginTx"
+          class="px-2 py-1 theme-bg-input theme-bg-input-hover theme-text text-xs rounded"
+        >
+          {{ t('table.beginTx') }}
+        </button>
         <button
           @click="showImporter = true"
           class="flex items-center gap-1.5 px-3 py-1 bg-[#1677ff] hover:bg-[#4096ff] text-white text-xs rounded transition-colors font-semibold"
@@ -232,8 +413,13 @@ watch(
       <DataGrid
         v-if="tableData.rows.length > 0"
         :data="queryResult"
+        :table-context="tableContext"
+        :schema="schema ?? undefined"
         @update="handleUpdate"
         @export="handleExport"
+        @batch-delete="handleBatchDelete"
+        @batch-edit="handleBatchEdit"
+        @paste-insert="handlePasteInsert"
       />
       <div v-else-if="isLoading" class="h-full flex items-center justify-center theme-text-muted">
         <n-spin :show="true" size="medium">
